@@ -1,0 +1,71 @@
+{
+  "suite": "Smart Contract Tests",
+  "timestamp": "2026-03-04T17:27:36.790Z",
+  "tests": [
+    {
+      "name": "Sepolia RPC Connection",
+      "status": "PASS",
+      "detail": "Connected to chainId: 11155111",
+      "data": null
+    },
+    {
+      "name": "Sepolia Contract Deployed",
+      "status": "PASS",
+      "detail": "Contract at 0x656e66d52bc4ce97e899BD680c4719111b893833",
+      "data": null
+    },
+    {
+      "name": "BSC Testnet RPC Connection",
+      "status": "PASS",
+      "detail": "Connected to chainId: 97",
+      "data": null
+    },
+    {
+      "name": "BSC Contract Deployed",
+      "status": "PASS",
+      "detail": "Contract at 0x0bC82C1d959d456c99cA468C7FDC267928A287FD",
+      "data": null
+    },
+    {
+      "name": "Database Read",
+      "status": "PASS",
+      "detail": "Found 3 records in database",
+      "data": null
+    },
+    {
+      "name": "Record Structure",
+      "status": "PASS",
+      "detail": "ModelId: 887889005, Action: TRAINING_COMPLETED",
+      "data": {
+        "modelId": 887889005,
+        "sepoliaTxHash": "0xc9258251e63d5f1ede2323bc286d5c1cec0961c3f990e39ed8a01fcb073c6d83",
+        "bscTxHash": "0x22ba6ba7911535eac72622ca49aceafd662610a6589ebdda29d9105ed9942873"
+      }
+    },
+    {
+      "name": "Wallet Address",
+      "status": "PASS",
+      "detail": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1",
+      "data": null
+    },
+    {
+      "name": "Sepolia Balance",
+      "status": "PASS",
+      "detail": "0.3270 ETH ",
+      "data": null
+    },
+    {
+      "name": "BSC Testnet Balance",
+      "status": "PASS",
+      "detail": "9.9989 tBNB ",
+      "data": null
+    }
+  ],
+  "summary": {
+    "passed": 9,
+    "failed": 0,
+    "warned": 0,
+    "skipped": 0,
+    "total": 9
+  }
+}

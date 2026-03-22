@@ -1,0 +1,71 @@
+{
+  "suite": "ZK Proof System Tests",
+  "timestamp": "2026-03-04T17:29:07.224Z",
+  "tests": [
+    {
+      "name": "Circuit Source",
+      "status": "PASS",
+      "detail": "Found (0.52 KB)",
+      "data": null
+    },
+    {
+      "name": "WASM File",
+      "status": "PASS",
+      "detail": "Found (1706.68 KB)",
+      "data": null
+    },
+    {
+      "name": "Proving Key",
+      "status": "PASS",
+      "detail": "Found (248.76 KB)",
+      "data": null
+    },
+    {
+      "name": "Verification Key",
+      "status": "PASS",
+      "detail": "Found (3.04 KB)",
+      "data": null
+    },
+    {
+      "name": "Test Input Created",
+      "status": "PASS",
+      "detail": "Secret: 123456, ModelId: 999999999",
+      "data": null
+    },
+    {
+      "name": "Proof Generation",
+      "status": "PASS",
+      "detail": "Proof and public signals generated successfully",
+      "data": null
+    },
+    {
+      "name": "Proof Structure",
+      "status": "PASS",
+      "detail": "pi_a: 3 elements, pi_b: 3 arrays",
+      "data": {
+        "publicSignals": 2
+      }
+    },
+    {
+      "name": "Calldata Format",
+      "status": "PASS",
+      "detail": "3 lines generated (pi_a, pi_b, pi_c + signals)",
+      "data": null
+    },
+    {
+      "name": "Calldata Structure",
+      "status": "PASS",
+      "detail": "ZK calldata components present",
+      "data": {
+        "lines": 3,
+        "total_length": 786
+      }
+    }
+  ],
+  "summary": {
+    "passed": 9,
+    "failed": 0,
+    "warned": 0,
+    "total": 9
+  }
+}

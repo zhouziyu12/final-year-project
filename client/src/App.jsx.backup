@@ -1,0 +1,893 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import axios from 'axios';
+import './App.css';
+
+const SERVER_URL = 'http://127.0.0.1:3000';
+
+const getExplorerUrl = (chain, txHash) => {
+  if (!txHash || txHash === 'N/A') return null;
+  
+  const explorers = {
+    somnia: `https://explorer.somnia.network/tx/${txHash}`,
+    sepolia: `https://sepolia.etherscan.io/tx/${txHash}`,
+    tbnb: `https://testnet.bscscan.com/tx/${txHash}`
+  };
+  
+  return explorers[chain];
+};
+
+const chainIcon = (key) => {
+  if (key === 'somnia') return '🟣';
+  if (key === 'sepolia') return '🔵';
+  if (key === 'tbnb') return '🟡';
+  return '⚪';
+};
+
+function ComparisonPanel({ versions, onClose }) {
+  const [selected, setSelected] = useState([]);
+
+  const toggleSelect = (v) => {
+    if (selected.find(s => s.model_id === v.model_id)) {
+      setSelected(selected.filter(s => s.model_id !== v.model_id));
+    } else if (selected.length < 2) {
+      setSelected([...selected, v]);
+    }
+  };
+
+  const renderDiff = () => {
+    if (selected.length !== 2) return null;
+    const [v1, v2] = selected;
+    
+    // Extract metrics from blockchain records
+    const getMetrics = (modelId) => {
+      const record = versions.find(v => v.model_id === modelId)?.record;
+      if (!record?.trainingMetadata) return null;
+      return {
+        accuracy: record.trainingMetadata.accuracy,
+        loss: record.trainingMetadata.final_loss,
+        initial_loss: record.trainingMetadata.initial_loss
+      };
+    };
+
+    const m1 = getMetrics(v1.model_id);
+    const m2 = getMetrics(v2.model_id);
+
+    if (!m1 || !m2) {
+      return <div style={{ color: '#57606a', marginTop: 16 }}>Metrics not available for comparison</div>;
+    }
+
+    const accDiff = m2.accuracy && m1.accuracy ? ((m2.accuracy - m1.accuracy) * 100).toFixed(2) : null;
+    const lossDiff = m2.loss && m1.loss ? (m1.loss - m2.loss).toFixed(4) : null;
+
+    return (
+      <div style={{ marginTop: 20, padding: 16, background: '#f6f8fa', borderRadius: 8, border: '1px solid #d0d7de' }}>
+        <h4 style={{ marginTop: 0 }}>📊 Comparison: {v1.version} vs {v2.version}</h4>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Metric</div>
+            <div>Accuracy</div>
+            <div>Final Loss</div>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>{v1.version}</div>
+            <div>{m1.accuracy ? (m1.accuracy * 100).toFixed(2) + '%' : 'N/A'}</div>
+            <div>{m1.loss ? m1.loss.toFixed(4) : 'N/A'}</div>
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>{v2.version}</div>
+            <div>{m2.accuracy ? (m2.accuracy * 100).toFixed(2) + '%' : 'N/A'}</div>
+            <div>{m2.loss ? m2.loss.toFixed(4) : 'N/A'}</div>
+          </div>
+        </div>
+        {(accDiff || lossDiff) && (
+          <div style={{ marginTop: 16, padding: 12, background: '#fff', borderRadius: 6 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>Δ Change</div>
+            {accDiff && (
+              <div style={{ marginBottom: 4 }}>
+                <b>Accuracy:</b> <span style={{ color: parseFloat(accDiff) > 0 ? '#1a7f37' : '#cf222e', fontWeight: 600 }}>
+                  {accDiff > 0 ? '+' : ''}{accDiff}%
+                </span>
+              </div>
+            )}
+            {lossDiff && (
+              <div>
+                <b>Loss:</b> <span style={{ color: parseFloat(lossDiff) > 0 ? '#1a7f37' : '#cf222e', fontWeight: 600 }}>
+                  {lossDiff > 0 ? '-' : '+'}{Math.abs(lossDiff)}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+      <div style={{ width: 'min(800px, 90vw)', maxHeight: '85vh', overflow: 'auto', background: '#fff', borderRadius: 12, padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <h3 style={{ margin: 0 }}>Compare Versions (Select 2)</h3>
+          <button onClick={onClose} style={{ border: '1px solid #d0d7de', borderRadius: 6, padding: '6px 12px', cursor: 'pointer' }}>Close</button>
+        </div>
+
+        <div style={{ marginBottom: 16 }}>
+          {versions.map(v => (
+            <div 
+              key={v.model_id}
+              onClick={() => toggleSelect(v)}
+              style={{ 
+                padding: 12, 
+                marginBottom: 8, 
+                border: selected.find(s => s.model_id === v.model_id) ? '2px solid #0969da' : '1px solid #d0d7de',
+                borderRadius: 8,
+                cursor: 'pointer',
+                background: selected.find(s => s.model_id === v.model_id) ? '#ddf4ff' : '#fff'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <div>
+                  <strong>{v.version}</strong> · Model ID: {v.model_id}
+                </div>
+                {selected.find(s => s.model_id === v.model_id) && (
+                  <span style={{ color: '#0969da', fontWeight: 600 }}>✓ Selected</span>
+                )}
+              </div>
+              {v.record?.trainingMetadata && (
+                <div style={{ fontSize: 14, color: '#57606a', marginTop: 4 }}>
+                  Acc: {(v.record.trainingMetadata.accuracy * 100).toFixed(2)}% | 
+                  Loss: {v.record.trainingMetadata.final_loss?.toFixed(4) || 'N/A'}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {renderDiff()}
+      </div>
+    </div>
+  );
+}
+
+function SeriesView({ series, onBack }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showCompare, setShowCompare] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${SERVER_URL}/api/lifecycle/${series.secret}`)
+      .then(res => {
+        if (res.data.success) {
+          // Merge version metadata with blockchain records
+          const enrichedVersions = res.data.versions.map(v => ({
+            ...v,
+            record: res.data.records.find(r => r.modelId === v.model_id)
+          }));
+          setData({ ...res.data, versions: enrichedVersions });
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, [series.secret]);
+
+  if (loading) {
+    return (
+      <div style={{ 
+        padding: 60, 
+        textAlign: 'center',
+        background: '#fff',
+        borderRadius: 12,
+        border: '1px solid #d0d7de'
+      }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+        <div style={{ color: '#57606a' }}>Loading series data...</div>
+      </div>
+    );
+  }
+  
+  if (!data) {
+    return (
+      <div style={{ 
+        padding: 60, 
+        textAlign: 'center',
+        background: '#fff',
+        borderRadius: 12,
+        border: '1px solid #d0d7de'
+      }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>❌</div>
+        <div style={{ color: '#cf222e' }}>Failed to load series data</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#f6f8fa', padding: 24 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <button 
+          onClick={onBack} 
+          style={{ 
+            marginBottom: 20, 
+            padding: '8px 16px', 
+            borderRadius: 6, 
+            border: '1px solid #d0d7de',
+            background: '#fff',
+            cursor: 'pointer',
+            fontSize: 14
+          }}
+        >
+          ← Back to All Series
+        </button>
+
+        <div style={{ 
+          background: '#fff',
+          borderRadius: 12,
+          padding: 24,
+          marginBottom: 24,
+          border: '1px solid #d0d7de'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 16 }}>
+            <div style={{ 
+              width: 48, 
+              height: 48, 
+              borderRadius: 10, 
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 24,
+              marginRight: 16
+            }}>
+              📦
+            </div>
+            <div>
+              <h2 style={{ margin: 0, marginBottom: 4 }}>{data.series}</h2>
+              <div style={{ color: '#57606a', fontSize: 14 }}>
+                🔑 Secret: <code style={{ 
+                  background: '#f6f8fa', 
+                  padding: '3px 8px', 
+                  borderRadius: 4,
+                  fontFamily: 'monospace',
+                  letterSpacing: 1
+                }}>{data.secret}</code>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: 16,
+            marginBottom: 16
+          }}>
+            <div style={{ padding: 12, background: '#f6f8fa', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, color: '#57606a', marginBottom: 4 }}>Created</div>
+              <div style={{ fontWeight: 600 }}>{new Date(data.created_at).toLocaleString()}</div>
+            </div>
+            <div style={{ padding: 12, background: '#f6f8fa', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, color: '#57606a', marginBottom: 4 }}>Total Versions</div>
+              <div style={{ fontWeight: 600, color: '#0969da' }}>{data.versions.length}</div>
+            </div>
+            <div style={{ padding: 12, background: '#f6f8fa', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, color: '#57606a', marginBottom: 4 }}>Latest Version</div>
+              <div style={{ fontWeight: 600 }}>{data.versions[0]?.version || 'N/A'}</div>
+            </div>
+          </div>
+
+          <button 
+            onClick={() => setShowCompare(true)}
+            disabled={data.versions.length < 2}
+            style={{ 
+              padding: '10px 20px', 
+              borderRadius: 6, 
+              border: 'none',
+              background: data.versions.length < 2 ? '#d0d7de' : '#0969da',
+              color: '#fff',
+              cursor: data.versions.length < 2 ? 'not-allowed' : 'pointer',
+              fontSize: 15,
+              fontWeight: 600,
+              opacity: data.versions.length < 2 ? 0.6 : 1
+            }}
+          >
+            📊 Compare Versions
+          </button>
+        </div>
+
+        <div style={{ position: 'relative', paddingLeft: 32 }}>
+          <div style={{ 
+            position: 'absolute', 
+            left: 16, 
+            top: 24, 
+            bottom: 24, 
+            width: 3, 
+            background: 'linear-gradient(180deg, #0969da 0%, #d0d7de 100%)',
+            borderRadius: 2
+          }} />
+          
+          {data.versions.map((v, idx) => (
+            <div key={v.model_id} style={{ position: 'relative', marginBottom: 24 }}>
+              <div style={{ 
+                position: 'absolute', 
+                left: -24, 
+                top: 20, 
+                width: 16, 
+                height: 16, 
+                borderRadius: '50%', 
+                background: '#0969da',
+                border: '3px solid #fff',
+                boxShadow: '0 0 0 3px #d0d7de',
+                zIndex: 1
+              }} />
+              
+              <div style={{ 
+                border: '1px solid #d0d7de', 
+                borderRadius: 12, 
+                padding: 20, 
+                background: '#fff',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <span style={{ 
+                      fontSize: 20, 
+                      fontWeight: 700,
+                      color: '#0969da'
+                    }}>
+                      {v.version}
+                    </span>
+                    {idx === 0 && (
+                      <span style={{ 
+                        padding: '2px 8px',
+                        background: '#1a7f37',
+                        color: '#fff',
+                        borderRadius: 4,
+                        fontSize: 12,
+                        fontWeight: 600
+                      }}>
+                        LATEST
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ color: '#57606a', fontSize: 14 }}>
+                    📅 {new Date(v.timestamp).toLocaleString()}
+                  </span>
+                </div>
+                
+                <div style={{ 
+                  marginBottom: 12,
+                  padding: 12,
+                  background: '#f6f8fa',
+                  borderRadius: 8,
+                  fontSize: 13
+                }}>
+                  <div style={{ marginBottom: 4 }}>
+                    <b>Model ID:</b> <code>{v.model_id}</code>
+                  </div>
+                  <div style={{ wordBreak: 'break-all' }}>
+                    <b>Hash:</b> <code>{v.model_hash}</code>
+                  </div>
+                </div>
+
+                {v.record && (
+                  <>
+                    {v.record.trainingMetadata && (
+                      <div style={{ 
+                        marginBottom: 12, 
+                        padding: 16, 
+                        background: 'linear-gradient(135deg, #f6f8fa 0%, #fff 100%)', 
+                        borderRadius: 8,
+                        border: '1px solid #e1e4e8'
+                      }}>
+                        <div style={{ fontWeight: 600, marginBottom: 10, fontSize: 15 }}>
+                          📊 Training Metrics
+                        </div>
+                        <div style={{ 
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+                          gap: 12
+                        }}>
+                          <div>
+                            <div style={{ fontSize: 12, color: '#57606a', marginBottom: 4 }}>Accuracy</div>
+                            <div style={{ fontSize: 18, fontWeight: 700, color: '#1a7f37' }}>
+                              {(v.record.trainingMetadata.accuracy * 100).toFixed(2)}%
+                            </div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 12, color: '#57606a', marginBottom: 4 }}>Final Loss</div>
+                            <div style={{ fontSize: 18, fontWeight: 700 }}>
+                              {v.record.trainingMetadata.final_loss?.toFixed(4) || 'N/A'}
+                            </div>
+                          </div>
+                          {v.record.trainingMetadata.initial_loss && (
+                            <div>
+                              <div style={{ fontSize: 12, color: '#57606a', marginBottom: 4 }}>Initial Loss</div>
+                              <div style={{ fontSize: 18, fontWeight: 700 }}>
+                                {v.record.trainingMetadata.initial_loss.toFixed(4)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        {v.record.trainingMetadata.zk_verified && (
+                          <div style={{ 
+                            marginTop: 12, 
+                            padding: 8,
+                            background: '#dafbe1',
+                            borderRadius: 6,
+                            color: '#1a7f37',
+                            fontSize: 13,
+                            fontWeight: 600
+                          }}>
+                            🛡️ Zero-Knowledge Verified
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ 
+                      marginBottom: 12,
+                      padding: 12,
+                      background: '#f6f8fa',
+                      borderRadius: 8
+                    }}>
+                      <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 14 }}>
+                        ⛓️ Blockchain Records
+                      </div>
+                      <div style={{ fontSize: 12, lineHeight: 2 }}>
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                            {chainIcon('somnia')} <b>Somnia:</b>
+                          </div>
+                          <div style={{ paddingLeft: 24 }}>
+                            <code style={{ fontSize: 11, wordBreak: 'break-all', display: 'block' }}>
+                              {v.record.somniaTxHash || 'N/A'}
+                            </code>
+                            {getExplorerUrl('somnia', v.record.somniaTxHash) && (
+                              <a 
+                                href={getExplorerUrl('somnia', v.record.somniaTxHash)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ 
+                                  fontSize: 12, 
+                                  color: '#0969da',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  marginTop: 4
+                                }}
+                              >
+                                🔗 View on Explorer →
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                        <div style={{ marginBottom: 8 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                            {chainIcon('sepolia')} <b>Sepolia:</b>
+                          </div>
+                          <div style={{ paddingLeft: 24 }}>
+                            <code style={{ fontSize: 11, wordBreak: 'break-all', display: 'block' }}>
+                              {v.record.sepoliaTxHash || 'N/A'}
+                            </code>
+                            {getExplorerUrl('sepolia', v.record.sepoliaTxHash) && (
+                              <a 
+                                href={getExplorerUrl('sepolia', v.record.sepoliaTxHash)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ 
+                                  fontSize: 12, 
+                                  color: '#0969da',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  marginTop: 4
+                                }}
+                              >
+                                🔗 View on Etherscan →
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                            {chainIcon('tbnb')} <b>tBNB:</b>
+                          </div>
+                          <div style={{ paddingLeft: 24 }}>
+                            <code style={{ fontSize: 11, wordBreak: 'break-all', display: 'block' }}>
+                              {v.record.tbnbTxHash || 'N/A'}
+                            </code>
+                            {getExplorerUrl('tbnb', v.record.tbnbTxHash) && (
+                              <a 
+                                href={getExplorerUrl('tbnb', v.record.tbnbTxHash)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{ 
+                                  fontSize: 12, 
+                                  color: '#0969da',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  marginTop: 4
+                                }}
+                              >
+                                🔗 View on BscScan →
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {v.record.modelCid && (
+                      <button
+                        onClick={() => window.open(`${SERVER_URL}/api/download/${v.record.modelCid}`, '_blank')}
+                        style={{ 
+                          padding: '10px 16px', 
+                          borderRadius: 6, 
+                          border: 'none',
+                          background: '#0969da', 
+                          color: '#fff', 
+                          cursor: 'pointer',
+                          fontSize: 14,
+                          fontWeight: 600
+                        }}
+                      >
+                        📦 Download Model Weights
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {showCompare && <ComparisonPanel versions={data.versions} onClose={() => setShowCompare(false)} />}
+      </div>
+    </div>
+  );
+}
+
+function SecretQueryPanel({ onSeriesFound }) {
+  const [secret, setSecret] = useState('');
+  const [searching, setSearching] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSearch = async () => {
+    if (!secret || secret.length !== 6) {
+      setError('Please enter a 6-digit secret');
+      return;
+    }
+    
+    setSearching(true);
+    setError('');
+    
+    try {
+      const res = await axios.get(`${SERVER_URL}/api/lifecycle/${secret}`);
+      if (res.data.success) {
+        onSeriesFound({ name: res.data.series, secret: res.data.secret });
+      } else {
+        setError('Secret not found. Please check and try again.');
+      }
+    } catch (err) {
+      setError('Failed to query. Please try again.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  return (
+    <div style={{ 
+      maxWidth: 500, 
+      margin: '40px auto', 
+      padding: 24, 
+      border: '1px solid #d0d7de', 
+      borderRadius: 12, 
+      background: '#fff',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+    }}>
+      <h3 style={{ marginTop: 0, marginBottom: 16 }}>🔑 Query by Secret</h3>
+      <p style={{ color: '#57606a', fontSize: 14, marginBottom: 16 }}>
+        Enter your 6-digit secret to view the complete model lifecycle.
+      </p>
+      
+      <div style={{ marginBottom: 16 }}>
+        <input
+          type="text"
+          value={secret}
+          onChange={(e) => setSecret(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          placeholder="Enter 6-digit secret"
+          maxLength={6}
+          style={{
+            width: '100%',
+            padding: '10px 12px',
+            fontSize: 16,
+            border: '1px solid #d0d7de',
+            borderRadius: 6,
+            fontFamily: 'monospace',
+            letterSpacing: 4,
+            textAlign: 'center'
+          }}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+        />
+      </div>
+
+      {error && (
+        <div style={{ 
+          padding: 12, 
+          marginBottom: 16, 
+          background: '#fff1f0', 
+          border: '1px solid #ffccc7',
+          borderRadius: 6,
+          color: '#cf222e',
+          fontSize: 14
+        }}>
+          ⚠️ {error}
+        </div>
+      )}
+
+      <button
+        onClick={handleSearch}
+        disabled={searching || secret.length !== 6}
+        style={{
+          width: '100%',
+          padding: '10px 16px',
+          fontSize: 16,
+          fontWeight: 600,
+          border: 'none',
+          borderRadius: 6,
+          background: secret.length === 6 ? '#0969da' : '#d0d7de',
+          color: '#fff',
+          cursor: secret.length === 6 ? 'pointer' : 'not-allowed',
+          transition: 'all 0.2s'
+        }}
+      >
+        {searching ? 'Searching...' : 'Search'}
+      </button>
+
+      <div style={{ 
+        marginTop: 16, 
+        padding: 12, 
+        background: '#f6f8fa', 
+        borderRadius: 6,
+        fontSize: 13,
+        color: '#57606a'
+      }}>
+        🔒 Your secret is never sent to the server. All verification happens locally.
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  const [view, setView] = useState('list'); // 'list', 'series', or 'query'
+  const [series, setSeries] = useState([]);
+  const [selectedSeries, setSelectedSeries] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    axios.get(`${SERVER_URL}/api/series`)
+      .then(res => {
+        if (res.data.success) {
+          setSeries(res.data.series);
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
+
+  const filteredSeries = useMemo(() => {
+    if (!searchQuery) return series;
+    const query = searchQuery.toLowerCase();
+    return series.filter(s => 
+      s.name.toLowerCase().includes(query) || 
+      s.secret.includes(query)
+    );
+  }, [series, searchQuery]);
+
+  if (view === 'series' && selectedSeries) {
+    return (
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, fontFamily: 'sans-serif' }}>
+        <SeriesView series={selectedSeries} onBack={() => { setView('list'); setSelectedSeries(null); }} />
+      </div>
+    );
+  }
+
+  if (view === 'query') {
+    return (
+      <div style={{ minHeight: '100vh', background: '#f6f8fa', padding: 24, fontFamily: 'sans-serif' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+          <button 
+            onClick={() => setView('list')}
+            style={{ 
+              marginBottom: 20,
+              padding: '8px 16px', 
+              borderRadius: 6, 
+              border: '1px solid #d0d7de',
+              background: '#fff',
+              cursor: 'pointer' 
+            }}
+          >
+            ← Back to All Series
+          </button>
+          <SecretQueryPanel onSeriesFound={(s) => { setSelectedSeries(s); setView('series'); }} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: '#f6f8fa', padding: 24, fontFamily: 'sans-serif' }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+        <div style={{ marginBottom: 32 }}>
+          <h1 style={{ marginBottom: 8, fontSize: 32 }}>🔗 AI Model Provenance System</h1>
+          <p style={{ color: '#57606a', marginTop: 0, fontSize: 16 }}>
+            Track AI model lifecycle with zero-knowledge proofs and multi-chain storage
+          </p>
+        </div>
+
+        <div style={{ 
+          display: 'flex', 
+          gap: 16, 
+          marginBottom: 24,
+          flexWrap: 'wrap'
+        }}>
+          <div style={{ flex: 1, minWidth: 300 }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="🔍 Search by name or secret..."
+              style={{
+                width: '100%',
+                padding: '10px 16px',
+                fontSize: 15,
+                border: '1px solid #d0d7de',
+                borderRadius: 6,
+                background: '#fff'
+              }}
+            />
+          </div>
+          <button
+            onClick={() => setView('query')}
+            style={{
+              padding: '10px 20px',
+              fontSize: 15,
+              fontWeight: 600,
+              border: '1px solid #0969da',
+              borderRadius: 6,
+              background: '#0969da',
+              color: '#fff',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            🔑 Query by Secret
+          </button>
+        </div>
+
+        {loading ? (
+          <div style={{ 
+            padding: 60, 
+            textAlign: 'center', 
+            background: '#fff',
+            borderRadius: 12,
+            border: '1px solid #d0d7de'
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>⏳</div>
+            <div style={{ color: '#57606a' }}>Loading model series...</div>
+          </div>
+        ) : filteredSeries.length === 0 ? (
+          <div style={{ 
+            padding: 60, 
+            textAlign: 'center', 
+            background: '#fff',
+            borderRadius: 12,
+            border: '1px dashed #d0d7de'
+          }}>
+            <div style={{ fontSize: 48, marginBottom: 16 }}>📦</div>
+            <div style={{ color: '#57606a', marginBottom: 8 }}>
+              {searchQuery ? 'No matching series found' : 'No model series found'}
+            </div>
+            {!searchQuery && (
+              <div style={{ color: '#57606a', fontSize: 14 }}>
+                Run <code style={{ background: '#f6f8fa', padding: '2px 6px', borderRadius: 4 }}>python train1.py</code> to create your first model
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div style={{ marginBottom: 16, color: '#57606a', fontSize: 14 }}>
+              Found {filteredSeries.length} model series
+            </div>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', 
+              gap: 16 
+            }}>
+              {filteredSeries.map(s => (
+                <div 
+                  key={s.secret}
+                  onClick={() => { setSelectedSeries(s); setView('series'); }}
+                  style={{ 
+                    border: '1px solid #d0d7de', 
+                    borderRadius: 12, 
+                    padding: 20, 
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    background: '#fff'
+                  }}
+                  onMouseEnter={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.1)'; 
+                    e.currentTarget.style.borderColor = '#0969da'; 
+                  }}
+                  onMouseLeave={(e) => { 
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = 'none'; 
+                    e.currentTarget.style.borderColor = '#d0d7de'; 
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ 
+                      width: 40, 
+                      height: 40, 
+                      borderRadius: 8, 
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 20,
+                      marginRight: 12
+                    }}>
+                      📦
+                    </div>
+                    <h3 style={{ margin: 0, fontSize: 18 }}>{s.name}</h3>
+                  </div>
+                  
+                  <div style={{ 
+                    fontSize: 13, 
+                    color: '#57606a', 
+                    marginBottom: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6
+                  }}>
+                    <span>🔑</span>
+                    <span>Secret: ●●●●●●</span>
+                  </div>
+                  
+                  <div style={{ fontSize: 13, color: '#57606a', marginBottom: 12 }}>
+                    📅 Created: {new Date(s.created_at).toLocaleDateString()}
+                  </div>
+                  
+                  <div style={{ 
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingTop: 12,
+                    borderTop: '1px solid #f6f8fa'
+                  }}>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: '#0969da' }}>
+                      {s.version_count} version{s.version_count !== 1 ? 's' : ''}
+                    </div>
+                    <div style={{ fontSize: 13, color: '#0969da' }}>
+                      View Details →
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,599 @@
+{
+  "ModelRegistry": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_bridge",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "ModelRegistered",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "bridge",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getOwner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "models",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "description",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "ipfsCid",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "checksum",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "framework",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "version",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "license",
+          "type": "string"
+        },
+        {
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_name",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_description",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_ipfsCid",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_checksum",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_framework",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_version",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_license",
+          "type": "string"
+        }
+      ],
+      "name": "register",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "ProvenanceTracker": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_registryAddress",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "recordId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "eventType",
+          "type": "string"
+        }
+      ],
+      "name": "RecordAdded",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_eventType",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_ipfsMetadata",
+          "type": "string"
+        }
+      ],
+      "name": "addRecord",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getModelHistory",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelHistory",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "nextRecordId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "records",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "recordId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "eventType",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "ipfsMetadata",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "previousRecordHash",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "registryAddress",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "Verifier": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256[2]",
+          "name": "_pA",
+          "type": "uint256[2]"
+        },
+        {
+          "internalType": "uint256[2][2]",
+          "name": "_pB",
+          "type": "uint256[2][2]"
+        },
+        {
+          "internalType": "uint256[2]",
+          "name": "_pC",
+          "type": "uint256[2]"
+        },
+        {
+          "internalType": "uint256[2]",
+          "name": "_pubSignals",
+          "type": "uint256[2]"
+        }
+      ],
+      "name": "verifyProof",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "addresses": {
+    "sepolia_registry": "0x878801331F0209A50008C2c65e212D5401e75Ea4",
+    "sepolia_tracker": "0x656e66d52bc4ce97e899BD680c4719111b893833",
+    "sepolia_verifier": "0x9D672d65c2dfe8A546f1539ba5d3c6cA2988687b",
+    "sepolia_bridge": "0x6Ab73fD3a19aeB903458240bE93aC16c4c09f28A",
+    "somnia_registry": "0xDAbF5958DfF624f4019d2979f3BD79e06Fa8d431",
+    "somnia_tracker": "0x1a470C45A6C785C0157057860F20d5770eD0e605",
+    "somnia_verifier": "0x19C10674d84E07dDde2B1e9BbF08ca461B08a8C1",
+    "somnia_bridge": "0x629b9c7285CEF6ab416BE144428F8833642Cc234",
+    "tbnb_registry": "0x73FDC0180b7B11ca82fb236EcAa778A4566f52E9",
+    "tbnb_tracker": "0x0bC82C1d959d456c99cA468C7FDC267928A287FD",
+    "tbnb_verifier": "0xfed6EB80A19fc4474A8b5424e6222fb614401fD0",
+    "tbnb_bridge": "0xB7b091f3757d5eBCf4b8A221Eba1421DD8bE180e"
+  },
+  "v2": {
+    "network": "hardhat",
+    "timestamp": "2026-03-18T11:54:36.709Z",
+    "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
+    "contracts": {
+      "accessControl": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+      "registry": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+      "tracker": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+      "auditLog": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
+      "nft": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
+      "staking": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+    },
+    "abis": {
+      "ModelAccessControl": [
+        "constructor(address)",
+        "event Blacklisted(address indexed,address indexed)",
+        "event GovernanceChanged(address indexed,address indexed)",
+        "event RoleGranted(bytes32 indexed,address indexed,address indexed)",
+        "event RoleRevoked(bytes32 indexed,address indexed,address indexed)",
+        "event Unblacklisted(address indexed,address indexed)",
+        "function ADMIN() view returns (bytes32)",
+        "function AUDITOR() view returns (bytes32)",
+        "function MINTER() view returns (bytes32)",
+        "function REGISTRAR() view returns (bytes32)",
+        "function addBlacklist(address)",
+        "function getGovernance() view returns (address)",
+        "function governance() view returns (address)",
+        "function grantRole(bytes32,address)",
+        "function grantRoles(bytes32,address[])",
+        "function hasRole(bytes32,address) view returns (bool)",
+        "function isBlacklisted(address) view returns (bool)",
+        "function removeBlacklist(address)",
+        "function revokeRole(bytes32,address)",
+        "function transferAdmin(address)",
+        "function updateGovernance(address)"
+      ],
+      "ModelRegistry": [
+        "constructor(address)",
+        "error BlacklistedAddress()",
+        "error InsufficientStake()",
+        "error InvalidStatus(uint8,uint8)",
+        "error NotOwner(address,address)",
+        "error StakedModel()",
+        "error TransferAlreadyPending()",
+        "error TransferNotPending()",
+        "error ZeroStake()",
+        "event ModelRegistered(uint256 indexed,address indexed)",
+        "event ModelStatusChanged(uint256 indexed,uint8,uint8,address indexed)",
+        "event OwnershipTransferAccepted(uint256 indexed,address indexed,address indexed)",
+        "event OwnershipTransferCancelled(uint256 indexed,address indexed)",
+        "event OwnershipTransferRequested(uint256 indexed,address indexed,address indexed)",
+        "event VersionAdded(uint256 indexed,uint256 indexed,uint8,uint8,uint8,uint8)",
+        "function acceptTransfer(uint256)",
+        "function accessControl() view returns (address)",
+        "function activateModel(uint256)",
+        "function addVersion(uint256,uint8,uint8,uint8,uint8,string,string) returns (uint256)",
+        "function cancelTransfer(uint256)",
+        "function deprecateModel(uint256)",
+        "function getModelOwner(uint256) view returns (address)",
+        "function getModelStatus(uint256) view returns (uint8)",
+        "function getVersionHistory(uint256) view returns ((uint256,uint256,uint8,uint8,uint8,uint8,string,string,uint256,address)[])",
+        "function isModelStaked(uint256) view returns (bool)",
+        "function latestVersionId(uint256) view returns (uint256)",
+        "function models(uint256) view returns (uint256,string,string,string,string,string,string,address,uint8,uint256,uint256,bool)",
+        "function pendingTransfers(uint256) view returns (uint256,address,address,uint256,bool)",
+        "function registerModel(string,string,string,string,string,string) returns (uint256)",
+        "function requestTransfer(uint256,address)",
+        "function revokeModel(uint256)",
+        "function transferHistory(uint256,uint256) view returns (uint256,address,address,uint256,bool)",
+        "function updateMetadata(uint256,string,string,string)",
+        "function versionCount(uint256) view returns (uint256)",
+        "function versions(uint256,uint256) view returns (uint256,uint256,uint8,uint8,uint8,uint8,string,string,uint256,address)"
+      ],
+      "ModelProvenanceTracker": [
+        "constructor(address,address)",
+        "error ModelIsBlacklisted()",
+        "error NotAuthorized()",
+        "event ModelBlacklisted(uint256 indexed,string,address)",
+        "event ModelUnblacklisted(uint256 indexed,address)",
+        "event RecordAdded(uint256 indexed,uint256 indexed,uint8 indexed,address)",
+        "function accessControl() view returns (address)",
+        "function addRecord(uint256,uint8,string) returns (uint256)",
+        "function addZKProofRecord(uint256,string) returns (uint256)",
+        "function blacklistModel(uint256,string)",
+        "function blacklistReasons(uint256) view returns (string)",
+        "function getModelHistory(uint256) view returns ((uint256,uint256,uint8,string,uint256,address,bytes32,bytes32)[])",
+        "function getModelsStatus(uint256[]) view returns (uint8[],bool[])",
+        "function modelBlacklist(uint256) view returns (bool)",
+        "function modelChainHead(uint256) view returns (bytes32)",
+        "function modelHistory(uint256,uint256) view returns (uint256)",
+        "function records(uint256) view returns (uint256,uint256,uint8,string,uint256,address,bytes32,bytes32)",
+        "function registry() view returns (address)",
+        "function unblacklistModel(uint256)",
+        "function verifyChain(uint256) view returns (bool)"
+      ],
+      "ModelAuditLog": [
+        "constructor(address)",
+        "error EmptyMetadata()",
+        "error OnlyAuditor()",
+        "event AuditEntryAdded(uint256 indexed,uint8 indexed,address indexed,uint256)",
+        "function accessControl() view returns (address)",
+        "function chainHead() view returns (bytes32)",
+        "function entries(uint256) view returns (uint256,uint8,address,uint256,uint256,bytes32,string,bytes32)",
+        "function getEntriesByRange(uint256,uint256) view returns ((uint256,uint8,address,uint256,uint256,bytes32,string,bytes32)[])",
+        "function getModelAuditTrail(uint256) view returns ((uint256,uint8,address,uint256,uint256,bytes32,string,bytes32)[])",
+        "function logAction(uint8,uint256,string,bytes32) returns (uint256)",
+        "function logModelRegistered(uint256,address,string) returns (uint256)",
+        "function logOwnershipTransfer(uint256,address,address,bool) returns (uint256)",
+        "function logRoleChange(address,bytes32,bool) returns (uint256)",
+        "function logStakeChange(uint256,address,uint256,bool) returns (uint256)",
+        "function logStatusChange(uint256,uint8,uint8,address) returns (uint256)",
+        "function logVersionAdded(uint256,uint256,address,string) returns (uint256)",
+        "function modelAuditIndex(uint256,uint256) view returns (uint256)",
+        "function totalEntries() view returns (uint256)",
+        "function verifyChain(uint256) view returns (bool)"
+      ],
+      "ModelNFT": [
+        "constructor(address)",
+        "error ModelAlreadyHasNFT()",
+        "error ModelNotRegistered()",
+        "error NotTokenOwner()",
+        "error TransferCooldownActive()",
+        "error ZeroAddress()",
+        "event Approval(address indexed,address indexed,uint256 indexed)",
+        "event ApprovalForAll(address indexed,address indexed,bool)",
+        "event ModelNFTBurned(uint256 indexed,uint256 indexed)",
+        "event ModelNFTMinted(uint256 indexed,uint256 indexed,address)",
+        "event ModelNFTTransferred(uint256 indexed,uint256 indexed,address indexed,address,uint256)",
+        "event Transfer(address indexed,address indexed,uint256 indexed)",
+        "function accessControl() view returns (address)",
+        "function approve(address,uint256)",
+        "function balanceOf(address) view returns (uint256)",
+        "function burn(uint256)",
+        "function getOwnerTokens(address) view returns (uint256[])",
+        "function getTokenByModel(uint256) view returns (uint256)",
+        "function lastTransferTime(uint256) view returns (uint256)",
+        "function mint(uint256,string) returns (uint256)",
+        "function modelHasNft(uint256) view returns (bool)",
+        "function modelToToken(uint256) view returns (uint256)",
+        "function name() view returns (string)",
+        "function operatorApprovals(address,address) view returns (bool)",
+        "function ownerOf(uint256) view returns (address)",
+        "function safeTransferFrom(address,address,uint256)",
+        "function setApprovalForAll(address,bool)",
+        "function setTransferCooldown(uint256)",
+        "function symbol() view returns (string)",
+        "function tokenApprovals(uint256) view returns (address)",
+        "function tokenMetadata(uint256) view returns (string)",
+        "function tokenOwner(uint256) view returns (address)",
+        "function tokenToModel(uint256) view returns (uint256)",
+        "function tokenURI(uint256) view returns (string)",
+        "function totalSupply() view returns (uint256)",
+        "function transferCooldown() view returns (uint256)"
+      ],
+      "ModelStaking": [
+        "constructor(address,address)",
+        "error AlreadySlashed()",
+        "error AlreadyWithdrawn()",
+        "error InsufficientStake()",
+        "error InvalidModelId()",
+        "error StakeLocked()",
+        "error StakerMismatch()",
+        "error ZeroAmount()",
+        "event LockPeriodUpdated(uint256,uint256)",
+        "event MinStakeUpdated(uint256,uint256)",
+        "event SlashRatioUpdated(uint256,uint256)",
+        "event StakeDeposited(uint256 indexed,address indexed,uint256)",
+        "event StakeSlashed(uint256 indexed,address indexed,uint256,uint256,string)",
+        "event StakeWithdrawn(uint256 indexed,address indexed,uint256)",
+        "event TreasuryUpdated(address indexed,address indexed)",
+        "function accessControl() view returns (address)",
+        "function batchSlash(uint256[],string)",
+        "function getLockRemaining(uint256) view returns (uint256)",
+        "function getStakeAmount(uint256) view returns (uint256)",
+        "function getStakeInfo(uint256) view returns ((uint256,address,uint256,uint256,uint256,bool,bool))",
+        "function lockPeriod() view returns (uint256)",
+        "function minStake() view returns (uint256)",
+        "function slash(uint256,string) returns (uint256)",
+        "function slashRatio() view returns (uint256)",
+        "function stake(uint256) payable",
+        "function stakes(uint256) view returns (uint256,address,uint256,uint256,uint256,bool,bool)",
+        "function totalSlashed() view returns (uint256)",
+        "function totalStaked() view returns (uint256)",
+        "function treasury() view returns (address)",
+        "function updateLockPeriod(uint256)",
+        "function updateMinStake(uint256)",
+        "function updateSlashRatio(uint256)",
+        "function updateTreasury(address)",
+        "function withdraw(uint256)"
+      ]
+    }
+  }
+}

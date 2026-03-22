@@ -1,0 +1,103 @@
+{
+  "suite": "SDK and Backend Integration Tests",
+  "timestamp": "2026-03-04T17:34:07.943680Z",
+  "tests": [
+    {
+      "name": "SDK Import",
+      "status": "PASS",
+      "detail": "ProvenanceSDK imported successfully",
+      "data": null
+    },
+    {
+      "name": "Secret Manager Import",
+      "status": "PASS",
+      "detail": "ModelSecretManager imported successfully",
+      "data": null
+    },
+    {
+      "name": "GET /api/series",
+      "status": "PASS",
+      "detail": "Retrieved 1 model series",
+      "data": null
+    },
+    {
+      "name": "GET /api/history",
+      "status": "PASS",
+      "detail": "Retrieved 2 records",
+      "data": null
+    },
+    {
+      "name": "Secret Manager Init",
+      "status": "PASS",
+      "detail": "Initialized successfully",
+      "data": null
+    },
+    {
+      "name": "Secret Generation",
+      "status": "PASS",
+      "detail": "Generated 6-digit secret: 626043",
+      "data": null
+    },
+    {
+      "name": "Version Tracking",
+      "status": "PASS",
+      "detail": "Version recorded and secret verified: 626043",
+      "data": null
+    },
+    {
+      "name": "File: server.js",
+      "status": "PASS",
+      "detail": "Exists (17.23 KB)",
+      "data": null
+    },
+    {
+      "name": "File: sdk/python/provenance_sdk.py",
+      "status": "PASS",
+      "detail": "Exists (10.87 KB)",
+      "data": null
+    },
+    {
+      "name": "File: sdk/python/model_secret_manager.py",
+      "status": "PASS",
+      "detail": "Exists (3.71 KB)",
+      "data": null
+    },
+    {
+      "name": "File: test_zk_standalone.js",
+      "status": "PASS",
+      "detail": "Exists (4.42 KB)",
+      "data": null
+    },
+    {
+      "name": "File: address_real.json",
+      "status": "PASS",
+      "detail": "Exists (0.77 KB)",
+      "data": null
+    },
+    {
+      "name": "File: server/database.json",
+      "status": "PASS",
+      "detail": "Exists (5.90 KB)",
+      "data": null
+    },
+    {
+      "name": "Pinata API Key",
+      "status": "PASS",
+      "detail": "Configured (db4e6f43...)",
+      "data": null
+    },
+    {
+      "name": "Pinata Secret Key",
+      "status": "PASS",
+      "detail": "Configured",
+      "data": null
+    }
+  ],
+  "summary": {
+    "passed": 15,
+    "failed": 0,
+    "warned": 0,
+    "skipped": 0,
+    "total": 15
+  }
+}
