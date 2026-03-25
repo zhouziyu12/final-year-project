@@ -88,11 +88,13 @@ function saveModelMap(map) {
 
 const modelNameMap = loadModelMap();
 
-const SEPOLIA_RPC = 'https://sepolia.infura.io/v3/8a031362da754c57814a57aebbd2e9db';
-const TBNB_RPC = 'https://data-seed-prebsc-1-s1.binance.org:8545';
+// RPC URLs from environment (with fallbacks for development)
+const SEPOLIA_RPC = process.env.SEPOLIA_RPC || process.env.SEPOLIA_URL || 
+  (process.env.INFURA_API_KEY ? `https://sepolia.infura.io/v3/${process.env.INFURA_API_KEY}` : 'https://rpc.sepolia.org');
+const TBNB_RPC = process.env.BNB_TESTNET_URL || 'https://bsc-testnet.publicnode.com';
 
 const pk = process.env.PRIVATE_KEY;
-if (!pk) { console.error('PRIVATE_KEY not set'); process.exit(1); }
+if (!pk) { console.error('PRIVATE_KEY not set in environment'); process.exit(1); }
 
 const sepProvider = new ethers.JsonRpcProvider(SEPOLIA_RPC);
 const bnbProvider = new ethers.JsonRpcProvider(TBNB_RPC);
