@@ -4,7 +4,13 @@ import axios from 'axios';
 import cors from 'cors';
 import 'dotenv/config';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import FormData from 'form-data';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -17,8 +23,11 @@ const corsOpts = {
 };
 app.use(cors(corsOpts));
 
-const ADDR_FILE = 'C:/Users/Tzuyu/Desktop/FYP/ai-project/address_v2_multi.json';
-const MODEL_MAP_FILE = 'C:/Users/Tzuyu/Desktop/FYP/ai-project/model_name_map.json';
+// Use relative paths (relative to project root, not server directory)
+const PROJECT_ROOT = path.resolve(__dirname, '..');
+const ADDR_FILE = path.join(PROJECT_ROOT, 'address_v2_multi.json');
+const MODEL_MAP_FILE = path.join(PROJECT_ROOT, 'model_name_map.json');
+
 const addrs = JSON.parse(fs.readFileSync(ADDR_FILE, 'utf8'));
 
 function loadModelMap() {
