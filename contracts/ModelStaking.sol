@@ -13,12 +13,12 @@ contract ModelStaking {
     // modelId → stake info
     mapping(uint256 => StakeInfo) public stakes;
 
-    // 质押参数（可由 ADMIN 调整）
+    // Staking parameters (adjustable by ADMIN)
     uint256 public minStake = 0.01 ether;
-    uint256 public slashRatio = 50;  // 罚没比例 50%
+    uint256 public slashRatio = 50;  // Slashing ratio 50%
     uint256 public lockPeriod = 7 days;
 
-    // 罚没资金接收地址（国库/DAO）
+    // Slashed funds receiver (treasury/DAO)
     address public treasury;
 
     uint256 public totalStaked;
@@ -74,7 +74,7 @@ contract ModelStaking {
 
     // ─── External Functions ───────────────────────────────────────────────────
 
-    /// @notice 质押（注册模型时调用，或后续追加质押）
+    /// @notice Stake (called during model registration or for additional staking)
     function stake(uint256 _modelId) external payable notBlacklisted {
         require(msg.value >= minStake, "Staking: below minimum stake");
         require(_modelId > 0, "Staking: invalid model id");
@@ -102,7 +102,7 @@ contract ModelStaking {
         emit StakeDeposited(_modelId, msg.sender, msg.value);
     }
 
-    /// @notice 提取质押（仅 staker，锁定期结束后）
+    /// @notice Withdraw stake (only by staker, after lock period)
     function withdraw(uint256 _modelId) external {
         StakeInfo storage info = stakes[_modelId];
         require(info.staker == msg.sender, "Staking: not staker");
@@ -120,7 +120,7 @@ contract ModelStaking {
         emit StakeWithdrawn(_modelId, msg.sender, amount);
     }
 
-    /// @notice 罚没质押（仅 ADMIN）
+    /// @notice Slash stake (ADMIN only)
     function slash(
         uint256 _modelId,
         string calldata _reason
@@ -153,7 +153,7 @@ contract ModelStaking {
         return slashedAmount;
     }
 
-    /// @notice 批量罚没（ADMIN）
+    /// @notice Batch slash (ADMIN only)
     function batchSlash(
         uint256[] calldata _modelIds,
         string calldata _reason

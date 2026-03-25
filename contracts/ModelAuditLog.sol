@@ -39,8 +39,8 @@ contract ModelAuditLog {
         address actor;
         uint256 targetId;       // modelId / tokenId / address
         uint256 timestamp;
-        bytes32 previousHash;   // 链式哈希（防篡改）
-        string metadata;         // 额外数据（JSON字符串存IPFS CID等）
+        bytes32 previousHash;   // Chain hash (tamper-proof)
+        string metadata;         // Extra data (JSON string for IPFS CID, etc.)
         bytes32 contentHash;    // 操作内容的哈希
     }
 

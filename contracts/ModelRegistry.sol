@@ -10,16 +10,16 @@ contract ModelRegistry {
     // ─── Enums ────────────────────────────────────────────────────────────────
 
     enum ModelStatus {
-        DRAFT,      // 草稿，可编辑
-        ACTIVE,     // 正式注册，可操作
-        DEPRECATED, // 已废弃（不再推荐使用）
-        REVOKED     // 已吊销（不可逆）
+        DRAFT,      // Draft, editable
+        ACTIVE,     // Active, operational
+        DEPRECATED, // Deprecated, not recommended
+        REVOKED     // Revoked, irreversible
     }
 
     enum VersionType {
-        MAJOR,  // 重大版本更新
-        MINOR,  // 次要版本更新
-        PATCH   // 补丁修复
+        MAJOR,  // Breaking changes
+        MINOR,  // New features
+        PATCH   // Bug fixes
     }
 
     // ─── Structs ─────────────────────────────────────────────────────────────
@@ -275,7 +275,7 @@ contract ModelRegistry {
         emit OwnershipTransferRequested(_modelId, msg.sender, _newOwner);
     }
 
-    /// @notice 接受转让
+    /// @notice Accept transfer
     function acceptTransfer(uint256 _modelId) external notBlacklisted {
         Transfer storage transfer = pendingTransfers[_modelId];
         if (transfer.from == address(0)) revert TransferNotPending();
@@ -293,7 +293,7 @@ contract ModelRegistry {
         emit OwnershipTransferAccepted(_modelId, oldOwner, msg.sender);
     }
 
-    /// @notice 取消转让
+    /// @notice Cancel transfer
     function cancelTransfer(uint256 _modelId) external {
         Transfer storage transfer = pendingTransfers[_modelId];
         if (transfer.from == address(0)) revert TransferNotPending();

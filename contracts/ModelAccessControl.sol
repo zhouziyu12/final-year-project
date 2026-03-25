@@ -17,7 +17,7 @@ contract ModelAccessControl {
     mapping(bytes32 => mapping(address => bool)) private _roles;
     mapping(address => bool) private _blacklist;
 
-    address public governance;  // 多签/DAO 治理地址（可升级角色）
+    address public governance;  // Multi-sig/DAO governance address (upgradeable role)
 
     // ─── Events ───────────────────────────────────────────────────────────────
 

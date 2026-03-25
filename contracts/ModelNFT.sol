@@ -23,9 +23,9 @@ contract ModelNFT {
 
     ModelAccessControl public accessControl;
 
-    // tokenId → modelId（在 ModelRegistry 中的 ID）
+    // tokenId → modelId（Model ID in ModelRegistry）
     mapping(uint256 => uint256) public tokenToModel;
-    // modelId → tokenId（1:1 映射）
+    // modelId → tokenId（1:1 mapping）
     mapping(uint256 => uint256) public modelToToken;
     // modelId → 是否已铸造 NFT
     mapping(uint256 => bool) public modelHasNft;
