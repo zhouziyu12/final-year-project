@@ -1,1 +1,2 @@
-export { Header, PageContainer, PageHeader, Tabs } from './Header';
+export { DesktopLayout } from './DesktopLayout';
+export { MobileLayout } from './MobileLayout';
