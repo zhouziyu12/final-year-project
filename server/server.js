@@ -197,9 +197,37 @@ app.get('/api/v2/audit/recent', handle(async (req, res) => {
   
   const { mal } = getContracts(chain);
   const addr = chains[chain].addr.contracts.ModelAuditLog;
-  const fromBlock = await chains[chain].provider.getBlockNumber() - 1000;
-  const filter = { address: addr, fromBlock, toBlock: 'latest' };
-  const logs = await chains[chain].provider.getLogs(filter);
+  const currentBlock = await chains[chain].provider.getBlockNumber();
+  
+  // Helper to fetch logs with retry
+  async function fetchLogs(fromBlock, toBlock, retries = 2) {
+    const filter = { address: addr, fromBlock, toBlock };
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await chains[chain].provider.getLogs(filter);
+      } catch (e) {
+        if (i < retries - 1 && e.code === 'NETWORK_ERROR') {
+          // Wait and retry (rate limit recovery)
+          await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+          continue;
+        }
+        throw e;
+      }
+    }
+    return [];
+  }
+  
+  // Start with small range (50 blocks) to avoid rate limits
+  const fromBlock = Math.max(currentBlock - 50, 1);
+  const toBlock = currentBlock;
+  
+  let logs = [];
+  try {
+    logs = await fetchLogs(fromBlock, toBlock);
+  } catch (e) {
+    console.log(`[AUDIT] Fetch error: ${e.message.slice(0, 80)}`);
+    // Return empty events on error (graceful degradation)
+  }
   
   const events = logs.map(l => {
     try {
@@ -221,7 +249,7 @@ app.get('/api/v2/audit/recent', handle(async (req, res) => {
     } catch { return null; }
   }).filter(Boolean).slice(-limit);
   
-  ok(res, { events });
+  ok(res, { events, blockRange: { from: fromBlock, to: toBlock } });
 }));
 
 // Get model by ID
