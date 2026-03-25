@@ -1,1 +1,1 @@
-export { Header, PageContainer, PageHeader } from './Header';
+export { Header, PageContainer, PageHeader, Tabs } from './Header';

@@ -1,131 +1,70 @@
 import React from 'react';
-import { Card, Badge, StatusDot, Skeleton } from '../components/ui';
+import { Card, StatCard, StatusDot, Skeleton } from '../components/ui';
 
-/**
- * Dashboard Page
- */
 export function DashboardPage({ status, loading }) {
   const stats = [
-    { label: 'Total Models', value: status?.totalModels || 0, color: 'text-blue-600' },
-    { label: 'Total Audits', value: status?.totalAudits || 0, color: 'text-emerald-600' },
-    { label: 'IPFS Storage', value: status?.ipfsStorage || 'Connected', color: 'text-purple-600' },
+    { label: 'Models', value: status?.totalModels || 0, accent: 'cyan' },
+    { label: 'Audits', value: status?.totalAudits || 0, accent: 'emerald' },
+    { label: 'ZK Engine', value: status?.zkReady ? 'Active' : 'Off', accent: status?.zkReady ? 'purple' : 'rose' },
+    { label: 'IPFS', value: 'Online', accent: 'amber' },
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="space-y-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, i) => (
-          <Card key={i} className="text-center">
-            {loading ? (
-              <>
-                <Skeleton className="h-4 w-20 mx-auto mb-2" />
-                <Skeleton className="h-8 w-16 mx-auto" />
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
-                <p className={`text-3xl font-bold ${stat.color}`}>{stat.value}</p>
-              </>
-            )}
-          </Card>
+          <div key={i} className="animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
+            {loading ? <Skeleton className="h-32" /> : <StatCard {...stat} />}
+          </div>
         ))}
       </div>
 
-      {/* Status Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Network Status */}
-        <Card title="Network Status">
-          {loading ? (
-            <Skeleton className="h-24" />
-          ) : (
+        <Card title="Networks" className="animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+          {loading ? <Skeleton className="h-40" /> : (
             <div className="space-y-3">
               {Object.entries(status?.chains || {}).map(([chain, info]) => (
-                <div key={chain} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div key={chain} className="flex items-center justify-between p-3 rounded-lg bg-slate-900/50">
                   <div className="flex items-center gap-3">
                     <StatusDot status={info.connected ? 'online' : 'offline'} />
-                    <span className="font-medium capitalize">{chain}</span>
+                    <span className="text-white capitalize">{chain}</span>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm text-gray-600">
-                      Block #{info.blockNumber?.toLocaleString() || 'N/A'}
-                    </p>
-                    <p className="text-xs text-gray-400 font-mono">
-                      {info.contractAddress || 'No contract'}
-                    </p>
-                  </div>
+                  <span className="text-cyan-400 font-mono text-sm">#{info.blockNumber?.toLocaleString()}</span>
                 </div>
               ))}
             </div>
           )}
         </Card>
 
-        {/* Quick Actions */}
-        <Card title="Quick Actions">
-          <div className="space-y-3">
-            <QuickAction
-              icon="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              title="Register New Model"
-              description="Add your AI model to the blockchain"
-              to="#register"
-            />
-            <QuickAction
-              icon="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-              title="Verify Model"
-              description="Generate ZK proof for a model"
-              to="#audit"
-            />
-            <QuickAction
-              icon="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-              title="View NFT Gallery"
-              description="Browse verified model NFTs"
-              to="#nft"
-            />
+        <Card title="Actions" className="animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
+          <div className="grid grid-cols-2 gap-3">
+            <a href="#register" className="flex items-center gap-3 p-4 rounded-lg border border-cyan-500/30 bg-cyan-500/5 hover:bg-cyan-500/10 transition-all">
+              <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center text-cyan-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+              </div>
+              <span className="text-cyan-400">Register</span>
+            </a>
+            <a href="#audit" className="flex items-center gap-3 p-4 rounded-lg border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all">
+              <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" /></svg>
+              </div>
+              <span className="text-emerald-400">Verify</span>
+            </a>
+            <a href="#nft" className="flex items-center gap-3 p-4 rounded-lg border border-purple-500/30 bg-purple-500/5 hover:bg-purple-500/10 transition-all">
+              <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" /></svg>
+              </div>
+              <span className="text-purple-400">NFTs</span>
+            </a>
+            <a href="#" className="flex items-center gap-3 p-4 rounded-lg border border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-all">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2z" /></svg>
+              </div>
+              <span className="text-amber-400">Stats</span>
+            </a>
           </div>
         </Card>
       </div>
-
-      {/* Recent Activity */}
-      <Card title="System Info">
-        {loading ? (
-          <Skeleton className="h-32" />
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <InfoItem label="Server" value="Online" />
-            <InfoItem label="API Version" value="v1.0.0" />
-            <InfoItem label="ZK Circuit" value={status?.zkReady ? 'Ready' : 'Loading'} />
-            <InfoItem label="Last Sync" value={new Date().toLocaleTimeString()} />
-          </div>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-function QuickAction({ icon, title, description, to }) {
-  return (
-    <a
-      href={to}
-      className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-    >
-      <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-        <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
-        </svg>
-      </div>
-      <div>
-        <p className="font-medium text-gray-900">{title}</p>
-        <p className="text-sm text-gray-500">{description}</p>
-      </div>
-    </a>
-  );
-}
-
-function InfoItem({ label, value }) {
-  return (
-    <div className="text-center p-3">
-      <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-      <p className="text-sm font-semibold text-gray-900 mt-1">{value}</p>
     </div>
   );
 }

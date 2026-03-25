@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Header Component
+ * Cyber Header Component
  */
 export function Header({ 
   title = 'AI Model Provenance',
@@ -10,30 +10,54 @@ export function Header({
   className = ''
 }) {
   return (
-    <header className={`bg-white border-b border-gray-200 ${className}`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo & Title */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
+    <header className={`relative z-50 ${className}`}>
+      {/* Main header background */}
+      <div 
+        className="border-b border-white/5"
+        style={{ 
+          background: 'linear-gradient(180deg, rgba(10, 11, 15, 0.98) 0%, rgba(10, 11, 15, 0.95) 100%)',
+          backdropFilter: 'blur(16px)',
+        }}
+      >
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex items-center justify-between h-20">
+            {/* Logo & Title */}
+            <div className="flex items-center gap-4">
+              {/* Logo */}
+              <div className="relative">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+                  {/* Shield icon with circuit pattern */}
+                  <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
+                </div>
+                {/* Glow effect */}
+                <div className="absolute inset-0 w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-purple-500 blur-xl opacity-30 -z-10" />
+              </div>
+              
+              {/* Title */}
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight">
+                  {title}
+                </h1>
+                {subtitle && (
+                  <p className="text-sm text-slate-400 tracking-wide">{subtitle}</p>
+                )}
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">{title}</h1>
-              {subtitle && <p className="text-sm text-gray-500">{subtitle}</p>}
-            </div>
+            
+            {/* Actions */}
+            {actions && (
+              <div className="flex items-center gap-4">
+                {actions}
+              </div>
+            )}
           </div>
-          
-          {/* Actions */}
-          {actions && (
-            <div className="flex items-center gap-3">
-              {actions}
-            </div>
-          )}
         </div>
       </div>
+      
+      {/* Accent line */}
+      <div className="h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
     </header>
   );
 }
@@ -43,9 +67,9 @@ export function Header({
  */
 export function PageContainer({ children, className = '' }) {
   return (
-    <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 ${className}`}>
+    <main className={`max-w-7xl mx-auto px-6 py-8 ${className}`}>
       {children}
-    </div>
+    </main>
   );
 }
 
@@ -55,19 +79,60 @@ export function PageContainer({ children, className = '' }) {
 export function PageHeader({ title, description, actions }) {
   return (
     <div className="mb-8">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+        {/* Left side */}
+        <div className="flex-1">
+          {/* Decorative line */}
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-px bg-cyan-500" />
+            <span className="text-xs text-cyan-400/70 uppercase tracking-widest">Section</span>
+          </div>
+          
+          <h2 className="text-3xl font-bold text-white tracking-tight">
+            {title}
+          </h2>
+          
           {description && (
-            <p className="mt-1 text-gray-600">{description}</p>
+            <p className="mt-2 text-slate-400 max-w-2xl">
+              {description}
+            </p>
           )}
         </div>
+        
+        {/* Right side - Actions */}
         {actions && (
           <div className="flex items-center gap-3">
             {actions}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Tab Navigation
+ */
+export function Tabs({ items, activeTab, onChange }) {
+  return (
+    <div className="flex items-center gap-1 p-1 bg-slate-900/50 rounded-xl border border-white/5">
+      {items.map((item) => (
+        <button
+          key={item.id}
+          onClick={() => onChange(item.id)}
+          className={`
+            flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium
+            transition-all duration-200
+            ${activeTab === item.id
+              ? 'bg-gradient-to-r from-cyan-500/20 to-cyan-500/10 text-cyan-400 border border-cyan-500/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+            }
+          `}
+        >
+          {item.icon}
+          {item.label}
+        </button>
+      ))}
     </div>
   );
 }

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Button, Input, Alert } from '../ui';
+import { Button, Input } from '../ui';
 
 /**
- * Audit Form Component
+ * Cyber Audit Form Component
  */
 export function AuditForm({ onSubmit, loading = false }) {
   const [formData, setFormData] = useState({
@@ -21,14 +21,18 @@ export function AuditForm({ onSubmit, loading = false }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
       <Input
         label="Model ID"
         name="modelId"
         value={formData.modelId}
         onChange={handleChange}
         placeholder="0x1234...abcd"
-        required
+        icon={
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+          </svg>
+        }
       />
       
       <Input
@@ -39,9 +43,14 @@ export function AuditForm({ onSubmit, loading = false }) {
         placeholder="1"
         type="number"
         min="1"
+        icon={
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z" />
+          </svg>
+        }
       />
       
-      <Button type="submit" loading={loading}>
+      <Button type="submit" loading={loading} variant="purple" glow className="mt-4">
         Generate ZK Proof
       </Button>
     </form>
@@ -55,14 +64,26 @@ export function AuditResult({ result }) {
   if (!result) return null;
 
   return (
-    <Alert variant="success" title="Audit Complete">
+    <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+      <div className="flex items-center gap-3 mb-3">
+        <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+          <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <span className="font-semibold text-emerald-400">Verification Complete</span>
+      </div>
+      
       <div className="space-y-2">
-        <p className="font-mono text-sm break-all">{result.proof}</p>
-        <div className="flex items-center gap-2 pt-2 border-t border-emerald-200 mt-2">
-          <span className="text-xs text-emerald-600 font-medium">Verified:</span>
-          <span className="text-xs font-mono">{result.publicSignals}</span>
+        <div>
+          <span className="text-xs text-slate-400 uppercase tracking-wider">Proof</span>
+          <p className="font-mono text-sm text-slate-300 break-all">{result.proof}</p>
+        </div>
+        <div>
+          <span className="text-xs text-slate-400 uppercase tracking-wider">Public Signals</span>
+          <p className="font-mono text-sm text-slate-300">{result.publicSignals}</p>
         </div>
       </div>
-    </Alert>
+    </div>
   );
 }

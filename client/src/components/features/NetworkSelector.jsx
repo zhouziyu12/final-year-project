@@ -1,35 +1,57 @@
 import React from 'react';
 
 /**
- * Network Selector Component
+ * Cyber Network Selector Component
  */
 export function NetworkSelector({ 
   value, 
   onChange, 
   networks = [
-    { id: 'sepolia', name: 'Sepolia', color: 'bg-blue-500' },
-    { id: 'tbnb', name: 'BNB Testnet', color: 'bg-yellow-500' },
-    { id: 'somnia', name: 'Somnia', color: 'bg-purple-500' },
+    { id: 'sepolia', name: 'Sepolia', color: '#3b82f6' },
+    { id: 'tbnb', name: 'BNB Testnet', color: '#f59e0b' },
+    { id: 'somnia', name: 'Somnia', color: '#8b5cf6' },
   ],
   className = ''
 }) {
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      {networks.map(network => (
+      {networks.map((network) => (
         <button
           key={network.id}
           onClick={() => onChange(network.id)}
           className={`
-            flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
-            transition-all duration-150
+            relative flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium
+            transition-all duration-200 overflow-hidden
             ${value === network.id
-              ? 'bg-gray-900 text-white'
-              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+              ? 'text-white'
+              : 'text-slate-400 hover:text-slate-200'
             }
           `}
         >
-          <span className={`w-2 h-2 rounded-full ${network.color} ${value === network.id ? 'bg-white' : ''}`} />
-          {network.name}
+          {/* Background */}
+          {value === network.id && (
+            <>
+              <div 
+                className="absolute inset-0 opacity-20"
+                style={{ background: `linear-gradient(135deg, ${network.color}40 0%, ${network.color}20 100%)` }}
+              />
+              <div 
+                className="absolute inset-0 border rounded-lg"
+                style={{ borderColor: `${network.color}50` }}
+              />
+            </>
+          )}
+          
+          {/* Indicator dot */}
+          <span 
+            className="relative w-2 h-2 rounded-full transition-all duration-200"
+            style={{ 
+              backgroundColor: value === network.id ? network.color : '#475569',
+              boxShadow: value === network.id ? `0 0 8px ${network.color}` : 'none'
+            }}
+          />
+          
+          <span className="relative">{network.name}</span>
         </button>
       ))}
     </div>
