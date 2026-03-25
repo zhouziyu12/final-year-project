@@ -1,102 +1,92 @@
 import React from 'react';
 
-/**
- * Cyber Card Component
- * Glass-effect cards with subtle borders and glow effects
- */
 export function Card({ 
   children, 
-  title, 
-  subtitle,
-  className = '',
+  className = '', 
+  hover = true,
   glow = false,
-  variant = 'default', // default, elevated, glow
-  padding = true,
+  gradient = false,
   ...props 
 }) {
-  const variants = {
-    default: 'bg-[var(--bg-card)] border border-white/5',
-    elevated: 'bg-[var(--bg-elevated)] border border-white/10',
-    glow: 'bg-[var(--bg-card)] border border-cyan-500/30 shadow-lg shadow-cyan-500/10',
-  };
-
+  const baseStyles = `
+    relative overflow-hidden rounded-xl sm:rounded-2xl
+    border border-white/5
+    transition-all duration-300
+    ${hover ? 'hover:border-white/10 hover:shadow-xl hover:shadow-cyan-500/5' : ''}
+    ${glow ? 'shadow-[0_0_30px_rgba(34,211,238,0.15)]' : ''}
+  `;
+  
+  const gradientStyle = gradient ? {
+    background: 'linear-gradient(135deg, rgba(22, 24, 34, 0.9) 0%, rgba(18, 20, 28, 0.95) 100%)',
+  } : {};
+  
   return (
-    <div 
-      className={`
-        rounded-xl backdrop-blur-sm
-        ${variants[variant]}
-        ${glow ? 'shadow-lg shadow-cyan-500/10 border-cyan-500/30' : ''}
-        ${className}
-      `}
-      style={{
-        background: 'linear-gradient(135deg, rgba(22, 24, 34, 0.9) 0%, rgba(18, 20, 28, 0.95) 100%)',
-        backdropFilter: 'blur(12px)',
-      }}
-      {...props}
-    >
-      {/* Card header with accent line */}
-      {(title || subtitle) && (
-        <div className="relative px-6 pt-6 pb-4">
-          {/* Top accent line */}
-          <div className="absolute top-0 left-6 right-6 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent" />
-          
-          {title && (
-            <h3 className="text-lg font-semibold text-white tracking-wide">
-              {title}
-            </h3>
-          )}
-          {subtitle && (
-            <p className="text-sm text-slate-400 mt-1">{subtitle}</p>
-          )}
-        </div>
+    <div className={baseStyles + ' ' + className} style={gradientStyle}>
+      {gradient && (
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5 pointer-events-none" />
       )}
-      
-      <div className={padding ? 'px-6 pb-6' : ''}>
-        {children}
-      </div>
+      {children}
     </div>
   );
 }
 
-/**
- * Stat Card - Special card for dashboard stats
- */
-export function StatCard({ label, value, change, icon, accent = 'cyan' }) {
-  const accentColors = {
-    cyan: 'from-cyan-500 to-cyan-400',
-    purple: 'from-purple-500 to-purple-400',
-    emerald: 'from-emerald-500 to-emerald-400',
-    amber: 'from-amber-500 to-amber-400',
-    rose: 'from-rose-500 to-rose-400',
-  };
-
+export function CardHeader({ children, className = '' }) {
   return (
-    <div 
-      className="relative overflow-hidden p-6 rounded-xl border border-white/5"
-      style={{ background: 'linear-gradient(135deg, rgba(22, 24, 34, 0.95) 0%, rgba(18, 20, 28, 0.98) 100%)' }}
-    >
-      {/* Decorative gradient orbs */}
-      <div className={`absolute -top-10 -right-10 w-32 h-32 rounded-full bg-gradient-to-br ${accentColors[accent]} opacity-10 blur-3xl`} />
-      
-      <div className="relative z-10">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-slate-400 uppercase tracking-wider">{label}</span>
-          {icon && (
-            <div className={`w-10 h-10 rounded-lg bg-gradient-to-br ${accentColors[accent]} flex items-center justify-center text-gray-900`}>
-              {icon}
-            </div>
-          )}
-        </div>
-        
-        <div className="flex items-end justify-between">
-          <span className="text-4xl font-bold text-white tracking-tight">{value}</span>
-          {change && (
-            <span className={`text-sm font-medium ${change > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {change > 0 ? '+' : ''}{change}%
-            </span>
-          )}
-        </div>
-      </div>
+    <div className={`px-4 sm:px-6 py-4 sm:py-5 border-b border-white/5 ${className}`}>
+      {children}
     </div>
   );
+}
+
+export function CardTitle({ children, className = '' }) {
+  return (
+    <h3 className={`text-base sm:text-lg font-semibold text-white ${className}`}>
+      {children}
+    </h3>
+  );
+}
+
+export function CardDescription({ children, className = '' }) {
+  return (
+    <p className={`text-sm text-slate-400 mt-1 ${className}`}>
+      {children}
+    </p>
+  );
+}
+
+export function CardContent({ children, className = '' }) {
+  return (
+    <div className={`px-4 sm:px-6 py-4 sm:py-5 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+export function CardFooter({ children, className = '' }) {
+  return (
+    <div className={`px-4 sm:px-6 py-4 sm:py-5 border-t border-white/5 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+export function StatCard({ label, value, accent = 'cyan' }) {
+  const colors = {
+    cyan: { bg: 'from-cyan-500/20 to-cyan-500/5', text: 'text-cyan-400', border: 'border-cyan-500/20' },
+    emerald: { bg: 'from-emerald-500/20 to-emerald-500/5', text: 'text-emerald-400', border: 'border-emerald-500/20' },
+    purple: { bg: 'from-purple-500/20 to-purple-500/5', text: 'text-purple-400', border: 'border-purple-500/20' },
+    amber: { bg: 'from-amber-500/20 to-amber-500/5', text: 'text-amber-400', border: 'border-amber-500/20' },
+    rose: { bg: 'from-rose-500/20 to-rose-500/5', text: 'text-rose-400', border: 'border-rose-500/20' },
+  };
+  const c = colors[accent] || colors.cyan;
+  return (
+    <div className={`relative overflow-hidden rounded-xl sm:rounded-2xl border ${c.border} bg-gradient-to-br ${c.bg} p-4 sm:p-6 transition-all duration-300 hover:scale-[1.02]`}>
+      <p className="text-xs sm:text-sm text-slate-400 mb-1 sm:mb-2">{label}</p>
+      <p className={`text-2xl sm:text-3xl font-bold ${c.text}`}>{value}</p>
+    </div>
+  );
+}
+
+export function StatusDot({ status }) {
+  return <div className={`w-2.5 h-2.5 rounded-full ${status === 'online' ? 'bg-emerald-400 shadow-lg shadow-emerald-400/50' : 'bg-slate-600'}`} />;
 }
