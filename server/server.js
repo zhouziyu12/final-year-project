@@ -12,6 +12,36 @@ import FormData from 'form-data';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ─── Error Handling Utilities ─────────────────────────────────────────────────
+
+/**
+ * Send success response (200)
+ */
+const ok = (res, data) => res.status(200).json({ success: true, ...data });
+
+/**
+ * Send error response with HTTP status code
+ */
+const err = (res, message, statusCode = 500) => {
+  res.status(statusCode).json({ success: false, error: message });
+};
+
+/**
+ * Async handler wrapper - catches errors and handles them properly
+ */
+const handle = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch((e) => {
+    console.error(`[ERROR] ${req.method} ${req.path}:`, e.message);
+    // Map common errors to appropriate HTTP codes
+    if (e.code === 'CALL_EXCEPTION') return err(res, 'Blockchain error: ' + e.reason || e.message, 502);
+    if (e.code === 'INSUFFICIENT_FUNDS') return err(res, 'Insufficient funds', 400);
+    if (e.code === 'NETWORK_ERROR') return err(res, 'Network error, please retry', 503);
+    err(res, e.message || 'Internal server error', 500);
+  });
+};
+
+// ─── App Setup ───────────────────────────────────────────────────────────────
+
 const app = express();
 app.use(express.json({ limit: '50mb' }));
 const corsOpts = {
@@ -23,12 +53,25 @@ const corsOpts = {
 };
 app.use(cors(corsOpts));
 
+// Request logging
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
+
 // Use relative paths (relative to project root, not server directory)
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ADDR_FILE = path.join(PROJECT_ROOT, 'address_v2_multi.json');
 const MODEL_MAP_FILE = path.join(PROJECT_ROOT, 'model_name_map.json');
 
-const addrs = JSON.parse(fs.readFileSync(ADDR_FILE, 'utf8'));
+// Load addresses with error handling
+let addrs;
+try {
+  addrs = JSON.parse(fs.readFileSync(ADDR_FILE, 'utf8'));
+} catch (e) {
+  console.error('Failed to load address file:', ADDR_FILE);
+  process.exit(1);
+}
 
 function loadModelMap() {
   try {
@@ -125,201 +168,236 @@ function getContracts(chain) {
 const bigintReplacer = (k, v) => typeof v === 'bigint' ? v.toString() : v;
 const safeJson = (data) => JSON.parse(JSON.stringify(data, bigintReplacer));
 
+// Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: Date.now() });
+  ok(res, { status: 'ok', timestamp: Date.now() });
 });
 
-app.get('/api/v2/status', async (req, res) => {
-  try {
-    const result = {};
-    for (const chain of ['sepolia', 'tbnb']) {
-      const c = chains[chain];
-      const block = await c.provider.getBlockNumber();
-      result[chain] = { blockNumber: block, connected: true };
-    }
-    res.json({ success: true, chains: result });
-  } catch(e) {
-    res.json({ success: false, error: e.message });
+// Network status
+app.get('/api/v2/status', handle(async (req, res) => {
+  const result = {};
+  for (const chain of ['sepolia', 'tbnb']) {
+    const c = chains[chain];
+    const block = await c.provider.getBlockNumber();
+    const balance = await c.provider.getBalance(c.wallet.address);
+    result[chain] = { 
+      blockNumber: block, 
+      connected: true,
+      balance: ethers.formatEther(balance)
+    };
   }
-});
+  ok(res, { chains: result });
+}));
 
-app.get('/api/v2/audit/recent', async (req, res) => {
-  try {
-    const chain = req.query.chain || 'sepolia';
-    const limit = parseInt(req.query.limit) || 10;
-    const { mal } = getContracts(chain);
-    const addr = chains[chain].addr.contracts.ModelAuditLog;
-    const fromBlock = await chains[chain].provider.getBlockNumber() - 1000;
-    const filter = { address: addr, fromBlock, toBlock: 'latest' };
-    const logs = await chains[chain].provider.getLogs(filter);
-    const events = logs.map(l => {
-      try {
-        const parsed = mal.interface.parseLog(l);
-        const args = {};
-        if (parsed.args) {
-          for (let i = 0; i < parsed.args.length; i++) {
-            args[i] = String(parsed.args[i]);
-          }
-        }
-        return {
-          blockNumber: l.blockNumber,
-          blockHash: l.blockHash,
-          transactionHash: l.transactionHash,
-          contractAddress: l.address,
-          event: parsed.name,
-          args
-        };
-      } catch { return null; }
-    }).filter(Boolean).slice(-limit);
-    res.json({ success: true, events });
-  } catch(e) {
-    res.json({ success: false, error: e.message });
-  }
-});
-
-app.get('/api/v2/models/:id', async (req, res) => {
-  try {
-    const chain = req.query.chain || 'sepolia';
-    const id = parseInt(req.params.id);
-    const { mr } = getContracts(chain);
+// Recent audit events
+app.get('/api/v2/audit/recent', handle(async (req, res) => {
+  const chain = req.query.chain || 'sepolia';
+  if (!chains[chain]) return err(res, `Invalid chain: ${chain}`, 400);
+  const limit = Math.min(parseInt(req.query.limit) || 10, 100);
+  
+  const { mal } = getContracts(chain);
+  const addr = chains[chain].addr.contracts.ModelAuditLog;
+  const fromBlock = await chains[chain].provider.getBlockNumber() - 1000;
+  const filter = { address: addr, fromBlock, toBlock: 'latest' };
+  const logs = await chains[chain].provider.getLogs(filter);
+  
+  const events = logs.map(l => {
     try {
-      const owner = await mr.getModelOwner(id);
-      if (owner === '0x0000000000000000000000000000000000000000') {
-        return res.json({ success: false, error: 'Model not found' });
+      const parsed = mal.interface.parseLog(l);
+      const args = {};
+      if (parsed.args) {
+        for (let i = 0; i < parsed.args.length; i++) {
+          args[i] = String(parsed.args[i]);
+        }
       }
-      const status = await mr.getModelStatus(id);
-      const staked = await mr.isModelStaked(id);
-      const statusNames = ['DRAFT', 'ACTIVE', 'DEPRECATED', 'REVOKED'];
-      res.json({ success: true, id, owner, status: statusNames[status], staked });
-    } catch {
-      res.json({ success: false, error: 'Model not found' });
-    }
-  } catch(e) {
-    res.json({ success: false, error: e.message });
-  }
-});
+      return {
+        blockNumber: l.blockNumber,
+        blockHash: l.blockHash,
+        transactionHash: l.transactionHash,
+        contractAddress: l.address,
+        event: parsed.name,
+        args
+      };
+    } catch { return null; }
+  }).filter(Boolean).slice(-limit);
+  
+  ok(res, { events });
+}));
 
-app.post('/api/sdk/provenance', async (req, res) => {
+// Get model by ID
+app.get('/api/v2/models/:id', handle(async (req, res) => {
+  const chain = req.query.chain || 'sepolia';
+  if (!chains[chain]) return err(res, `Invalid chain: ${chain}`, 400);
+  const id = parseInt(req.params.id);
+  if (isNaN(id) || id <= 0) return err(res, 'Invalid model ID', 400);
+  
+  const { mr } = getContracts(chain);
   try {
-    const { modelId, modelHash, action, sender, ipfsHash, metadataCid, chain, modelName, versionTag } = req.body;
-    const c = chain || 'sepolia';
-    const { mr, mpt } = getContracts(c);
+    const owner = await mr.getModelOwner(id);
+    if (owner === '0x0000000000000000000000000000000000000000') {
+      return err(res, 'Model not found', 404);
+    }
+    const status = await mr.getModelStatus(id);
+    const staked = await mr.isModelStaked(id);
+    const statusNames = ['DRAFT', 'ACTIVE', 'DEPRECATED', 'REVOKED'];
+    ok(res, { id, owner, status: statusNames[status], staked });
+  } catch (e) {
+    err(res, 'Model not found', 404);
+  }
+}));
 
-    const actionMap = { 'REGISTERED': 0, 'ACTIVATED': 1, 'UPDATED': 2, 'DEPRECATED': 3, 'REVOKED': 4, 'VERSION_RELEASED': 5, 'TRANSFERRED': 6, 'STAKED': 7, 'UNSTAKED': 8, 'SLASHED': 9, 'ZK_PROOF_VERIFIED': 10 };
-    const eventType = actionMap[action] ?? 0;
-    const metaStr = JSON.stringify({ modelHash, ipfsHash, metadataCid, action, sender, timestamp: Date.now(), versionTag });
+// Provenance tracking (SDK endpoint)
+app.post('/api/sdk/provenance', handle(async (req, res) => {
+  const { modelId, modelHash, action, sender, ipfsHash, metadataCid, chain, modelName, versionTag } = req.body;
+  
+  if (!modelId && !modelName) {
+    return err(res, 'Either modelId or modelName is required', 400);
+  }
+  
+  const c = chain || 'sepolia';
+  if (!chains[c]) return err(res, `Invalid chain: ${c}`, 400);
+  
+  const { mr, mpt } = getContracts(c);
 
-    let actualModelId = modelId;
-    let isNewModel = false;
+  const actionMap = { 'REGISTERED': 0, 'ACTIVATED': 1, 'UPDATED': 2, 'DEPRECATED': 3, 'REVOKED': 4, 'VERSION_RELEASED': 5, 'TRANSFERRED': 6, 'STAKED': 7, 'UNSTAKED': 8, 'SLASHED': 9, 'ZK_PROOF_VERIFIED': 10 };
+  const eventType = actionMap[action] ?? 0;
+  const metaStr = JSON.stringify({ modelHash, ipfsHash, metadataCid, action, sender, timestamp: Date.now(), versionTag });
 
-    if (modelName) {
-      const mapKey = `${c}:${modelName}`;
-      if (modelNameMap[mapKey]) {
-        actualModelId = modelNameMap[mapKey];
-        console.log(`[PROVENANCE] Using existing model ${actualModelId} for "${modelName}"`);
-      } else {
-        try {
-          const regTx = await mr.registerModel(modelName, 'Auto-registered', ipfsHash || '', modelHash, 'PyTorch', 'MIT');
-          const receipt = await regTx.wait();
-          for (const log of receipt.logs) {
+  let actualModelId = modelId;
+  let isNewModel = false;
+
+  if (modelName) {
+    const mapKey = `${c}:${modelName}`;
+    if (modelNameMap[mapKey]) {
+      actualModelId = modelNameMap[mapKey];
+      console.log(`[PROVENANCE] Using existing model ${actualModelId} for "${modelName}"`);
+    } else {
+      try {
+        const regTx = await mr.registerModel(modelName, 'Auto-registered', ipfsHash || '', modelHash, 'PyTorch', 'MIT');
+        const receipt = await regTx.wait();
+        for (const log of receipt.logs) {
+          try {
+            const parsed = mr.interface.parseLog({ topics: log.topics, data: log.data });
+            if (parsed.name === 'ModelRegistered') {
+              actualModelId = Number(parsed.args[0]);
+              break;
+            }
+          } catch {}
+        }
+        if (actualModelId === modelId) {
+          for (let id = 999; id > 0; id--) {
             try {
-              const parsed = mr.interface.parseLog({ topics: log.topics, data: log.data });
-              if (parsed.name === 'ModelRegistered') {
-                actualModelId = Number(parsed.args[0]);
-                break;
-              }
+              const h = await mpt.getModelHistory(id);
+              if (h.length === 0) { actualModelId = id; break; }
             } catch {}
           }
-          if (actualModelId === modelId) {
-            for (let id = 999; id > 0; id--) {
-              try {
-                const h = await mpt.getModelHistory(id);
-                if (h.length === 0) { actualModelId = id; break; }
-              } catch {}
-            }
-          }
-          modelNameMap[mapKey] = actualModelId;
-          saveModelMap(modelNameMap);
-          isNewModel = true;
-          console.log(`[PROVENANCE] Registered new model ${actualModelId} for "${modelName}"`);
-        } catch (e) {
-          console.log(`[PROVENANCE] Register failed, using modelId ${modelId}: ${e.message.slice(0,100)}`);
         }
+        modelNameMap[mapKey] = actualModelId;
+        saveModelMap(modelNameMap);
+        isNewModel = true;
+        console.log(`[PROVENANCE] Registered new model ${actualModelId} for "${modelName}"`);
+      } catch (e) {
+        console.log(`[PROVENANCE] Register failed, using modelId ${modelId}: ${e.message.slice(0,100)}`);
       }
     }
-
-    const tx = await mpt.addRecord(actualModelId, eventType, metaStr);
-    await tx.wait();
-    res.json({ success: true, tx: tx.hash, modelId: actualModelId, eventType, isNewModel });
-  } catch(e) {
-    res.json({ success: false, error: e.message });
   }
+
+  const tx = await mpt.addRecord(actualModelId, eventType, metaStr);
+  await tx.wait();
+  ok(res, { tx: tx.hash, modelId: actualModelId, eventType, isNewModel });
+}));
+
+// IPFS file upload
+app.post('/api/ipfs/upload/file', handle(async (req, res) => {
+  const { data, fileName } = req.body;
+  
+  if (!data) return err(res, 'Missing data field', 400);
+  
+  const apiKey = process.env.PINATA_API_KEY;
+  const apiSecret = process.env.PINATA_SECRET;
+  
+  if (!apiKey || !apiSecret) {
+    return err(res, 'Pinata credentials not configured', 503);
+  }
+  
+  const buf = Buffer.from(data, 'base64');
+  const formData = new FormData();
+  formData.append('file', buf, { filename: fileName || 'file' });
+  
+  const pinataUrl = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
+  const hdrs = formData.getHeaders();
+  const headers = { ...hdrs, pinata_api_key: apiKey, pinata_secret_api_key: apiSecret };
+  
+  const resp = await axios.post(pinataUrl, formData, { headers });
+  const cid = resp.data.IpfsHash;
+  const gatewayUrl = 'https://gateway.pinata.cloud/ipfs/' + cid;
+  
+  ok(res, { cid, gatewayUrl });
+}));
+
+// IPFS metadata upload
+app.post('/api/ipfs/upload/metadata', handle(async (req, res) => {
+  const { metadata } = req.body;
+  
+  if (!metadata) return err(res, 'Missing metadata field', 400);
+  
+  const apiKey = process.env.PINATA_API_KEY;
+  const apiSecret = process.env.PINATA_SECRET;
+  
+  if (!apiKey || !apiSecret) {
+    return err(res, 'Pinata credentials not configured', 503);
+  }
+  
+  const pinataUrl = 'https://api.pinata.cloud/pinning/pinJSONToIPFS';
+  const body = { pinataContent: metadata, pinataMetadata: { name: 'metadata' } };
+  const headers = { pinata_api_key: apiKey, pinata_secret_api_key: apiSecret };
+  
+  const resp = await axios.post(pinataUrl, body, { headers });
+  const cid = resp.data.IpfsHash;
+  const gatewayUrl = 'https://gateway.pinata.cloud/ipfs/' + cid;
+  
+  ok(res, { cid, gatewayUrl });
+}));
+
+// IPFS content retrieval
+app.get('/api/ipfs/cat/:cid', handle(async (req, res) => {
+  const { cid } = req.params;
+  
+  if (!cid) return err(res, 'Missing CID', 400);
+  
+  const gateways = [
+    'https://gateway.pinata.cloud/ipfs/' + cid,
+    'https://ipfs.io/ipfs/' + cid
+  ];
+  
+  for (const url of gateways) {
+    try {
+      const r = await axios.get(url, { responseType: 'arraybuffer', timeout: 5000 });
+      const content = Buffer.from(r.data).toString('base64');
+      return ok(res, { content });
+    } catch {}
+  }
+  
+  err(res, 'Failed to fetch from all gateways', 502);
+}));
+
+// ─── Global Error Handlers ───────────────────────────────────────────────────
+
+// 404 handler for undefined routes
+app.use((req, res) => {
+  err(res, `Route not found: ${req.method} ${req.path}`, 404);
 });
 
-app.post('/api/ipfs/upload/file', async (req, res) => {
-  try {
-    const { data, fileName } = req.body;
-    const apiKey = process.env.PINATA_API_KEY;
-    const apiSecret = process.env.PINATA_SECRET;
-    if (!apiKey || !apiSecret) {
-      return res.json({ success: false, error: 'Pinata credentials not set' });
-    }
-    const buf = Buffer.from(data, 'base64');
-    const formData = new FormData();
-    formData.append('file', buf, { filename: fileName || 'file' });
-    const pinataUrl = 'https://api.pinata.cloud/pinning/pinFileToIPFS';
-    const hdrs = formData.getHeaders();
-    const headers = { ...hdrs, pinata_api_key: apiKey, pinata_secret_api_key: apiSecret };
-    const res2 = await axios.post(pinataUrl, formData, { headers });
-    const cid = res2.data.IpfsHash;
-    const gatewayUrl = 'https://gateway.pinata.cloud/ipfs/' + cid;
-    res.json({ success: true, cid, gatewayUrl });
-  } catch(e) {
-    res.json({ success: false, error: e.message });
+// Global error handler
+app.use((err, req, res, next) => {
+  console.error('[UNHANDLED ERROR]', err.message);
+  if (!err.isOperational) {
+    console.error(err.stack);
   }
+  err(res, 'Internal server error', 500);
 });
 
-app.post('/api/ipfs/upload/metadata', async (req, res) => {
-  try {
-    const { metadata } = req.body;
-    const apiKey = process.env.PINATA_API_KEY;
-    const apiSecret = process.env.PINATA_SECRET;
-    if (!apiKey || !apiSecret) {
-      return res.json({ success: false, error: 'Pinata credentials not set' });
-    }
-    const pinataUrl = 'https://api.pinata.cloud/pinning/pinJSONToIPFS';
-    const body = { pinataContent: metadata, pinataMetadata: { name: 'metadata' } };
-    const headers = { pinata_api_key: apiKey, pinata_secret_api_key: apiSecret };
-    const res2 = await axios.post(pinataUrl, body, { headers });
-    const cid = res2.data.IpfsHash;
-    const gatewayUrl = 'https://gateway.pinata.cloud/ipfs/' + cid;
-    res.json({ success: true, cid, gatewayUrl });
-  } catch(e) {
-    res.json({ success: false, error: e.message });
-  }
-});
-
-app.get('/api/ipfs/cat/:cid', async (req, res) => {
-  try {
-    const { cid } = req.params;
-    const gateways = [
-      'https://gateway.pinata.cloud/ipfs/' + cid,
-      'https://ipfs.io/ipfs/' + cid
-    ];
-    let content = null;
-    for (const url of gateways) {
-      try {
-        const r = await axios.get(url, { responseType: 'arraybuffer', timeout: 5000 });
-        content = Buffer.from(r.data).toString('base64');
-        break;
-      } catch {}
-    }
-    if (content) res.json({ success: true, content });
-    else res.json({ success: false, error: 'Failed to fetch from all gateways' });
-  } catch(e) {
-    res.json({ success: false, error: e.message });
-  }
-});
+// ─── Start Server ─────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log('Server on port', PORT));
