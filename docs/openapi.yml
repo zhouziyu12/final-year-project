@@ -1,0 +1,365 @@
+openapi: 3.0.3
+info:
+  title: AI Model Provenance API
+  description: |
+    Backend API for AI Model Provenance System.
+    
+    This API provides endpoints for:
+    - Querying blockchain status and model information
+    - Tracking AI model provenance on-chain
+    - Uploading files to IPFS
+    - Retrieving content from IPFS
+    
+    ## Networks
+    - `sepolia` - Ethereum Sepolia testnet
+    - `tbnb` - BSC testnet
+  version: 2.0.0
+  contact:
+    name: FYP Project
+    url: https://github.com/zhouziyu12/final-year-project
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: https://api.example.com
+    description: Production server
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Status
+    description: Blockchain status and wallet info
+  - name: Models
+    description: AI model queries
+  - name: Audit
+    description: Audit log events
+  - name: Provenance
+    description: Provenance tracking (SDK)
+  - name: IPFS
+    description: IPFS file operations
+
+paths:
+  # ─── Health ──────────────────────────────────────────────────────────────────
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: integer
+                    example: 1700000000000
+
+  # ─── Status ─────────────────────────────────────────────────────────────────
+  /api/v2/status:
+    get:
+      tags: [Status]
+      summary: Get blockchain status
+      description: Returns status and balance for all configured chains
+      parameters:
+        - name: network
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [sepolia, tbnb]
+          description: Specific network to query
+      responses:
+        '200':
+          description: Status retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  chains:
+                    type: object
+                    properties:
+                      sepolia:
+                        $ref: '#/components/schemas/ChainStatus'
+                      tbnb:
+                        $ref: '#/components/schemas/ChainStatus'
+
+  # ─── Audit ──────────────────────────────────────────────────────────────────
+  /api/v2/audit/recent:
+    get:
+      tags: [Audit]
+      summary: Get recent audit events
+      description: Returns recent audit log events from the blockchain
+      parameters:
+        - name: chain
+          in: query
+          required: false
+          schema:
+            type: string
+            default: sepolia
+            enum: [sepolia, tbnb]
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+      responses:
+        '200':
+          description: Events retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  events:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditEvent'
+
+  # ─── Models ─────────────────────────────────────────────────────────────────
+  /api/v2/models/{id}:
+    get:
+      tags: [Models]
+      summary: Get model by ID
+      description: Returns model information including owner and status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Model ID
+        - name: chain
+          in: query
+          required: false
+          schema:
+            type: string
+            default: sepolia
+      responses:
+        '200':
+          description: Model found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  id:
+                    type: integer
+                  owner:
+                    type: string
+                  status:
+                    type: string
+                    enum: [DRAFT, ACTIVE, DEPRECATED, REVOKED]
+                  staked:
+                    type: boolean
+        '404':
+          description: Model not found
+
+  # ─── Provenance ──────────────────────────────────────────────────────────────
+  /api/sdk/provenance:
+    post:
+      tags: [Provenance]
+      summary: Record provenance event
+      description: |
+        Records a provenance event on-chain.
+        
+        Can auto-register new models by name.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                modelId:
+                  type: integer
+                  description: Model ID (required if modelName not provided)
+                modelName:
+                  type: string
+                  description: Model name (auto-registers if not exists)
+                modelHash:
+                  type: string
+                  description: Model content hash
+                action:
+                  type: string
+                  enum:
+                    - REGISTERED
+                    - ACTIVATED
+                    - UPDATED
+                    - DEPRECATED
+                    - REVOKED
+                    - VERSION_RELEASED
+                    - TRANSFERRED
+                    - STAKED
+                    - UNSTAKED
+                    - SLASHED
+                    - ZK_PROOF_VERIFIED
+                sender:
+                  type: string
+                  description: Sender address
+                ipfsHash:
+                  type: string
+                  description: IPFS content hash
+                metadataCid:
+                  type: string
+                  description: Metadata IPFS CID
+                chain:
+                  type: string
+                  default: sepolia
+                versionTag:
+                  type: string
+                  description: Version tag (e.g., "v1.2.3")
+      responses:
+        '200':
+          description: Provenance recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  tx:
+                    type: string
+                  modelId:
+                    type: integer
+                  eventType:
+                    type: integer
+                  isNewModel:
+                    type: boolean
+
+  # ─── IPFS Upload ────────────────────────────────────────────────────────────
+  /api/ipfs/upload/file:
+    post:
+      tags: [IPFS]
+      summary: Upload file to IPFS
+      description: Uploads a file to IPFS via Pinata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - data
+              properties:
+                data:
+                  type: string
+                  description: Base64 encoded file data
+                fileName:
+                  type: string
+                  description: Original file name
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  cid:
+                    type: string
+                  gatewayUrl:
+                    type: string
+        '503':
+          description: Pinata not configured
+
+  /api/ipfs/upload/metadata:
+    post:
+      tags: [IPFS]
+      summary: Upload metadata to IPFS
+      description: Uploads JSON metadata to IPFS via Pinata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - metadata
+              properties:
+                metadata:
+                  type: object
+                  description: JSON metadata object
+      responses:
+        '200':
+          description: Metadata uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  cid:
+                    type: string
+                  gatewayUrl:
+                    type: string
+
+  /api/ipfs/cat/{cid}:
+    get:
+      tags: [IPFS]
+      summary: Get IPFS content
+      description: Retrieves content from IPFS via gateway
+      parameters:
+        - name: cid
+          in: path
+          required: true
+          schema:
+            type: string
+          description: IPFS CID
+      responses:
+        '200':
+          description: Content retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  content:
+                    type: string
+                    description: Base64 encoded content
+        '502':
+          description: Failed to fetch from gateways
+
+# ─── Components ────────────────────────────────────────────────────────────────
+components:
+  schemas:
+    ChainStatus:
+      type: object
+      properties:
+        blockNumber:
+          type: integer
+        connected:
+          type: boolean
+        balance:
+          type: string
+          description: ETH/BNB balance
+
+    AuditEvent:
+      type: object
+      properties

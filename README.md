@@ -70,8 +70,7 @@ contracts/
 
 ### Prerequisites
 
-- Node.js 16+
-- Python 3.8+
+- Node.js 18+
 - Git
 - Ethereum wallet with Sepolia/BSC testnet funds
 
@@ -87,7 +86,7 @@ npm install
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your wallet private key
+# Edit .env with your wallet private key and API keys
 
 # Compile contracts
 npx hardhat compile
@@ -98,6 +97,67 @@ node scripts/deploy_multi_chain.cjs
 # Run tests
 node scripts/test_contracts.cjs
 ```
+
+### Frontend Development
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+### Backend Server
+
+```bash
+cd server
+node server.js
+```
+
+## API Documentation
+
+### Base URL
+```
+http://localhost:3000
+```
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/health` | Health check |
+| GET | `/api/v2/status` | Blockchain status |
+| GET | `/api/v2/audit/recent` | Recent audit events |
+| GET | `/api/v2/models/:id` | Get model by ID |
+| POST | `/api/sdk/provenance` | Record provenance event |
+| POST | `/api/ipfs/upload/file` | Upload file to IPFS |
+| POST | `/api/ipfs/upload/metadata` | Upload metadata to IPFS |
+| GET | `/api/ipfs/cat/:cid` | Get IPFS content |
+
+### Example Usage
+
+```bash
+# Health check
+curl http://localhost:3000/api/health
+
+# Get blockchain status
+curl http://localhost:3000/api/v2/status
+
+# Get model info
+curl http://localhost:3000/api/v2/models/1?chain=sepolia
+
+# Record provenance (requires body)
+curl -X POST http://localhost:3000/api/sdk/provenance \
+  -H "Content-Type: application/json" \
+  -d '{"modelId": 1, "action": "ACTIVATED"}'
+
+# Upload to IPFS (requires Pinata credentials)
+curl -X POST http://localhost:3000/api/ipfs/upload/file \
+  -H "Content-Type: application/json" \
+  -d '{"data": "'$(base64 -w0 file.bin)'", "fileName": "model.bin"}'
+```
+
+### OpenAPI Spec
+Full API documentation available at: [docs/openapi.yml](docs/openapi.yml)
 
 ## Testing
 
@@ -186,6 +246,44 @@ ai-project/
 - **Groth16** proof system via snarkjs
 - **Verification**: 1 input, 1 output, 1 public signal
 - **Circuit**: Hash-based model ownership verification
+
+### ZK Circuit Usage
+
+```bash
+# Navigate to ZK directory
+cd zk
+
+# Compile circuit
+./compile.sh
+
+# Generate proof
+node utils.js prove <modelId> <secret>
+
+# Export Solidity verifier
+node utils.js export
+```
+
+See [docs/ZK_GUIDE.md](docs/ZK_GUIDE.md) for detailed ZK documentation.
+
+## CI/CD
+
+This project uses GitHub Actions for continuous integration.
+
+### Workflows
+
+- **Contracts**: Compiles and tests smart contracts on every push
+- **Frontend**: Builds React app and uploads artifacts
+- **Server**: Syntax checks Node.js server code
+- **ZK**: Compiles Circom circuits
+
+### Secrets Required
+
+Configure these in GitHub repository settings:
+
+- `SEPOLIA_RPC`: Sepolia RPC URL
+- `TEST_PRIVATE_KEY`: Test wallet private key (for testnets only)
+
+## License
 
 ### Access Control
 - **4 Roles**: ADMIN, REGISTRAR, AUDITOR, MINTER
