@@ -1,0 +1,259 @@
+{
+  "summary": {
+    "Sepolia": [
+      {
+        "name": "ADMIN角色检查",
+        "status": "PASS",
+        "msg": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
+      },
+      {
+        "name": "授予REGISTRAR",
+        "status": "PASS",
+        "msg": "0x09d4Fa3a..."
+      },
+      {
+        "name": "撤销REGISTRAR",
+        "status": "PASS",
+        "msg": "已撤销"
+      },
+      {
+        "name": "加入黑名单",
+        "status": "PASS",
+        "msg": "已加入"
+      },
+      {
+        "name": "移除黑名单",
+        "status": "PASS",
+        "msg": "已移除"
+      },
+      {
+        "name": "注册模型",
+        "status": "PASS",
+        "msg": "Model #5"
+      },
+      {
+        "name": "初始状态DRAFT(0)",
+        "status": "PASS",
+        "msg": "Status=0"
+      },
+      {
+        "name": "激活→ACTIVE(1)",
+        "status": "PASS",
+        "msg": "Status=1"
+      },
+      {
+        "name": "版本管理",
+        "status": "PASS",
+        "msg": "共3个版本"
+      },
+      {
+        "name": "版本号递增",
+        "status": "PASS",
+        "msg": "latestVersionId=10, count=3"
+      },
+      {
+        "name": "弃用→DEPRECATED(2)",
+        "status": "PASS",
+        "msg": "Status=2"
+      },
+      {
+        "name": "添加记录",
+        "status": "PASS",
+        "msg": "共3条"
+      },
+      {
+        "name": "ZK证明记录",
+        "status": "PASS",
+        "msg": "共4条"
+      },
+      {
+        "name": "链完整性验证",
+        "status": "PASS",
+        "msg": "valid=true"
+      },
+      {
+        "name": "总条目数",
+        "status": "PASS",
+        "msg": "6"
+      },
+      {
+        "name": "新增审计日志",
+        "status": "PASS",
+        "msg": "6 → 7"
+      },
+      {
+        "name": "审计链验证",
+        "status": "PASS",
+        "msg": "valid=true"
+      },
+      {
+        "name": "初始NFT数量",
+        "status": "PASS",
+        "msg": "1"
+      },
+      {
+        "name": "铸造NFT",
+        "status": "PASS",
+        "msg": "Token #7"
+      },
+      {
+        "name": "NFT所有者正确",
+        "status": "PASS",
+        "msg": "0xEF8a56C4..."
+      },
+      {
+        "name": "TokenURI正确",
+        "status": "PASS",
+        "msg": "ipfs://nft-metadata"
+      },
+      {
+        "name": "销毁NFT",
+        "status": "PASS",
+        "msg": "1"
+      },
+      {
+        "name": "质押ETH",
+        "status": "PASS",
+        "msg": "0.05 ETH"
+      },
+      {
+        "name": "查询质押金额",
+        "status": "PASS",
+        "msg": "0.05 ETH"
+      },
+      {
+        "name": "罚没质押",
+        "status": "PASS",
+        "msg": "slashed=true"
+      }
+    ],
+    "BSC-Testnet": [
+      {
+        "name": "ADMIN角色检查",
+        "status": "PASS",
+        "msg": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
+      },
+      {
+        "name": "授予REGISTRAR",
+        "status": "PASS",
+        "msg": "0x58deA1D0..."
+      },
+      {
+        "name": "撤销REGISTRAR",
+        "status": "PASS",
+        "msg": "已撤销"
+      },
+      {
+        "name": "加入黑名单",
+        "status": "PASS",
+        "msg": "已加入"
+      },
+      {
+        "name": "移除黑名单",
+        "status": "PASS",
+        "msg": "已移除"
+      },
+      {
+        "name": "注册模型",
+        "status": "PASS",
+        "msg": "Model #4"
+      },
+      {
+        "name": "初始状态DRAFT(0)",
+        "status": "PASS",
+        "msg": "Status=0"
+      },
+      {
+        "name": "激活→ACTIVE(1)",
+        "status": "PASS",
+        "msg": "Status=1"
+      },
+      {
+        "name": "版本管理",
+        "status": "PASS",
+        "msg": "共3个版本"
+      },
+      {
+        "name": "版本号递增",
+        "status": "PASS",
+        "msg": "latestVersionId=8, count=3"
+      },
+      {
+        "name": "弃用→DEPRECATED(2)",
+        "status": "PASS",
+        "msg": "Status=2"
+      },
+      {
+        "name": "添加记录",
+        "status": "PASS",
+        "msg": "共3条"
+      },
+      {
+        "name": "ZK证明记录",
+        "status": "PASS",
+        "msg": "共4条"
+      },
+      {
+        "name": "链完整性验证",
+        "status": "PASS",
+        "msg": "valid=true"
+      },
+      {
+        "name": "总条目数",
+        "status": "PASS",
+        "msg": "5"
+      },
+      {
+        "name": "新增审计日志",
+        "status": "PASS",
+        "msg": "5 → 6"
+      },
+      {
+        "name": "审计链验证",
+        "status": "PASS",
+        "msg": "valid=true"
+      },
+      {
+        "name": "初始NFT数量",
+        "status": "PASS",
+        "msg": "0"
+      },
+      {
+        "name": "铸造NFT",
+        "status": "PASS",
+        "msg": "Token #6"
+      },
+      {
+        "name": "NFT所有者正确",
+        "status": "PASS",
+        "msg": "0xEF8a56C4..."
+      },
+      {
+        "name": "TokenURI正确",
+        "status": "PASS",
+        "msg": "ipfs://nft-metadata"
+      },
+      {
+        "name": "销毁NFT",
+        "status": "PASS",
+        "msg": "0"
+      },
+      {
+        "name": "质押ETH",
+        "status": "PASS",
+        "msg": "0.05 ETH"
+      },
+      {
+        "name": "查询质押金额",
+        "status": "PASS",
+        "msg": "0.05 ETH"
+      },
+      {
+        "name": "罚没质押",
+        "status": "PASS",
+        "msg": "slashed=true"
+      }
+    ]
+  },
+  "timestamp": "2026-03-18T13:49:21.678Z"
+}
