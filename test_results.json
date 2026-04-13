@@ -1,259 +1,167 @@
 {
+  "suite": "Contract Verification",
+  "timestamp": "2026-04-13T18:05:51.672Z",
   "summary": {
+    "passed": 30,
+    "failed": 0,
+    "warned": 0,
+    "skipped": 0,
+    "total": 30
+  },
+  "results": {
     "Sepolia": [
       {
-        "name": "ADMIN角色检查",
+        "name": "Admin role check",
         "status": "PASS",
         "msg": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
       },
       {
-        "name": "授予REGISTRAR",
+        "name": "Grant registrar role",
         "status": "PASS",
-        "msg": "0x09d4Fa3a..."
+        "msg": "0x87290caE03e155724011Aa2b635878Bd5F0446c2"
       },
       {
-        "name": "撤销REGISTRAR",
+        "name": "Revoke registrar role",
         "status": "PASS",
-        "msg": "已撤销"
+        "msg": "0x87290caE03e155724011Aa2b635878Bd5F0446c2"
       },
       {
-        "name": "加入黑名单",
+        "name": "Register model",
         "status": "PASS",
-        "msg": "已加入"
+        "msg": "modelId=24"
       },
       {
-        "name": "移除黑名单",
+        "name": "Initial status is DRAFT",
         "status": "PASS",
-        "msg": "已移除"
+        "msg": "status=0"
       },
       {
-        "name": "注册模型",
+        "name": "Activate model",
         "status": "PASS",
-        "msg": "Model #5"
+        "msg": "status=1"
       },
       {
-        "name": "初始状态DRAFT(0)",
+        "name": "Version history",
         "status": "PASS",
-        "msg": "Status=0"
+        "msg": "count=2"
       },
       {
-        "name": "激活→ACTIVE(1)",
-        "status": "PASS",
-        "msg": "Status=1"
-      },
-      {
-        "name": "版本管理",
-        "status": "PASS",
-        "msg": "共3个版本"
-      },
-      {
-        "name": "版本号递增",
-        "status": "PASS",
-        "msg": "latestVersionId=10, count=3"
-      },
-      {
-        "name": "弃用→DEPRECATED(2)",
-        "status": "PASS",
-        "msg": "Status=2"
-      },
-      {
-        "name": "添加记录",
-        "status": "PASS",
-        "msg": "共3条"
-      },
-      {
-        "name": "ZK证明记录",
-        "status": "PASS",
-        "msg": "共4条"
-      },
-      {
-        "name": "链完整性验证",
+        "name": "Tracker chain verification",
         "status": "PASS",
         "msg": "valid=true"
       },
       {
-        "name": "总条目数",
+        "name": "Audit entry appended",
         "status": "PASS",
-        "msg": "6"
+        "msg": "9 -> 10"
       },
       {
-        "name": "新增审计日志",
-        "status": "PASS",
-        "msg": "6 → 7"
-      },
-      {
-        "name": "审计链验证",
+        "name": "Audit chain verification",
         "status": "PASS",
         "msg": "valid=true"
       },
       {
-        "name": "初始NFT数量",
+        "name": "Mint NFT",
         "status": "PASS",
-        "msg": "1"
+        "msg": "tokenId=10"
       },
       {
-        "name": "铸造NFT",
+        "name": "NFT owner check",
         "status": "PASS",
-        "msg": "Token #7"
+        "msg": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
       },
       {
-        "name": "NFT所有者正确",
+        "name": "Burn NFT",
         "status": "PASS",
-        "msg": "0xEF8a56C4..."
+        "msg": "1 -> 1"
       },
       {
-        "name": "TokenURI正确",
+        "name": "Stake model",
         "status": "PASS",
-        "msg": "ipfs://nft-metadata"
+        "msg": "0.05"
       },
       {
-        "name": "销毁NFT",
-        "status": "PASS",
-        "msg": "1"
-      },
-      {
-        "name": "质押ETH",
-        "status": "PASS",
-        "msg": "0.05 ETH"
-      },
-      {
-        "name": "查询质押金额",
-        "status": "PASS",
-        "msg": "0.05 ETH"
-      },
-      {
-        "name": "罚没质押",
+        "name": "Slash stake",
         "status": "PASS",
         "msg": "slashed=true"
       }
     ],
     "BSC-Testnet": [
       {
-        "name": "ADMIN角色检查",
+        "name": "Admin role check",
         "status": "PASS",
         "msg": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
       },
       {
-        "name": "授予REGISTRAR",
+        "name": "Grant registrar role",
         "status": "PASS",
-        "msg": "0x58deA1D0..."
+        "msg": "0x53084080CA273574ad504E5FA1Db978852ddBd1E"
       },
       {
-        "name": "撤销REGISTRAR",
+        "name": "Revoke registrar role",
         "status": "PASS",
-        "msg": "已撤销"
+        "msg": "0x53084080CA273574ad504E5FA1Db978852ddBd1E"
       },
       {
-        "name": "加入黑名单",
+        "name": "Register model",
         "status": "PASS",
-        "msg": "已加入"
+        "msg": "modelId=19"
       },
       {
-        "name": "移除黑名单",
+        "name": "Initial status is DRAFT",
         "status": "PASS",
-        "msg": "已移除"
+        "msg": "status=0"
       },
       {
-        "name": "注册模型",
+        "name": "Activate model",
         "status": "PASS",
-        "msg": "Model #4"
+        "msg": "status=1"
       },
       {
-        "name": "初始状态DRAFT(0)",
+        "name": "Version history",
         "status": "PASS",
-        "msg": "Status=0"
+        "msg": "count=2"
       },
       {
-        "name": "激活→ACTIVE(1)",
-        "status": "PASS",
-        "msg": "Status=1"
-      },
-      {
-        "name": "版本管理",
-        "status": "PASS",
-        "msg": "共3个版本"
-      },
-      {
-        "name": "版本号递增",
-        "status": "PASS",
-        "msg": "latestVersionId=8, count=3"
-      },
-      {
-        "name": "弃用→DEPRECATED(2)",
-        "status": "PASS",
-        "msg": "Status=2"
-      },
-      {
-        "name": "添加记录",
-        "status": "PASS",
-        "msg": "共3条"
-      },
-      {
-        "name": "ZK证明记录",
-        "status": "PASS",
-        "msg": "共4条"
-      },
-      {
-        "name": "链完整性验证",
+        "name": "Tracker chain verification",
         "status": "PASS",
         "msg": "valid=true"
       },
       {
-        "name": "总条目数",
+        "name": "Audit entry appended",
         "status": "PASS",
-        "msg": "5"
+        "msg": "8 -> 9"
       },
       {
-        "name": "新增审计日志",
-        "status": "PASS",
-        "msg": "5 → 6"
-      },
-      {
-        "name": "审计链验证",
+        "name": "Audit chain verification",
         "status": "PASS",
         "msg": "valid=true"
       },
       {
-        "name": "初始NFT数量",
+        "name": "Mint NFT",
         "status": "PASS",
-        "msg": "0"
+        "msg": "tokenId=9"
       },
       {
-        "name": "铸造NFT",
+        "name": "NFT owner check",
         "status": "PASS",
-        "msg": "Token #6"
+        "msg": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
       },
       {
-        "name": "NFT所有者正确",
+        "name": "Burn NFT",
         "status": "PASS",
-        "msg": "0xEF8a56C4..."
+        "msg": "0 -> 0"
       },
       {
-        "name": "TokenURI正确",
+        "name": "Stake model",
         "status": "PASS",
-        "msg": "ipfs://nft-metadata"
+        "msg": "0.05"
       },
       {
-        "name": "销毁NFT",
-        "status": "PASS",
-        "msg": "0"
-      },
-      {
-        "name": "质押ETH",
-        "status": "PASS",
-        "msg": "0.05 ETH"
-      },
-      {
-        "name": "查询质押金额",
-        "status": "PASS",
-        "msg": "0.05 ETH"
-      },
-      {
-        "name": "罚没质押",
+        "name": "Slash stake",
         "status": "PASS",
         "msg": "slashed=true"
       }
     ]
-  },
-  "timestamp": "2026-03-18T13:49:21.678Z"
+  }
 }

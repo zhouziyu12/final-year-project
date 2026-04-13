@@ -2,24 +2,24 @@
 pragma solidity ^0.8.19;
 
 /// @title ModelAccessControl
-/// @notice RBAC role-based access control for the provenance system
-/// @dev Four roles: ADMIN, REGISTRAR, AUDITOR, MINTER
+/// @notice Role-based access control for the provenance system.
+/// @dev Supported roles: ADMIN, REGISTRAR, AUDITOR, MINTER.
 contract ModelAccessControl {
-    // ─── Roles ────────────────────────────────────────────────────────────────
+    // Roles
 
-    bytes32 public constant ADMIN     = keccak256("ADMIN");
+    bytes32 public constant ADMIN = keccak256("ADMIN");
     bytes32 public constant REGISTRAR = keccak256("REGISTRAR");
-    bytes32 public constant AUDITOR   = keccak256("AUDITOR");
-    bytes32 public constant MINTER    = keccak256("MINTER");
+    bytes32 public constant AUDITOR = keccak256("AUDITOR");
+    bytes32 public constant MINTER = keccak256("MINTER");
 
-    // ─── Storage ─────────────────────────────────────────────────────────────
+    // Storage
 
     mapping(bytes32 => mapping(address => bool)) private _roles;
     mapping(address => bool) private _blacklist;
 
-    address public governance;  // Multi-sig/DAO governance address (upgradeable role)
+    address public governance;
 
-    // ─── Events ───────────────────────────────────────────────────────────────
+    // Events
 
     event RoleGranted(bytes32 indexed role, address indexed account, address indexed grantedBy);
     event RoleRevoked(bytes32 indexed role, address indexed account, address indexed revokedBy);
@@ -27,7 +27,7 @@ contract ModelAccessControl {
     event Unblacklisted(address indexed account, address indexed by);
     event GovernanceChanged(address indexed oldGov, address indexed newGov);
 
-    // ─── Modifiers ────────────────────────────────────────────────────────────
+    // Modifiers
 
     modifier onlyAdmin() {
         require(hasRole(ADMIN, msg.sender), "AccessControl: caller is not admin");
@@ -39,29 +39,29 @@ contract ModelAccessControl {
         _;
     }
 
-    // ─── Constructor ─────────────────────────────────────────────────────────
+    // Constructor
 
     constructor(address _governance) {
         require(_governance != address(0), "AccessControl: governance address required");
         governance = _governance;
 
-        // 部署者自动成为 ADMIN
+        // The deployer becomes the initial admin.
         _grantRole(ADMIN, msg.sender);
     }
 
-    // ─── External Functions ───────────────────────────────────────────────────
+    // External functions
 
-    /// @notice 授予角色（仅 ADMIN）
+    /// @notice Grant a role. Admin only.
     function grantRole(bytes32 role, address account) external onlyAdmin {
         _grantRole(role, account);
     }
 
-    /// @notice 撤销角色（仅 ADMIN）
+    /// @notice Revoke a role. Admin only.
     function revokeRole(bytes32 role, address account) external onlyAdmin {
         _revokeRole(role, account);
     }
 
-    /// @notice 将地址加入黑名单（仅 ADMIN）
+    /// @notice Add an address to the blacklist. Admin only.
     function addBlacklist(address account) external onlyAdmin {
         require(account != address(0), "AccessControl: cannot blacklist zero");
         require(!_blacklist[account], "AccessControl: already blacklisted");
@@ -69,21 +69,21 @@ contract ModelAccessControl {
         emit Blacklisted(account, msg.sender);
     }
 
-    /// @notice 将地址从黑名单移除（仅 ADMIN）
+    /// @notice Remove an address from the blacklist. Admin only.
     function removeBlacklist(address account) external onlyAdmin {
         require(_blacklist[account], "AccessControl: not blacklisted");
         _blacklist[account] = false;
         emit Unblacklisted(account, msg.sender);
     }
 
-    /// @notice 转移 ADMIN 角色（仅当前 ADMIN）
+    /// @notice Transfer the admin role to a new address.
     function transferAdmin(address newAdmin) external onlyAdmin {
         require(newAdmin != address(0), "AccessControl: new admin is zero");
         _revokeRole(ADMIN, msg.sender);
         _grantRole(ADMIN, newAdmin);
     }
 
-    /// @notice 更新治理地址（仅 ADMIN）
+    /// @notice Update the governance address. Admin only.
     function updateGovernance(address newGov) external onlyAdmin {
         require(newGov != address(0), "AccessControl: governance is zero");
         address oldGov = governance;
@@ -91,14 +91,14 @@ contract ModelAccessControl {
         emit GovernanceChanged(oldGov, newGov);
     }
 
-    /// @notice 批量授予角色（仅 ADMIN）
+    /// @notice Grant the same role to multiple accounts. Admin only.
     function grantRoles(bytes32 role, address[] calldata accounts) external onlyAdmin {
-        for (uint i = 0; i < accounts.length; i++) {
+        for (uint256 i = 0; i < accounts.length; i++) {
             _grantRole(role, accounts[i]);
         }
     }
 
-    // ─── View Functions ───────────────────────────────────────────────────────
+    // View functions
 
     function hasRole(bytes32 role, address account) public view returns (bool) {
         return _roles[role][account];
@@ -108,13 +108,12 @@ contract ModelAccessControl {
         return _blacklist[account];
     }
 
-    /// @notice 获取某角色下的所有成员数量（需要外部维护列表，这里提供查询接口）
-    /// @dev 实际成员列表建议在应用层或用 Events 索引
+    /// @notice Return the governance address.
     function getGovernance() external view returns (address) {
         return governance;
     }
 
-    // ─── Internal ─────────────────────────────────────────────────────────────
+    // Internal functions
 
     function _grantRole(bytes32 role, address account) internal {
         require(account != address(0), "AccessControl: account is zero");

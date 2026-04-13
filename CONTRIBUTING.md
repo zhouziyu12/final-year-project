@@ -1,82 +1,71 @@
-# Contributing to AI Model Provenance System
+# Contributing
 
-Thank you for your interest in contributing!
-
-## Development Setup
+## Setup
 
 ```bash
-# Fork and clone
-git clone https://github.com/YOUR_USERNAME/final-year-project.git
+git clone https://github.com/zhouziyu12/final-year-project.git
 cd final-year-project
-
-# Add upstream remote
-git remote add upstream https://github.com/zhouziyu12/final-year-project.git
-
-# Create feature branch
-git checkout -b feature/your-feature-name
+npm install
+cd client && npm install
+cd ..
 ```
 
-## Code Style
+## Branching
 
-- **Solidity**: Follow [Solidity style guide](https://docs.soliditylang.org/en/latest/style-guide.html)
-- **JavaScript**: Use ES6+ features, 2-space indentation
-- **React**: Functional components with hooks
-
-## Commit Messages
-
-Use conventional commits:
-
-```
-feat: add new feature
-fix: bug fix
-docs: documentation changes
-refactor: code refactoring
-test: adding tests
-chore: maintenance tasks
-```
-
-Example:
-```
-feat: add model versioning support
-fix: resolve IPFS upload timeout
-docs: update API documentation
-```
-
-## Pull Request Process
-
-1. **Fork** the repository
-2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
-3. **Commit** your changes (`git commit -m 'feat: add amazing feature'`)
-4. **Push** to the branch (`git push origin feature/amazing-feature`)
-5. **Open** a Pull Request
-
-### PR Checklist
-
-- [ ] Code follows project style guidelines
-- [ ] Tests pass locally
-- [ ] Documentation updated (if needed)
-- [ ] Commits are atomic and well-described
-
-## Testing
+Use a short feature or fix branch name:
 
 ```bash
-# Run all tests
-npm test
-
-# Run specific test file
-npx hardhat test test/ModelRegistry.test.js
-
-# Run frontend tests
-cd client && npm test
+git checkout -b feature/your-change
 ```
 
-## Branch Protection
+## Commit Style
 
-The `master` branch is protected:
-- Requires PR review
-- CI must pass
-- No force pushes
+Use conventional commit messages:
 
-## Questions?
+```text
+feat: add model lifecycle endpoint
+fix: correct audit chain verification
+docs: refresh deployment guide
+test: update backend integration flow
+refactor: simplify nft mint validation
+```
 
-Open an issue or reach out to the maintainers.
+## Before Opening a Pull Request
+
+Make sure these pass:
+
+```bash
+npx hardhat compile
+cd client && npm run build && cd ..
+python -m py_compile sdk/python/provenance_sdk.py sdk/python/model_secret_manager.py tests/test_sdk_backend.py
+powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
+```
+
+## Code Expectations
+
+- Keep Solidity comments and documentation in English
+- Keep Markdown documentation in English
+- Do not introduce new mojibake or mixed-encoding files
+- Prefer updating existing scripts and docs instead of adding duplicate files
+- Do not remove deployed-address references unless they are actually obsolete
+
+## Pull Request Checklist
+
+- [ ] Scope is limited to the intended change
+- [ ] Contracts compile successfully
+- [ ] Frontend builds successfully
+- [ ] Tests pass or failures are explained
+- [ ] Documentation is updated when behavior changes
+
+## Reporting Issues
+
+Include:
+
+- exact command that failed
+- full error output
+- affected file paths
+- network or environment used
+
+## Questions
+
+Open an issue or start a discussion in the repository.

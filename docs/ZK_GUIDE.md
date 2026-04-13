@@ -1,141 +1,86 @@
 # Zero-Knowledge Proof Guide
 
-## Overview
+## ZK Assets
 
-This project uses **Groth16** zero-knowledge proofs via **snarkjs** to prove AI model ownership without revealing sensitive information.
+The current repository stores ZK proof assets under `zk/`.
 
-## How It Works
+Important paths:
 
-```
-┌─────────────┐    ┌──────────────┐    ┌─────────────┐
-│   Prover    │    │   Circuit    │    │  Verifier   │
-│  (Frontend) │───▶│  (On-chain)  │◀───│ (Smart      │
-│             │    │              │    │  Contract)  │
-└─────────────┘    └──────────────┘    └─────────────┘
-     │                   │                   │
-     │  modelId (public) │                   │
-     │  secret (private) │                   │
-     │                   │                   │
-     │  Proof π          │                   │
-     └───────────────────┼───────────────────┘
-                         │ (modelId, proof)
-                         ▼
-                  ┌──────────────┐
-                  │  Verifier   │
-                  │  Contract   │
-                  │  (Solidity) │
-                  └──────────────┘
-```
+- `zk/circuit.circom`
+- `zk/build/circuit_js/circuit.wasm`
+- `zk/circuit_final.zkey`
+- `zk/verification_key.json`
+- `zk/utils.js`
+- `zk/compile.sh`
 
-## Circuit: ModelProver
+Proof input used by the standalone test:
 
-The circuit proves knowledge of a secret `s` such that:
+- `scripts/last_proof_input.json`
 
-```
-commitment = Poseidon(s, modelId)
-```
+## Compile the Circuit
 
-Where:
-- `modelId` is **public** (known to everyone)
-- `secret` is **private** (never revealed)
-- `commitment` is stored **on-chain**
-
-## Quick Start
-
-### 1. Compile Circuit
+From the repository root:
 
 ```bash
 cd zk
 ./compile.sh
 ```
 
-This generates:
-- `build/circuit.r1cs` - Constraint system
-- `build/circuit_js/circuit.wasm` - WASM for witness generation
-- `build/circuit_final.zkey` - Proving key
+This produces the circuit build output and proving artifacts used by the standalone flow.
 
-### 2. Generate Proof (Frontend)
+## Standalone Proof Test
 
-```javascript
-import { groth16 } from 'snarkjs';
+Run:
 
-// Input (from user)
-const input = {
-  modelId: 123,
-  secret: "0x..."
-};
-
-// Generate proof
-const { proof, publicSignals } = await groth16.fullProve(
-  input,
-  "circuit.wasm",
-  "circuit_final.zkey"
-);
-
-// Send to contract
-await verifierContract.verify(proof, publicSignals);
+```bash
+node test_zk_standalone.js
 ```
 
-### 3. Verify On-Chain
+The script now:
 
-```solidity
-// In your smart contract
-Verifier verifier;
+- loads `scripts/last_proof_input.json`
+- creates a default input file if it is missing
+- resolves artifacts from the current `zk/` layout
+- generates `proof.json`
+- generates `public.json`
+- writes Solidity calldata to `proof_calldata_debug.txt`
 
-function verifyZKProof(
-    uint[2] calldata a,
-    uint[2][2] calldata b,
-    uint[2] calldata c,
-    uint[2] calldata pubSignals
-) external {
-    require(
-        verifier.verifyProof(a, b, c, pubSignals),
-        "ZK proof verification failed"
-    );
-    // Continue with logic...
+## Proof Input Format
+
+Example:
+
+```json
+{
+  "secret": "123456",
+  "modelId": "999999999"
 }
 ```
 
-## Circuit Templates
+## Related Files
 
-### ModelProver (Basic)
-- Input: `modelId` (public), `secret` (private)
-- Output: `commitment`
-- Use case: Basic ownership proof
+- `contracts/Verifier.sol`
+- `contracts/RealZKBridge.sol`
+- `sdk/python/provenance_sdk.py`
 
-### ModelVersionProver (Extended)
-- Input: `modelId`, `versionHash` (public), `secret`, `versionSalt` (private)
-- Output: `commitment`, `versionCommitment`
-- Use case: Prove specific model version
+## Troubleshooting
 
-### ModelUpdateProver (Update Chain)
-- Input: `modelId`, `prevCommitment`, `newVersion` (public), `secret`, `updateHash` (private)
-- Output: `commitment`
-- Use case: Sequential updates with integrity
+### Missing WASM or proving key
 
-## Security Considerations
+Rebuild the circuit:
 
-1. **Secret Protection**: Never log or expose the secret key
-2. **Randomness**: Use cryptographically secure random for salts
-3. **Trusted Setup**: For production, run a proper Powers of Tau ceremony
-4. **Field Elements**: All inputs must be valid field elements
+```bash
+cd zk
+./compile.sh
+```
 
-## Common Issues
+### Proof test cannot find input
 
-### "Constraint system not satisfied"
-- Your inputs don't satisfy the circuit constraints
-- Check that `modelId` is a valid public signal
+The standalone script will now generate a default `scripts/last_proof_input.json` automatically.
 
-### "Invalid witness"
-- The WASM calculation produced invalid witness
-- Ensure all inputs are within field bounds
+### Need Solidity calldata for debugging
 
-### "Proof verification failed"
-- On-chain verifier received malformed proof
-- Check ABI encoding is correct
+After a successful standalone run, use:
 
-## Resources
-
-- [snarkjs documentation](https://github.com/iden3/snarkjs)
-- [Circom documentation](https://docs.circom.io/)
-- [ZoKrates](https://zokrates.github.io/) - Alternative ZK toolkit
+- `proof.json`
+- `public.json`
+- `proof_calldata_debug.txt`

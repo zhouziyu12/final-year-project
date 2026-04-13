@@ -1,0 +1,330 @@
+﻿{
+    "timestamp":  "2026-04-14T02:06:01Z",
+    "version":  "2.0.0",
+    "suites":  [
+                   {
+                       "suite":  "Contract Verification",
+                       "timestamp":  "2026-04-13T18:05:51.672Z",
+                       "summary":  {
+                                       "passed":  30,
+                                       "failed":  0,
+                                       "warned":  0,
+                                       "skipped":  0,
+                                       "total":  30
+                                   },
+                       "results":  {
+                                       "Sepolia":  [
+                                                       {
+                                                           "name":  "Admin role check",
+                                                           "status":  "PASS",
+                                                           "msg":  "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
+                                                       },
+                                                       {
+                                                           "name":  "Grant registrar role",
+                                                           "status":  "PASS",
+                                                           "msg":  "0x87290caE03e155724011Aa2b635878Bd5F0446c2"
+                                                       },
+                                                       {
+                                                           "name":  "Revoke registrar role",
+                                                           "status":  "PASS",
+                                                           "msg":  "0x87290caE03e155724011Aa2b635878Bd5F0446c2"
+                                                       },
+                                                       {
+                                                           "name":  "Register model",
+                                                           "status":  "PASS",
+                                                           "msg":  "modelId=24"
+                                                       },
+                                                       {
+                                                           "name":  "Initial status is DRAFT",
+                                                           "status":  "PASS",
+                                                           "msg":  "status=0"
+                                                       },
+                                                       {
+                                                           "name":  "Activate model",
+                                                           "status":  "PASS",
+                                                           "msg":  "status=1"
+                                                       },
+                                                       {
+                                                           "name":  "Version history",
+                                                           "status":  "PASS",
+                                                           "msg":  "count=2"
+                                                       },
+                                                       {
+                                                           "name":  "Tracker chain verification",
+                                                           "status":  "PASS",
+                                                           "msg":  "valid=true"
+                                                       },
+                                                       {
+                                                           "name":  "Audit entry appended",
+                                                           "status":  "PASS",
+                                                           "msg":  "9 -\u003e 10"
+                                                       },
+                                                       {
+                                                           "name":  "Audit chain verification",
+                                                           "status":  "PASS",
+                                                           "msg":  "valid=true"
+                                                       },
+                                                       {
+                                                           "name":  "Mint NFT",
+                                                           "status":  "PASS",
+                                                           "msg":  "tokenId=10"
+                                                       },
+                                                       {
+                                                           "name":  "NFT owner check",
+                                                           "status":  "PASS",
+                                                           "msg":  "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
+                                                       },
+                                                       {
+                                                           "name":  "Burn NFT",
+                                                           "status":  "PASS",
+                                                           "msg":  "1 -\u003e 1"
+                                                       },
+                                                       {
+                                                           "name":  "Stake model",
+                                                           "status":  "PASS",
+                                                           "msg":  "0.05"
+                                                       },
+                                                       {
+                                                           "name":  "Slash stake",
+                                                           "status":  "PASS",
+                                                           "msg":  "slashed=true"
+                                                       }
+                                                   ],
+                                       "BSC-Testnet":  [
+                                                           {
+                                                               "name":  "Admin role check",
+                                                               "status":  "PASS",
+                                                               "msg":  "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
+                                                           },
+                                                           {
+                                                               "name":  "Grant registrar role",
+                                                               "status":  "PASS",
+                                                               "msg":  "0x53084080CA273574ad504E5FA1Db978852ddBd1E"
+                                                           },
+                                                           {
+                                                               "name":  "Revoke registrar role",
+                                                               "status":  "PASS",
+                                                               "msg":  "0x53084080CA273574ad504E5FA1Db978852ddBd1E"
+                                                           },
+                                                           {
+                                                               "name":  "Register model",
+                                                               "status":  "PASS",
+                                                               "msg":  "modelId=19"
+                                                           },
+                                                           {
+                                                               "name":  "Initial status is DRAFT",
+                                                               "status":  "PASS",
+                                                               "msg":  "status=0"
+                                                           },
+                                                           {
+                                                               "name":  "Activate model",
+                                                               "status":  "PASS",
+                                                               "msg":  "status=1"
+                                                           },
+                                                           {
+                                                               "name":  "Version history",
+                                                               "status":  "PASS",
+                                                               "msg":  "count=2"
+                                                           },
+                                                           {
+                                                               "name":  "Tracker chain verification",
+                                                               "status":  "PASS",
+                                                               "msg":  "valid=true"
+                                                           },
+                                                           {
+                                                               "name":  "Audit entry appended",
+                                                               "status":  "PASS",
+                                                               "msg":  "8 -\u003e 9"
+                                                           },
+                                                           {
+                                                               "name":  "Audit chain verification",
+                                                               "status":  "PASS",
+                                                               "msg":  "valid=true"
+                                                           },
+                                                           {
+                                                               "name":  "Mint NFT",
+                                                               "status":  "PASS",
+                                                               "msg":  "tokenId=9"
+                                                           },
+                                                           {
+                                                               "name":  "NFT owner check",
+                                                               "status":  "PASS",
+                                                               "msg":  "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
+                                                           },
+                                                           {
+                                                               "name":  "Burn NFT",
+                                                               "status":  "PASS",
+                                                               "msg":  "0 -\u003e 0"
+                                                           },
+                                                           {
+                                                               "name":  "Stake model",
+                                                               "status":  "PASS",
+                                                               "msg":  "0.05"
+                                                           },
+                                                           {
+                                                               "name":  "Slash stake",
+                                                               "status":  "PASS",
+                                                               "msg":  "slashed=true"
+                                                           }
+                                                       ]
+                                   }
+                   },
+                   {
+                       "suite":  "SDK and Backend Integration Tests",
+                       "timestamp":  "2026-04-13T18:05:56.790960Z",
+                       "tests":  [
+                                     {
+                                         "name":  "SDK Import",
+                                         "status":  "PASS",
+                                         "detail":  "ProvenanceSDK imported successfully",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "Secret Manager Import",
+                                         "status":  "PASS",
+                                         "detail":  "ModelSecretManager imported successfully",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "GET /api/health",
+                                         "status":  "PASS",
+                                         "detail":  "Endpoint returned success=true",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "GET /api/v2/status",
+                                         "status":  "PASS",
+                                         "detail":  "Endpoint returned success=true",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "GET /api/v2/models",
+                                         "status":  "PASS",
+                                         "detail":  "Endpoint returned success=true",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "GET /api/v2/audit/recent",
+                                         "status":  "PASS",
+                                         "detail":  "Endpoint returned success=true",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "Secret Manager Init",
+                                         "status":  "PASS",
+                                         "detail":  "Initialized successfully",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "Secret Generation",
+                                         "status":  "PASS",
+                                         "detail":  "Generated 6-digit secret: 721094",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "Version Tracking",
+                                         "status":  "PASS",
+                                         "detail":  "Version recorded and secret verified: 721094",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: server/server.js",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (18.74 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: sdk/python/provenance_sdk.py",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (10.86 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: sdk/python/model_secret_manager.py",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (3.72 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: test_zk_standalone.js",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (4.90 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: address_v2_multi.json",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (1.34 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: contracts/ModelAccessControl.sol",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (4.29 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: contracts/ModelRegistry.sol",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (11.86 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: contracts/ModelAuditLog.sol",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (8.60 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: contracts/ModelNFT.sol",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (8.05 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: contracts/ModelStaking.sol",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (7.03 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: contracts/ProvenanceTracker.sol",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (7.35 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: scripts/test_contracts.cjs",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (9.53 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "File: scripts/deploy_multi_chain.cjs",
+                                         "status":  "PASS",
+                                         "detail":  "Exists (4.56 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "Pinata API Key",
+                                         "status":  "PASS",
+                                         "detail":  "Configured (5b2dd2e9...)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "Pinata Secret",
+                                         "status":  "PASS",
+                                         "detail":  "Configured",
+                                         "data":  null
+                                     }
+                                 ],
+                       "summary":  {
+                                       "passed":  24,
+                                       "failed":  0,
+                                       "warned":  0,
+                                       "skipped":  0,
+                                       "total":  24
+                                   }
+                   }
+               ]
+}

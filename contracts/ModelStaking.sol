@@ -4,27 +4,24 @@ pragma solidity ^0.8.19;
 import "./ModelAccessControl.sol";
 
 /// @title ModelStaking
-/// @notice Stake-based model registration with slashing mechanism for quality assurance
+/// @notice Stake-based model registration with slashing support.
 contract ModelStaking {
-    // ─── Storage ─────────────────────────────────────────────────────────────
+    // Storage
 
     ModelAccessControl public accessControl;
-
-    // modelId → stake info
     mapping(uint256 => StakeInfo) public stakes;
 
-    // Staking parameters (adjustable by ADMIN)
+    // Staking parameters
     uint256 public minStake = 0.01 ether;
-    uint256 public slashRatio = 50;  // Slashing ratio 50%
+    uint256 public slashRatio = 50;
     uint256 public lockPeriod = 7 days;
 
-    // Slashed funds receiver (treasury/DAO)
     address public treasury;
 
     uint256 public totalStaked;
     uint256 public totalSlashed;
 
-    // ─── Struct ─────────────────────────────────────────────────────────────
+    // Structs
 
     struct StakeInfo {
         uint256 modelId;
@@ -36,7 +33,7 @@ contract ModelStaking {
         bool slashed;
     }
 
-    // ─── Events ─────────────────────────────────────────────────────────────
+    // Events
 
     event StakeDeposited(uint256 indexed modelId, address indexed staker, uint256 amount);
     event StakeWithdrawn(uint256 indexed modelId, address indexed staker, uint256 amount);
@@ -52,17 +49,18 @@ contract ModelStaking {
     event LockPeriodUpdated(uint256 oldPeriod, uint256 newPeriod);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
 
-    // ─── Errors ─────────────────────────────────────────────────────────────
+    // Errors
 
-    error InsufficientStake();
-    error StakeLocked();
-    error AlreadyWithdrawn();
     error AlreadySlashed();
-    error ZeroAmount();
+    error AlreadyWithdrawn();
+    error BlacklistedAddress();
     error InvalidModelId();
+    error NotAdmin();
+    error StakeLocked();
     error StakerMismatch();
+    error ZeroAmount();
 
-    // ─── Constructor ─────────────────────────────────────────────────────────
+    // Constructor
 
     constructor(address _accessControl, address _treasury) {
         require(_accessControl != address(0), "Staking: access control required");
@@ -72,16 +70,16 @@ contract ModelStaking {
         treasury = _treasury;
     }
 
-    // ─── External Functions ───────────────────────────────────────────────────
+    // External functions
 
-    /// @notice Stake (called during model registration or for additional staking)
+    /// @notice Deposit stake for a model.
     function stake(uint256 _modelId) external payable notBlacklisted {
+        if (msg.value == 0) revert ZeroAmount();
+        if (_modelId == 0) revert InvalidModelId();
         require(msg.value >= minStake, "Staking: below minimum stake");
-        require(_modelId > 0, "Staking: invalid model id");
 
         StakeInfo storage info = stakes[_modelId];
 
-        // 首次质押
         if (info.amount == 0) {
             info.modelId = _modelId;
             info.staker = msg.sender;
@@ -90,10 +88,9 @@ contract ModelStaking {
             info.withdrawn = false;
             info.slashed = false;
         } else {
-            // 追加质押
-            require(info.staker == msg.sender, "Staking: not the original staker");
-            require(!info.withdrawn, "Staking: already withdrawn");
-            require(!info.slashed, "Staking: already slashed");
+            if (info.staker != msg.sender) revert StakerMismatch();
+            if (info.withdrawn) revert AlreadyWithdrawn();
+            if (info.slashed) revert AlreadySlashed();
         }
 
         info.amount += msg.value;
@@ -102,13 +99,13 @@ contract ModelStaking {
         emit StakeDeposited(_modelId, msg.sender, msg.value);
     }
 
-    /// @notice Withdraw stake (only by staker, after lock period)
+    /// @notice Withdraw stake after the lock period expires.
     function withdraw(uint256 _modelId) external {
         StakeInfo storage info = stakes[_modelId];
-        require(info.staker == msg.sender, "Staking: not staker");
-        require(!info.withdrawn, "Staking: already withdrawn");
-        require(!info.slashed, "Staking: already slashed");
-        require(block.timestamp >= info.unlockTime, "Staking: still locked");
+        if (info.staker != msg.sender) revert StakerMismatch();
+        if (info.withdrawn) revert AlreadyWithdrawn();
+        if (info.slashed) revert AlreadySlashed();
+        if (block.timestamp < info.unlockTime) revert StakeLocked();
 
         uint256 amount = info.amount;
         info.withdrawn = true;
@@ -120,54 +117,25 @@ contract ModelStaking {
         emit StakeWithdrawn(_modelId, msg.sender, amount);
     }
 
-    /// @notice Slash stake (ADMIN only)
+    /// @notice Slash stake for a model.
     function slash(
         uint256 _modelId,
         string calldata _reason
     ) external onlyAdmin returns (uint256 slashedAmount) {
-        StakeInfo storage info = stakes[_modelId];
-        require(info.amount > 0, "Staking: no stake");
-        require(!info.slashed, "Staking: already slashed");
-
-        slashedAmount = (info.amount * slashRatio) / 100;
-        uint256 toStaker = info.amount - slashedAmount;
-
-        info.slashed = true;
-        info.withdrawn = false;
-        totalStaked -= info.amount;
-        totalSlashed += slashedAmount;
-
-        // 部分返还给 staker（惩罚性）
-        if (toStaker > 0) {
-            (bool s1, ) = info.staker.call{value: toStaker}("");
-            require(s1, "Staking: staker refund failed");
-        }
-
-        // 部分发往国库
-        if (slashedAmount > 0) {
-            (bool s2, ) = treasury.call{value: slashedAmount}("");
-            require(s2, "Staking: treasury transfer failed");
-        }
-
-        emit StakeSlashed(_modelId, info.staker, slashedAmount, slashedAmount, _reason);
-        return slashedAmount;
+        return _slash(_modelId, _reason);
     }
 
-    /// @notice Batch slash (ADMIN only)
+    /// @notice Slash stake for multiple models.
     function batchSlash(
         uint256[] calldata _modelIds,
         string calldata _reason
     ) external onlyAdmin {
-        for (uint i = 0; i < _modelIds.length; i++) {
-            try this.slash(_modelIds[i], _reason) {
-                // 罚没成功，跳过
-            } catch {
-                // 单个失败不影响其他
-            }
+        for (uint256 i = 0; i < _modelIds.length; i++) {
+            _slash(_modelIds[i], _reason);
         }
     }
 
-    // ─── Admin Config Functions ───────────────────────────────────────────────
+    // Admin configuration
 
     function updateSlashRatio(uint256 _ratio) external onlyAdmin {
         require(_ratio > 0 && _ratio <= 100, "Staking: ratio must be 1-100");
@@ -195,7 +163,7 @@ contract ModelStaking {
         emit TreasuryUpdated(old, _treasury);
     }
 
-    // ─── View Functions ────────────────────────────────────────────────────
+    // View functions
 
     function getStakeInfo(uint256 _modelId) external view returns (StakeInfo memory) {
         return stakes[_modelId];
@@ -211,18 +179,52 @@ contract ModelStaking {
         return info.unlockTime - block.timestamp;
     }
 
-    // ─── Modifiers ────────────────────────────────────────────────────────────
+    // Internal functions
+
+    function _slash(uint256 _modelId, string memory _reason) internal returns (uint256 slashedAmount) {
+        if (_modelId == 0) revert InvalidModelId();
+
+        StakeInfo storage info = stakes[_modelId];
+        require(info.amount > 0, "Staking: no stake");
+        if (info.slashed) revert AlreadySlashed();
+        if (info.withdrawn) revert AlreadyWithdrawn();
+
+        uint256 originalAmount = info.amount;
+        slashedAmount = (originalAmount * slashRatio) / 100;
+        uint256 toStaker = originalAmount - slashedAmount;
+
+        info.amount = 0;
+        info.slashed = true;
+        info.withdrawn = true;
+        totalStaked -= originalAmount;
+        totalSlashed += slashedAmount;
+
+        if (toStaker > 0) {
+            (bool stakerRefundOk, ) = info.staker.call{value: toStaker}("");
+            require(stakerRefundOk, "Staking: staker refund failed");
+        }
+
+        if (slashedAmount > 0) {
+            (bool treasuryTransferOk, ) = treasury.call{value: slashedAmount}("");
+            require(treasuryTransferOk, "Staking: treasury transfer failed");
+        }
+
+        emit StakeSlashed(_modelId, info.staker, slashedAmount, slashedAmount, _reason);
+        return slashedAmount;
+    }
+
+    // Modifiers
 
     modifier onlyAdmin() {
         if (!accessControl.hasRole(accessControl.ADMIN(), msg.sender)) {
-            revert ZeroAmount();
+            revert NotAdmin();
         }
         _;
     }
 
     modifier notBlacklisted() {
         if (accessControl.isBlacklisted(msg.sender)) {
-            revert ZeroAmount();
+            revert BlacklistedAddress();
         }
         _;
     }

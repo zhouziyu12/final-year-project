@@ -4,10 +4,9 @@ pragma solidity ^0.8.19;
 import "./ModelAccessControl.sol";
 
 /// @title ModelAuditLog
-/// @notice Immutable audit trail for all sensitive operations in the provenance system
+/// @notice Immutable audit trail for sensitive provenance operations.
 contract ModelAuditLog {
-
-    // ─── Action Types ────────────────────────────────────────────────────────
+    // Action types
 
     enum ActionType {
         MODEL_REGISTERED,
@@ -31,34 +30,29 @@ contract ModelAuditLog {
         NFT_BURNED
     }
 
-    // ─── Struct ─────────────────────────────────────────────────────────────
+    // Structs
 
     struct AuditEntry {
         uint256 id;
         ActionType action;
         address actor;
-        uint256 targetId;       // modelId / tokenId / address
+        uint256 targetId;
         uint256 timestamp;
-        bytes32 previousHash;   // Chain hash (tamper-proof)
-        string metadata;         // Extra data (JSON string for IPFS CID, etc.)
-        bytes32 contentHash;    // 操作内容的哈希
+        bytes32 previousHash;
+        string metadata;
+        bytes32 contentHash;
     }
 
-    // ─── Storage ─────────────────────────────────────────────────────────────
+    // Storage
 
     ModelAccessControl public accessControl;
     uint256 private _entryCounter;
-
     mapping(uint256 => AuditEntry) public entries;
     uint256 public totalEntries;
-
-    // 链首哈希（最新条目哈希）
     bytes32 public chainHead;
-
-    // 快速索引: modelId → entryIds
     mapping(uint256 => uint256[]) public modelAuditIndex;
 
-    // ─── Events ─────────────────────────────────────────────────────────────
+    // Events
 
     event AuditEntryAdded(
         uint256 indexed entryId,
@@ -67,25 +61,23 @@ contract ModelAuditLog {
         uint256 targetId
     );
 
-    // ─── Errors ─────────────────────────────────────────────────────────────
+    // Errors
 
     error OnlyAuditor();
-    error EmptyMetadata();
 
-    // ─── Constructor ─────────────────────────────────────────────────────────
+    // Constructor
 
     constructor(address _accessControl) {
         require(_accessControl != address(0), "AuditLog: access control required");
         accessControl = ModelAccessControl(_accessControl);
 
-        // 创建创世条目（entryId=1），并将 _entryCounter 设为 1
         _appendGenesis();
-        _entryCounter = 1; // 防止后续 _append 从 1 开始覆盖创世块
+        _entryCounter = 1;
     }
 
-    // ─── External Functions ───────────────────────────────────────────────────
+    // External functions
 
-    /// @notice 记录任意操作（AUDITOR 或 ADMIN 可调用）
+    /// @notice Record a generic audit action.
     function logAction(
         ActionType _action,
         uint256 _targetId,
@@ -95,38 +87,45 @@ contract ModelAuditLog {
         return _append(_action, msg.sender, _targetId, _metadata, _contentHash);
     }
 
-    /// @notice 记录模型注册（自动调用接口，供其他合约调用）
+    /// @notice Record model registration.
     function logModelRegistered(
         uint256 _modelId,
         address _owner,
         string calldata _metadata
     ) external onlyAuditorOrAdmin returns (uint256) {
-        return _append(ActionType.MODEL_REGISTERED, _owner, _modelId, _metadata, keccak256(abi.encode(_modelId, _owner)));
+        return _append(
+            ActionType.MODEL_REGISTERED,
+            _owner,
+            _modelId,
+            _metadata,
+            keccak256(abi.encode(_modelId, _owner))
+        );
     }
 
-    /// @notice 记录状态变更
+    /// @notice Record model status changes.
     function logStatusChange(
         uint256 _modelId,
         uint8 _oldStatus,
         uint8 _newStatus,
         address _operator
     ) external onlyAuditorOrAdmin returns (uint256) {
-        bytes32 ch = keccak256(abi.encode(_modelId, _oldStatus, _newStatus, _operator));
-        return _append(ActionType.MODEL_REVOKED, _operator, _modelId, "", ch);
+        bytes32 contentHash = keccak256(abi.encode(_modelId, _oldStatus, _newStatus, _operator));
+        ActionType action = _statusToAction(_newStatus);
+        return _append(action, _operator, _modelId, "", contentHash);
     }
 
-    /// @notice 记录版本新增
+    /// @notice Record a new model version.
     function logVersionAdded(
         uint256 _modelId,
         uint256 _versionId,
         address _operator,
         string calldata _metadata
     ) external onlyAuditorOrAdmin returns (uint256) {
-        bytes32 ch = keccak256(abi.encode(_modelId, _versionId, _operator));
-        return _append(ActionType.VERSION_ADDED, _operator, _modelId, _metadata, ch);
+        bytes32 contentHash = keccak256(abi.encode(_modelId, _versionId, _operator));
+        return _append(ActionType.VERSION_ADDED, _operator, _modelId, _metadata, contentHash);
     }
 
-    /// @notice 记录转让
+    /// @notice Record ownership transfer activity.
     function logOwnershipTransfer(
         uint256 _modelId,
         address _from,
@@ -137,11 +136,11 @@ contract ModelAuditLog {
             ? ActionType.OWNERSHIP_TRANSFER_ACCEPTED
             : ActionType.OWNERSHIP_TRANSFER_REQUESTED;
 
-        bytes32 ch = keccak256(abi.encode(_modelId, _from, _to, _accepted));
-        return _append(action, msg.sender, _modelId, "", ch);
+        bytes32 contentHash = keccak256(abi.encode(_modelId, _from, _to, _accepted));
+        return _append(action, msg.sender, _modelId, "", contentHash);
     }
 
-    /// @notice 记录质押
+    /// @notice Record stake changes.
     function logStakeChange(
         uint256 _modelId,
         address _actor,
@@ -149,59 +148,60 @@ contract ModelAuditLog {
         bool _slashed
     ) external onlyAuditorOrAdmin returns (uint256) {
         ActionType action = _slashed ? ActionType.STAKE_SLASHED : ActionType.STAKE_DEPOSITED;
-        bytes32 ch = keccak256(abi.encode(_modelId, _actor, _amount, _slashed));
-        return _append(action, _actor, _modelId, "", ch);
+        bytes32 contentHash = keccak256(abi.encode(_modelId, _actor, _amount, _slashed));
+        return _append(action, _actor, _modelId, "", contentHash);
     }
 
-    /// @notice 记录角色变更
+    /// @notice Record role changes.
     function logRoleChange(
         address _account,
         bytes32 _role,
         bool _granted
     ) external onlyAuditorOrAdmin returns (uint256) {
         ActionType action = _granted ? ActionType.ROLE_GRANTED : ActionType.ROLE_REVOKED;
-        bytes32 ch = keccak256(abi.encode(_account, _role, _granted));
-        return _append(action, msg.sender, 0, "", ch);
+        bytes32 contentHash = keccak256(abi.encode(_account, _role, _granted));
+        return _append(action, msg.sender, 0, "", contentHash);
     }
 
-    /// @notice 验证链完整性（从任意条目往回验证哈希链）
+    /// @notice Verify the audit chain up to a given entry.
     function verifyChain(uint256 _entryId) external view returns (bool) {
         if (_entryId == 0 || _entryId > totalEntries) return false;
-        if (_entryId == 1) return true; // 创世块
+        if (_entryId == 1) return true;
 
-        AuditEntry memory entry = entries[_entryId];
-        AuditEntry memory prev = entries[_entryId - 1];
+        bytes32 expectedPreviousHash = _entryHash(entries[1]);
+        for (uint256 i = 2; i <= _entryId; i++) {
+            AuditEntry memory entry = entries[i];
+            if (entry.previousHash != expectedPreviousHash) {
+                return false;
+            }
+            expectedPreviousHash = _entryHash(entry);
+        }
 
-        bytes32 expectedHash = keccak256(abi.encode(
-            prev.id, prev.action, prev.actor, prev.targetId,
-            prev.timestamp, prev.previousHash, prev.contentHash
-        ));
-
-        return entry.previousHash == expectedHash;
+        return true;
     }
 
-    /// @notice 获取某模型的所有审计条目
+    /// @notice Return the full audit trail for a model.
     function getModelAuditTrail(uint256 _modelId) external view returns (AuditEntry[] memory) {
         uint256[] storage ids = modelAuditIndex[_modelId];
         AuditEntry[] memory result = new AuditEntry[](ids.length);
-        for (uint i = 0; i < ids.length; i++) {
+        for (uint256 i = 0; i < ids.length; i++) {
             result[i] = entries[ids[i]];
         }
         return result;
     }
 
-    /// @notice 获取某时间范围内的审计条目（通过事件查询更高效）
+    /// @notice Return audit entries in an inclusive ID range.
     function getEntriesByRange(uint256 _start, uint256 _end) external view returns (AuditEntry[] memory) {
         require(_start <= _end && _end <= totalEntries, "AuditLog: invalid range");
         uint256 count = _end - _start + 1;
         AuditEntry[] memory result = new AuditEntry[](count);
-        for (uint i = _start; i <= _end; i++) {
+        for (uint256 i = _start; i <= _end; i++) {
             result[i - _start] = entries[i];
         }
         return result;
     }
 
-    // ─── Internal ─────────────────────────────────────────────────────────────
+    // Internal functions
 
     function _append(
         ActionType _action,
@@ -224,11 +224,7 @@ contract ModelAuditLog {
         });
 
         entries[entryId] = entry;
-        chainHead = keccak256(abi.encode(
-            entry.id, entry.action, entry.actor, entry.targetId,
-            entry.timestamp, entry.previousHash, entry.contentHash
-        ));
-
+        chainHead = _entryHash(entry);
         totalEntries = entryId;
 
         if (_targetId > 0) {
@@ -236,7 +232,6 @@ contract ModelAuditLog {
         }
 
         emit AuditEntryAdded(entryId, _action, _actor, _targetId);
-
         return entryId;
     }
 
@@ -254,12 +249,29 @@ contract ModelAuditLog {
             contentHash: genesisHash
         });
 
-        chainHead = keccak256(abi.encode(
-            1, ActionType.MODEL_REGISTERED, address(0), uint256(0),
-            block.timestamp, bytes32(0), genesisHash
-        ));
-
+        chainHead = _entryHash(entries[1]);
         totalEntries = 1;
+    }
+
+    function _entryHash(AuditEntry memory _entry) internal pure returns (bytes32) {
+        return keccak256(
+            abi.encode(
+                _entry.id,
+                _entry.action,
+                _entry.actor,
+                _entry.targetId,
+                _entry.timestamp,
+                _entry.previousHash,
+                _entry.contentHash
+            )
+        );
+    }
+
+    function _statusToAction(uint8 _status) internal pure returns (ActionType) {
+        if (_status == 1) return ActionType.MODEL_ACTIVATED;
+        if (_status == 2) return ActionType.MODEL_DEPRECATED;
+        if (_status == 3) return ActionType.MODEL_REVOKED;
+        return ActionType.MODEL_UPDATED;
     }
 
     modifier onlyAuditorOrAdmin() {
@@ -269,4 +281,3 @@ contract ModelAuditLog {
         _;
     }
 }
-

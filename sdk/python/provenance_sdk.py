@@ -264,7 +264,7 @@ class ProvenanceSDK:
         payload = {
             "modelHash": model_hash,
             "modelId": model_id,
-            "action": "TRAINING_COMPLETED",
+            "action": "UPDATED",
             "sender": sender,
             "commit": commit_msg,
             "versionTag": version,

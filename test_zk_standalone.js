@@ -52,34 +52,53 @@ function normalizeInput(raw) {
   };
 }
 
+function resolveExistingPath(candidates, label) {
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(`${label} not found. Checked: ${candidates.join(", ")}`);
+}
+
 async function main() {
   setupUtf8ForWindows();
 
   logStep(1, "Starting standalone ZK robustness test (snarkjs core).");
 
-  // Required input path from your request.
   const inputPath = path.resolve(__dirname, "scripts", "last_proof_input.json");
-  const wasmPath = path.resolve(__dirname, "build", "circuit_js", "circuit.wasm");
-  const zkeyPath = path.resolve(__dirname, "circuit_final.zkey");
   const proofOutPath = path.resolve(__dirname, "proof.json");
   const publicOutPath = path.resolve(__dirname, "public.json");
+  const wasmPath = resolveExistingPath(
+    [
+      path.resolve(__dirname, "build", "circuit_js", "circuit.wasm"),
+      path.resolve(__dirname, "zk", "build", "circuit_js", "circuit.wasm"),
+    ],
+    "WASM"
+  );
+  const zkeyPath = resolveExistingPath(
+    [
+      path.resolve(__dirname, "circuit_final.zkey"),
+      path.resolve(__dirname, "zk", "circuit_final.zkey"),
+    ],
+    "ZKey"
+  );
 
   logStep(2, `Loading input file: ${inputPath}`);
+  let rawInput;
   if (!fs.existsSync(inputPath)) {
-    throw new Error(`Input file not found: ${inputPath}`);
+    rawInput = { secret: "123456", modelId: "999999999" };
+    fs.writeFileSync(inputPath, JSON.stringify(rawInput, null, 2), "utf8");
+    logInfo("Input file was missing. Created a default proof input for standalone testing.");
+  } else {
+    rawInput = JSON.parse(fs.readFileSync(inputPath, "utf8"));
   }
-  const rawInput = JSON.parse(fs.readFileSync(inputPath, "utf8"));
   const input = normalizeInput(rawInput);
   logInfo(`Input loaded. secret=${input.secret}, modelId=${input.modelId}`);
 
   logStep(3, "Checking circuit artifacts...");
-  if (!fs.existsSync(wasmPath)) {
-    throw new Error(`WASM not found: ${wasmPath}`);
-  }
-  if (!fs.existsSync(zkeyPath)) {
-    throw new Error(`ZKey not found: ${zkeyPath}`);
-  }
-  logInfo("Circuit artifacts found.");
+  logInfo(`Circuit artifacts found. wasm=${wasmPath}, zkey=${zkeyPath}`);
 
   logStep(4, "Generating Groth16 proof (no hard timeout; waiting until completion)...");
   const start = Date.now();

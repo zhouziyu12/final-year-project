@@ -4,25 +4,24 @@ pragma solidity ^0.8.19;
 import "./ModelAccessControl.sol";
 
 /// @title ModelRegistry
-/// @notice AI model registry with state machine, version control, and ownership transfer
+/// @notice AI model registry with a state machine, version control, and ownership transfer.
 contract ModelRegistry {
-
-    // ─── Enums ────────────────────────────────────────────────────────────────
+    // Enums
 
     enum ModelStatus {
-        DRAFT,      // Draft, editable
-        ACTIVE,     // Active, operational
-        DEPRECATED, // Deprecated, not recommended
-        REVOKED     // Revoked, irreversible
+        DRAFT,
+        ACTIVE,
+        DEPRECATED,
+        REVOKED
     }
 
     enum VersionType {
-        MAJOR,  // Breaking changes
-        MINOR,  // New features
-        PATCH   // Bug fixes
+        MAJOR,
+        MINOR,
+        PATCH
     }
 
-    // ─── Structs ─────────────────────────────────────────────────────────────
+    // Structs
 
     struct Model {
         uint256 id;
@@ -60,7 +59,7 @@ contract ModelRegistry {
         bool accepted;
     }
 
-    // ─── Storage ─────────────────────────────────────────────────────────────
+    // Storage
 
     ModelAccessControl public accessControl;
     uint256 private _modelCounter;
@@ -73,20 +72,15 @@ contract ModelRegistry {
     mapping(uint256 => Transfer) public pendingTransfers;
     mapping(uint256 => Transfer[]) public transferHistory;
 
-    // ─── Events ─────────────────────────────────────────────────────────────
+    // Events
 
-    event ModelRegistered(
-        uint256 indexed id,
-        address indexed owner
-    );
-
+    event ModelRegistered(uint256 indexed id, address indexed owner);
     event ModelStatusChanged(
         uint256 indexed id,
         ModelStatus oldStatus,
         ModelStatus newStatus,
         address indexed operator
     );
-
     event VersionAdded(
         uint256 indexed modelId,
         uint256 indexed versionId,
@@ -95,25 +89,19 @@ contract ModelRegistry {
         uint8 patch,
         VersionType versionType
     );
-
     event OwnershipTransferRequested(
         uint256 indexed modelId,
         address indexed from,
         address indexed to
     );
-
     event OwnershipTransferAccepted(
         uint256 indexed modelId,
         address indexed from,
         address indexed to
     );
+    event OwnershipTransferCancelled(uint256 indexed modelId, address indexed cancelledBy);
 
-    event OwnershipTransferCancelled(
-        uint256 indexed modelId,
-        address indexed cancelledBy
-    );
-
-    // ─── Errors ───────────────────────────────────────────────────────────────
+    // Errors
 
     error InvalidStatus(ModelStatus expected, ModelStatus actual);
     error NotOwner(address expected, address actual);
@@ -124,16 +112,16 @@ contract ModelRegistry {
     error ZeroStake();
     error InsufficientStake();
 
-    // ─── Constructor ─────────────────────────────────────────────────────────
+    // Constructor
 
     constructor(address _accessControl) {
         require(_accessControl != address(0), "AccessControl address required");
         accessControl = ModelAccessControl(_accessControl);
     }
 
-    // ─── External Functions ───────────────────────────────────────────────────
+    // External functions
 
-    /// @notice 注册新模型（需要 REGISTRAR 角色且不在黑名单）
+    /// @notice Register a new model. Requires the REGISTRAR role and a clean blacklist status.
     function registerModel(
         string calldata _name,
         string calldata _description,
@@ -149,29 +137,29 @@ contract ModelRegistry {
 
         uint256 id = ++_modelCounter;
 
-        // 逐字段赋值，减少栈压力
-        Model storage m = models[id];
-        m.id = id;
-        m.name = _name;
-        m.description = _description;
-        m.ipfsCid = _ipfsCid;
-        m.checksum = _checksum;
-        m.framework = _framework;
-        m.license = _license;
-        m.owner = msg.sender;
-        m.status = ModelStatus.DRAFT;
-        m.timestamp = block.timestamp;
-        m.stakeAmount = 0;
-        m.staked = false;
+        // Assign fields directly to avoid stack pressure.
+        Model storage model = models[id];
+        model.id = id;
+        model.name = _name;
+        model.description = _description;
+        model.ipfsCid = _ipfsCid;
+        model.checksum = _checksum;
+        model.framework = _framework;
+        model.license = _license;
+        model.owner = msg.sender;
+        model.status = ModelStatus.DRAFT;
+        model.timestamp = block.timestamp;
+        model.stakeAmount = 0;
+        model.staked = false;
 
-        // 自动创建 v0.0.1 版本
-        _addVersion(id, 1, 0, 0, 1, VersionType.PATCH, "", "");
+        // Create the initial version as v1.0.0.
+        _addVersion(id, 1, 1, 0, 0, VersionType.PATCH, "", "");
 
         emit ModelRegistered(id, msg.sender);
         return id;
     }
 
-    /// @notice 激活模型（DRAFT → ACTIVE）
+    /// @notice Activate a model.
     function activateModel(uint256 _id) external {
         Model storage model = models[_id];
         _requireOwner(model);
@@ -181,7 +169,7 @@ contract ModelRegistry {
         _setStatus(model, _id, ModelStatus.ACTIVE);
     }
 
-    /// @notice 弃用模型（ACTIVE → DEPRECATED）
+    /// @notice Deprecate a model.
     function deprecateModel(uint256 _id) external {
         Model storage model = models[_id];
         _requireOwner(model);
@@ -191,7 +179,7 @@ contract ModelRegistry {
         _setStatus(model, _id, ModelStatus.DEPRECATED);
     }
 
-    /// @notice 吊销模型（ACTIVE/DEPRECATED → REVOKED）
+    /// @notice Revoke a model. The owner or an admin may call this.
     function revokeModel(uint256 _id) external {
         Model storage model = models[_id];
         bool isOwner = model.owner == msg.sender;
@@ -209,7 +197,7 @@ contract ModelRegistry {
         emit ModelStatusChanged(_id, oldStatus, ModelStatus.REVOKED, msg.sender);
     }
 
-    /// @notice 更新模型元数据（仅 ACTIVE 状态）
+    /// @notice Update model metadata while the model is ACTIVE.
     function updateMetadata(
         uint256 _id,
         string calldata _description,
@@ -225,7 +213,7 @@ contract ModelRegistry {
         model.checksum = _checksum;
     }
 
-    /// @notice 添加新版本
+    /// @notice Add a new version to an existing model.
     function addVersion(
         uint256 _modelId,
         uint8 _major,
@@ -240,21 +228,21 @@ contract ModelRegistry {
 
         uint256 latest = latestVersionId[_modelId];
         if (latest > 0) {
-            ModelVersion memory lv = versions[_modelId][latest];
-            bool validVersion = (_major > lv.versionMajor) ||
-                (_major == lv.versionMajor && _minor > lv.versionMinor) ||
-                (_major == lv.versionMajor && _minor == lv.versionMinor && _patch > lv.versionPatch);
+            ModelVersion memory latestVersion = versions[_modelId][latest];
+            bool validVersion = (_major > latestVersion.versionMajor) ||
+                (_major == latestVersion.versionMajor && _minor > latestVersion.versionMinor) ||
+                (_major == latestVersion.versionMajor &&
+                    _minor == latestVersion.versionMinor &&
+                    _patch > latestVersion.versionPatch);
             require(validVersion, "ModelRegistry: version must be greater than current");
         }
 
         uint256 versionId = ++_versionCounter;
-
         _addVersion(_modelId, versionId, _major, _minor, _patch, _type, _ipfsMetadata, _parentHash);
-
         return versionId;
     }
 
-    /// @notice 请求转让
+    /// @notice Request ownership transfer for an ACTIVE unstaked model.
     function requestTransfer(uint256 _modelId, address _newOwner) external notBlacklisted {
         Model storage model = models[_modelId];
         _requireOwner(model);
@@ -275,7 +263,7 @@ contract ModelRegistry {
         emit OwnershipTransferRequested(_modelId, msg.sender, _newOwner);
     }
 
-    /// @notice Accept transfer
+    /// @notice Accept a pending ownership transfer.
     function acceptTransfer(uint256 _modelId) external notBlacklisted {
         Transfer storage transfer = pendingTransfers[_modelId];
         if (transfer.from == address(0)) revert TransferNotPending();
@@ -293,7 +281,7 @@ contract ModelRegistry {
         emit OwnershipTransferAccepted(_modelId, oldOwner, msg.sender);
     }
 
-    /// @notice Cancel transfer
+    /// @notice Cancel a pending ownership transfer.
     function cancelTransfer(uint256 _modelId) external {
         Transfer storage transfer = pendingTransfers[_modelId];
         if (transfer.from == address(0)) revert TransferNotPending();
@@ -302,7 +290,7 @@ contract ModelRegistry {
         emit OwnershipTransferCancelled(_modelId, msg.sender);
     }
 
-    /// @notice 获取版本历史
+    /// @notice Return the full version history for a model.
     function getVersionHistory(uint256 _modelId) external view returns (ModelVersion[] memory) {
         uint256 count = versionCount[_modelId];
         ModelVersion[] memory history = new ModelVersion[](count);
@@ -312,22 +300,22 @@ contract ModelRegistry {
         return history;
     }
 
-    /// @notice 查询模型状态
+    /// @notice Return the current model status.
     function getModelStatus(uint256 _id) external view returns (ModelStatus) {
         return models[_id].status;
     }
 
-    /// @notice 查询模型所有者
+    /// @notice Return the current model owner.
     function getModelOwner(uint256 _id) external view returns (address) {
         return models[_id].owner;
     }
 
-    /// @notice 查询是否已质押
+    /// @notice Return whether a model is marked as staked.
     function isModelStaked(uint256 _id) external view returns (bool) {
         return models[_id].staked;
     }
 
-    // ─── Internal ─────────────────────────────────────────────────────────────
+    // Internal functions
 
     function _addVersion(
         uint256 _modelId,
@@ -339,18 +327,18 @@ contract ModelRegistry {
         string memory _ipfsMetadata,
         string memory _parentHash
     ) internal {
-        // 直接字段赋值，避免 viaIR + struct 字面量的潜在编译器问题
-        ModelVersion storage v = versions[_modelId][_versionId];
-        v.versionId = _versionId;
-        v.modelId = _modelId;
-        v.versionMajor = _major;
-        v.versionMinor = _minor;
-        v.versionPatch = _patch;
-        v.versionType = _type;
-        v.ipfsMetadata = _ipfsMetadata;
-        v.parentHash = _parentHash;
-        v.timestamp = block.timestamp;
-        v.operator = msg.sender;
+        // Assign fields directly to avoid viaIR struct literal issues.
+        ModelVersion storage version = versions[_modelId][_versionId];
+        version.versionId = _versionId;
+        version.modelId = _modelId;
+        version.versionMajor = _major;
+        version.versionMinor = _minor;
+        version.versionPatch = _patch;
+        version.versionType = _type;
+        version.ipfsMetadata = _ipfsMetadata;
+        version.parentHash = _parentHash;
+        version.timestamp = block.timestamp;
+        version.operator = msg.sender;
 
         latestVersionId[_modelId] = _versionId;
         versionCount[_modelId]++;
@@ -377,5 +365,3 @@ contract ModelRegistry {
         _;
     }
 }
-
-

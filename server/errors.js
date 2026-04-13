@@ -1,4 +1,4 @@
-// ─── Custom Error Classes ────────────────────────────────────────────────────
+// Custom error classes
 
 export class AppError extends Error {
   constructor(message, statusCode = 500) {
@@ -30,25 +30,25 @@ export class BlockchainError extends AppError {
   }
 }
 
-// ─── Error Response Helpers ──────────────────────────────────────────────────
+// Error response helpers
 
 /**
- * Send success response
+ * Send a success response.
  */
 export const success = (res, data, statusCode = 200) => {
   return res.status(statusCode).json({
     success: true,
-    ...data,
+    ...data
   });
 };
 
 /**
- * Send error response with proper HTTP status code
+ * Send an error response with an HTTP status code.
  */
 export const error = (res, message, statusCode = 500, details = null) => {
   const response = {
     success: false,
-    error: message,
+    error: message
   };
   if (details && process.env.NODE_ENV !== 'production') {
     response.details = details;
@@ -57,37 +57,37 @@ export const error = (res, message, statusCode = 500, details = null) => {
 };
 
 /**
- * Async handler wrapper - catches errors and passes to next()
+ * Wrap an async route handler and forward errors.
  */
 export const asyncHandler = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-// ─── Validation Helpers ──────────────────────────────────────────────────────
+// Validation helpers
 
 /**
- * Validate required fields in request
+ * Ensure that an object contains all required fields.
  */
 export const validateRequired = (obj, fields) => {
-  const missing = fields.filter(f => !obj[f]);
+  const missing = fields.filter((field) => !obj[field]);
   if (missing.length > 0) {
     throw new ValidationError(`Missing required fields: ${missing.join(', ')}`);
   }
 };
 
 /**
- * Validate model ID
+ * Validate a model ID.
  */
 export const validateModelId = (id) => {
-  const num = parseInt(id);
-  if (isNaN(num) || num <= 0) {
+  const num = parseInt(id, 10);
+  if (Number.isNaN(num) || num <= 0) {
     throw new ValidationError('Invalid model ID');
   }
   return num;
 };
 
 /**
- * Validate address format (basic check)
+ * Validate a basic Ethereum address format.
  */
 export const validateAddress = (addr) => {
   if (!addr || typeof addr !== 'string') {
@@ -100,7 +100,7 @@ export const validateAddress = (addr) => {
 };
 
 /**
- * Validate network parameter
+ * Validate the requested network.
  */
 export const validateNetwork = (network) => {
   const validNetworks = ['sepolia', 'tbnb'];
@@ -110,7 +110,7 @@ export const validateNetwork = (network) => {
   return network;
 };
 
-// ─── Logging ─────────────────────────────────────────────────────────────────
+// Logging
 
 export const logError = (err, req = null) => {
   const timestamp = new Date().toISOString();

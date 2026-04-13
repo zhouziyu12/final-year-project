@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useDevice } from '../hooks';
 
-export function AuditPage({ onAudit, loading }) {
+export function AuditPage({ onAudit }) {
   const { isMobile } = useDevice();
   const [modelId, setModelId] = useState('');
   const [result, setResult] = useState(null);
@@ -11,12 +11,13 @@ export function AuditPage({ onAudit, loading }) {
     if (!modelId.trim()) return;
     setVerifying(true);
     try {
-      const res = await onAudit({ modelId });
-      setResult(res);
-    } catch (err) {
+      const response = await onAudit({ modelId });
+      setResult(response);
+    } catch {
       setResult({ error: 'Verification failed' });
+    } finally {
+      setVerifying(false);
     }
-    setVerifying(false);
   };
 
   if (isMobile) {
@@ -24,29 +25,31 @@ export function AuditPage({ onAudit, loading }) {
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-xl font-bold text-white">Verify Model</h1>
-          <p className="text-zinc-400 text-sm">ZK-based audit</p>
+          <p className="text-sm text-zinc-400">Chain consistency audit</p>
         </div>
 
         <div className="space-y-3">
           <input
             type="text"
             value={modelId}
-            onChange={(e) => setModelId(e.target.value)}
+            onChange={(event) => setModelId(event.target.value)}
             placeholder="Enter model ID..."
-            className="w-full px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-zinc-500"
+            className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-zinc-500"
           />
           <button
             onClick={handleVerify}
             disabled={!modelId.trim() || verifying}
-            className="w-full py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold disabled:opacity-50 active:scale-[0.98]"
+            className="w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 py-4 font-semibold text-white disabled:opacity-50 active:scale-[0.98]"
           >
             {verifying ? 'Verifying...' : 'Verify'}
           </button>
         </div>
 
         {result && (
-          <div className={`p-4 rounded-2xl ${result.error ? 'bg-red-500/10 border border-red-500/30' : 'bg-emerald-500/10 border border-emerald-500/30'}`}>
-            <p className={result.error ? 'text-red-400' : 'text-emerald-400'}>{result.error || 'Verified successfully'}</p>
+          <div className={`rounded-2xl p-4 ${result.error ? 'border border-red-500/30 bg-red-500/10' : 'border border-emerald-500/30 bg-emerald-500/10'}`}>
+            <p className={result.error ? 'text-red-400' : 'text-emerald-400'}>
+              {result.error || (result.verified ? 'Verified successfully' : 'Chain verification failed')}
+            </p>
           </div>
         )}
       </div>
@@ -57,40 +60,42 @@ export function AuditPage({ onAudit, loading }) {
     <div className="grid grid-cols-2 gap-8 animate-fade-in">
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-white mb-2">Verify Model</h1>
-          <p className="text-zinc-400">Use ZK proofs to verify model integrity</p>
+          <h1 className="mb-2 text-2xl font-bold text-white">Verify Model</h1>
+          <p className="text-zinc-400">Verify the recorded provenance chain for a model</p>
         </div>
 
-        <div className="p-6 rounded-xl bg-white/5 border border-white/5 space-y-4">
+        <div className="space-y-4 rounded-xl border border-white/5 bg-white/5 p-6">
           <input
             type="text"
             value={modelId}
-            onChange={(e) => setModelId(e.target.value)}
+            onChange={(event) => setModelId(event.target.value)}
             placeholder="Enter model ID..."
-            className="w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white placeholder:text-zinc-500 font-mono"
+            className="w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 font-mono text-white placeholder:text-zinc-500"
           />
           <button
             onClick={handleVerify}
             disabled={!modelId.trim() || verifying}
-            className="w-full py-3 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 text-white font-semibold disabled:opacity-50"
+            className="w-full rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 py-3 font-semibold text-white disabled:opacity-50"
           >
             {verifying ? 'Verifying...' : 'Verify'}
           </button>
         </div>
 
         {result && (
-          <div className={`p-4 rounded-xl ${result.error ? 'bg-red-500/10 border border-red-500/30' : 'bg-emerald-500/10 border border-emerald-500/30'}`}>
-            <p className={result.error ? 'text-red-400' : 'text-emerald-400'}>{result.error || 'Verified successfully'}</p>
+          <div className={`rounded-xl p-4 ${result.error ? 'border border-red-500/30 bg-red-500/10' : 'border border-emerald-500/30 bg-emerald-500/10'}`}>
+            <p className={result.error ? 'text-red-400' : 'text-emerald-400'}>
+              {result.error || (result.verified ? 'Verified successfully' : 'Chain verification failed')}
+            </p>
           </div>
         )}
       </div>
 
-      <div className="p-6 rounded-xl bg-gradient-to-br from-purple-500/10 to-cyan-500/10 border border-purple-500/20">
-        <h2 className="text-lg font-semibold text-white mb-4">How It Works</h2>
+      <div className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-cyan-500/10 p-6">
+        <h2 className="mb-4 text-lg font-semibold text-white">How It Works</h2>
         <div className="space-y-4 text-zinc-400">
-          <p>1. Input model hash or ID</p>
-          <p>2. ZK proof generated on-chain</p>
-          <p>3. Verification result returned</p>
+          <p>1. Enter a registered model ID.</p>
+          <p>2. The backend loads the model provenance history from the tracker contract.</p>
+          <p>3. The chain hash is validated and the verification result is returned.</p>
         </div>
       </div>
     </div>

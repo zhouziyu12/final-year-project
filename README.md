@@ -1,304 +1,175 @@
 # AI Model Provenance System
 
-A blockchain-based AI model provenance tracking system with zero-knowledge proof verification, RBAC access control, model NFT-ization, staking mechanism, and multi-chain storage.
+A multi-chain AI model provenance platform with smart-contract-backed lifecycle tracking, audit logging, NFT minting, staking, IPFS storage, and zero-knowledge proof support.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-16+-green.svg)](https://nodejs.org/)
-[![Solidity](https://img.shields.io/badge/Solidity-0.8.19-blue.svg)](https://soliditylang.org/)
-[![Tests](https://img.shields.io/badge/Tests-50/50%20pass-brightgreen.svg)]()
+## Overview
 
-## Features
+The repository contains:
 
-### Core Blockchain Features
-- 🔐 **Zero-Knowledge Proofs**: Verify model ownership without revealing secrets (Groth16 via snarkjs)
-- ⛓️ **Multi-Chain Storage**: Records stored on Sepolia, BSC Testnet, and Somnia
-- 📦 **IPFS Integration**: Decentralized model weight storage via Pinata
-- 🔄 **Lifecycle Tracking**: Track all versions of a model series with a single secret
+- Solidity contracts for access control, model registration, provenance, audit logs, NFTs, staking, and ZK verification
+- A Node.js backend that exposes REST APIs and bridges the contracts to the SDK and frontend
+- A React + Vite frontend for browsing models and audit records
+- A Python SDK for submitting provenance records from training pipelines
+- A Circom/snarkjs ZK proof workflow under `zk/`
 
-### Smart Contract Features (v2.0)
-- 🔱 **RBAC Access Control**: 4 roles (ADMIN, REGISTRAR, AUDITOR, MINTER) + blacklist mechanism
-- 🏷️ **Model State Machine**: DRAFT → ACTIVE → DEPRECATED → REVOKED lifecycle management
-- 📋 **Semantic Versioning**: MAJOR.MINOR.PATCH version control with type classification
-- 🔄 **Ownership Transfer**: Request-accept-cancel transfer flow for model ownership
-- 📜 **Immutable Audit Log**: Chain-hash linked tamper-proof audit trail (18 action types)
-- 🎨 **Model NFT-ization**: ERC-721 tokenization with 1:1 model-to-token mapping and transfer cooldown
-- 🚫 **Revocation & Blacklist**: Per-model and per-address blacklist with reasons
-- 💰 **Staking Mechanism**: ETH staking with configurable slashing (50%) and lock periods
+## Current Status
 
-## Contract Architecture
+Latest local verification on April 14, 2026:
 
+- `npx hardhat compile` passes
+- `cd client && npm run build` passes
+- `powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1` passes
+
+Test suites currently passing:
+
+- Smart contract suite across Sepolia and BSC Testnet
+- Standalone ZK proof generation flow
+- SDK and backend integration flow
+
+## Repository Layout
+
+```text
+ai-project/
+  contracts/              Solidity contracts
+  scripts/                Deployment and contract test scripts
+  server/                 Express backend
+  client/                 React frontend
+  sdk/python/             Python SDK and secret manager
+  tests/                  Test runners and result summaries
+  zk/                     Circom circuit, proving keys, and build artifacts
+  docs/                   Project documentation
 ```
-contracts/
-├── Verifier.sol                    # Groth16 ZK proof verifier (snarkjs generated)
-├── RealZKBridge.sol               # Cross-chain ZK proof bridge
-├── ModelAccessControl.sol          # RBAC + blacklist (ADMIN/REGISTRAR/AUDITOR/MINTER)
-├── ModelRegistry.sol              # Model state machine + version control + ownership transfer
-├── ModelProvenanceTracker.sol      # Lifecycle events + chain-hash records + ZK proof logs
-├── ModelAuditLog.sol              # Immutable audit trail with genesis block
-├── ModelNFT.sol                   # ERC-721 NFT with transfer cooldown
-└── ModelStaking.sol              # ETH staking with slashing mechanism
-```
+
+## Smart Contracts
+
+Main contracts:
+
+- `ModelAccessControl.sol`
+- `ModelRegistry.sol`
+- `ProvenanceTracker.sol` (contract name: `ModelProvenanceTracker`)
+- `ModelAuditLog.sol`
+- `ModelNFT.sol`
+- `ModelStaking.sol`
+- `Verifier.sol`
+- `RealZKBridge.sol`
 
 ## Deployed Addresses
 
-### Sepolia Testnet
-| Contract | Address |
-|----------|---------|
-| ModelAccessControl | `0x2b10c15a6e9a4FBDe74705AAd497CBf9013a1E77` |
-| ModelRegistry | `0x0416E82F7463f65E22B9209Aa1866c8895Ff4167` |
-| ModelProvenanceTracker | `0xF4DD796B894c79B197E9420350DD59F3602b7095` |
-| ModelAuditLog | `0x584Bb2E2d2E18d99976779C3bd817B69B3A579bc` |
-| ModelNFT | `0x02Ca5220360eb44c0F8c4FB7AEf732115e46f2a0` |
-| ModelStaking | `0x1D263F7f4B5F36b81138E6c809159090bb383a16` |
+Contract addresses are stored in [`address_v2_multi.json`](./address_v2_multi.json).
 
-### BSC Testnet
-| Contract | Address |
-|----------|---------|
-| ModelAccessControl | `0xF6bD1a729eE2Ae2E8bcE5834127E9e518470e517` |
-| ModelRegistry | `0x67fe7a49778674C4152fFe875dFb06C002f85E95` |
-| ModelProvenanceTracker | `0xDd0C2E81D9134A914fcA7Db9655d9813C87D5701` |
-| ModelAuditLog | `0x2Ee33973d1DbE6355E4a12f2e73E55645744DbD8` |
-| ModelNFT | `0x8Ddfa02851982E964E713CF0d432Fd050962b662` |
-| ModelStaking | `0x2FAaaC1764CDA120405A390de2D6C86c10934397` |
+Networks currently tracked:
 
-### Somnia Testnet
-| Contract | Address |
-|----------|---------|
-| ModelAccessControl | `0x5218C37411Fe49c15F3889DF131EA405Fe491703` |
+- `sepolia`
+- `tbnb`
+- `somnia`
 
 ## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- Git
-- Ethereum wallet with Sepolia/BSC testnet funds
+- Python 3.10+
+- npm
 
-### Installation
+### Install Dependencies
 
 ```bash
-# Clone the repository
-git clone https://github.com/zhouziyu12/final-year-project.git
-cd final-year-project
-
-# Install dependencies
 npm install
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your wallet private key and API keys
-
-# Compile contracts
-npx hardhat compile
-
-# Deploy to all chains
-node scripts/deploy_multi_chain.cjs
-
-# Run tests
-node scripts/test_contracts.cjs
+cd client && npm install
+cd ..
 ```
 
-### Frontend Development
+### Compile Contracts
+
+```bash
+npx hardhat compile
+```
+
+### Start the Backend
+
+```bash
+node server/server.js
+```
+
+### Start the Frontend
 
 ```bash
 cd client
-npm install
 npm run dev
 ```
 
-### Backend Server
+### Run the Full Test Flow
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
+```
+
+## Build Commands
+
+Backend sanity check:
 
 ```bash
-cd server
-node server.js
+node --check server/server.js
 ```
 
-## API Documentation
-
-### Base URL
-```
-http://localhost:3000
-```
-
-### Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/v2/status` | Blockchain status |
-| GET | `/api/v2/audit/recent` | Recent audit events |
-| GET | `/api/v2/models/:id` | Get model by ID |
-| POST | `/api/sdk/provenance` | Record provenance event |
-| POST | `/api/ipfs/upload/file` | Upload file to IPFS |
-| POST | `/api/ipfs/upload/metadata` | Upload metadata to IPFS |
-| GET | `/api/ipfs/cat/:cid` | Get IPFS content |
-
-### Example Usage
+Frontend production build:
 
 ```bash
-# Health check
-curl http://localhost:3000/api/health
-
-# Get blockchain status
-curl http://localhost:3000/api/v2/status
-
-# Get model info
-curl http://localhost:3000/api/v2/models/1?chain=sepolia
-
-# Record provenance (requires body)
-curl -X POST http://localhost:3000/api/sdk/provenance \
-  -H "Content-Type: application/json" \
-  -d '{"modelId": 1, "action": "ACTIVATED"}'
-
-# Upload to IPFS (requires Pinata credentials)
-curl -X POST http://localhost:3000/api/ipfs/upload/file \
-  -H "Content-Type: application/json" \
-  -d '{"data": "'$(base64 -w0 file.bin)'", "fileName": "model.bin"}'
+cd client
+npm run build
 ```
 
-### OpenAPI Spec
-Full API documentation available at: [docs/openapi.yml](docs/openapi.yml)
-
-## Testing
-
-Run the complete multi-chain test suite:
+Python syntax check:
 
 ```bash
-node scripts/test_contracts.cjs
+python -m py_compile sdk/python/provenance_sdk.py sdk/python/model_secret_manager.py tests/test_sdk_backend.py
 ```
 
-**Test Results**: 50/50 tests passing (100%) across Sepolia and BSC Testnet
+## API Summary
 
-| Contract | Tests | Status |
-|----------|-------|--------|
-| ModelAccessControl | 5 | ✅ Pass |
-| ModelRegistry | 7 | ✅ Pass |
-| ProvenanceTracker | 3 | ✅ Pass |
-| ModelAuditLog | 3 | ✅ Pass |
-| ModelNFT | 5 | ✅ Pass |
-| ModelStaking | 3 | ✅ Pass |
+Main backend endpoints:
 
-## Architecture
+- `GET /api/health`
+- `GET /api/v2/status`
+- `GET /api/v2/models`
+- `GET /api/v2/models/:id`
+- `GET /api/v2/audit/recent`
+- `GET /api/v2/audit/verify/:id`
+- `POST /api/sdk/provenance`
+- `POST /api/register`
+- `POST /api/audit`
+- `POST /api/ipfs/upload/file`
+- `POST /api/ipfs/upload/metadata`
+- `GET /api/ipfs/cat/:cid`
 
-```
-┌────────────────────────────────────────────────────────────────────┐
-│                        Training Script                              │
-│                        (Python + PyTorch)                           │
-└────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────┐
-│                        Provenance SDK                               │
-│              (ZK Proof + IPFS + Blockchain)                        │
-└────────────────────────────────────────────────────────────────────┘
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              ▼                     ▼                     ▼
-┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
-│     Sepolia      │  │       BSC        │  │      Somnia      │
-│    Testnet       │  │    Testnet      │  │    Testnet      │
-└──────────────────┘  └──────────────────┘  └──────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────┐
-│                      Backend API (Node.js)                          │
-└────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────┐
-│                   Frontend (React + Vite)                          │
-│                    Query → Visualize → Compare                      │
-└────────────────────────────────────────────────────────────────────┘
-```
+Legacy compatibility routes still exposed:
 
-## Project Structure
+- `GET /api/status`
+- `GET /api/models`
 
-```
-ai-project/
-├── contracts/
-│   ├── Verifier.sol                   # ZK proof verifier (snarkjs)
-│   ├── RealZKBridge.sol               # Cross-chain bridge
-│   ├── ModelAccessControl.sol         # RBAC + blacklist
-│   ├── ModelRegistry.sol              # Model registry + state machine
-│   ├── ModelProvenanceTracker.sol     # Lifecycle tracking
-│   ├── ModelAuditLog.sol             # Immutable audit trail
-│   ├── ModelNFT.sol                  # ERC-721 NFT
-│   └── ModelStaking.sol              # Staking mechanism
-├── scripts/
-│   ├── deploy_multi_chain.cjs         # Multi-chain deployment
-│   └── test_contracts.cjs            # Multi-chain test suite
-├── sdk/
-│   └── python/
-│       ├── provenance_sdk.py           # Main SDK
-│       └── model_secret_manager.py    # Secret management
-├── server/                          # Express API server
-├── client/                          # React frontend
-├── train1.py                        # Training script v1
-├── train2.py                        # Training script v2
-├── query_lifecycle.py               # Lifecycle query tool
-├── zk/                             # Zero-knowledge circuit
-└── hardhat.config.js               # Hardhat configuration
-```
+See [`docs/API.md`](./docs/API.md) for details.
 
-## Security Features
+## Zero-Knowledge Workflow
 
-### Zero-Knowledge Proofs
-- **Groth16** proof system via snarkjs
-- **Verification**: 1 input, 1 output, 1 public signal
-- **Circuit**: Hash-based model ownership verification
+The ZK assets live under `zk/`:
 
-### ZK Circuit Usage
+- `zk/circuit.circom`
+- `zk/build/circuit_js/circuit.wasm`
+- `zk/circuit_final.zkey`
+- `zk/verification_key.json`
 
-```bash
-# Navigate to ZK directory
-cd zk
+See [`docs/ZK_GUIDE.md`](./docs/ZK_GUIDE.md) for the full flow.
 
-# Compile circuit
-./compile.sh
+## Documentation
 
-# Generate proof
-node utils.js prove <modelId> <secret>
-
-# Export Solidity verifier
-node utils.js export
-```
-
-See [docs/ZK_GUIDE.md](docs/ZK_GUIDE.md) for detailed ZK documentation.
-
-## CI/CD
-
-This project uses GitHub Actions for continuous integration.
-
-### Workflows
-
-- **Contracts**: Compiles and tests smart contracts on every push
-- **Frontend**: Builds React app and uploads artifacts
-- **Server**: Syntax checks Node.js server code
-- **ZK**: Compiles Circom circuits
-
-### Secrets Required
-
-Configure these in GitHub repository settings:
-
-- `SEPOLIA_RPC`: Sepolia RPC URL
-- `TEST_PRIVATE_KEY`: Test wallet private key (for testnets only)
+- [`docs/API.md`](./docs/API.md)
+- [`docs/DEPLOY_GUIDE.md`](./docs/DEPLOY_GUIDE.md)
+- [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md)
+- [`docs/USER_MANUAL.md`](./docs/USER_MANUAL.md)
+- [`docs/ZK_GUIDE.md`](./docs/ZK_GUIDE.md)
+- [`tests/README.md`](./tests/README.md)
+- [`tests/TEST_SUMMARY.md`](./tests/TEST_SUMMARY.md)
 
 ## License
 
-### Access Control
-- **4 Roles**: ADMIN, REGISTRAR, AUDITOR, MINTER
-- **Blacklist**: Per-address blocking with reasons
-- **Role Hierarchy**: ADMIN > REGISTRAR > AUDITOR > MINTER
-
-### Audit Trail
-- **Immutable**: Chain-hash linked records
-- **18 Action Types**: Full lifecycle coverage
-- **Genesis Block**: First timestamp record
-
-## License
-
-MIT License - See [LICENSE](LICENSE) for details.
-
-## Author
-
-Zhou Ziyu - [GitHub](https://github.com/zhouziyu12)
+MIT

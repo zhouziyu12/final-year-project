@@ -5,16 +5,15 @@ import "./ModelAccessControl.sol";
 
 /// @title ModelRegistry Interface
 interface IModelRegistry {
-    function getOwner(uint256 _id) external view returns (address);
+    function getModelOwner(uint256 _id) external view returns (address);
     function getModelStatus(uint256 _id) external view returns (uint8);
     function isModelStaked(uint256 _id) external view returns (bool);
 }
 
 /// @title ModelProvenanceTracker
-/// @notice Tracks model lifecycle events with chain hash, blacklist checks, and ZK proof support
+/// @notice Tracks model lifecycle events with chain hashing and blacklist checks.
 contract ModelProvenanceTracker {
-
-    // ─── Event Types ─────────────────────────────────────────────────────────
+    // Event types
 
     enum EventType {
         REGISTERED,
@@ -30,7 +29,7 @@ contract ModelProvenanceTracker {
         ZK_PROOF_VERIFIED
     }
 
-    // ─── Struct ─────────────────────────────────────────────────────────────
+    // Structs
 
     struct ProvenanceRecord {
         uint256 recordId;
@@ -43,7 +42,7 @@ contract ModelProvenanceTracker {
         bytes32 recordHash;
     }
 
-    // ─── Storage ─────────────────────────────────────────────────────────────
+    // Storage
 
     ModelAccessControl public accessControl;
     IModelRegistry public registry;
@@ -56,7 +55,7 @@ contract ModelProvenanceTracker {
     mapping(uint256 => bool) public modelBlacklist;
     mapping(uint256 => string) public blacklistReasons;
 
-    // ─── Events ─────────────────────────────────────────────────────────────
+    // Events
 
     event RecordAdded(
         uint256 indexed recordId,
@@ -68,12 +67,12 @@ contract ModelProvenanceTracker {
     event ModelBlacklisted(uint256 indexed modelId, string reason, address by);
     event ModelUnblacklisted(uint256 indexed modelId, address by);
 
-    // ─── Errors ─────────────────────────────────────────────────────────────
+    // Errors
 
     error ModelIsBlacklisted();
     error NotAuthorized();
 
-    // ─── Constructor ─────────────────────────────────────────────────────────
+    // Constructor
 
     constructor(address _accessControl, address _registry) {
         require(_accessControl != address(0), "Tracker: access control required");
@@ -82,7 +81,7 @@ contract ModelProvenanceTracker {
         registry = IModelRegistry(_registry);
     }
 
-    // ─── External Functions ───────────────────────────────────────────────────
+    // External functions
 
     function addRecord(
         uint256 _modelId,
@@ -138,7 +137,7 @@ contract ModelProvenanceTracker {
     function getModelHistory(uint256 _modelId) external view returns (ProvenanceRecord[] memory) {
         uint256[] storage ids = modelHistory[_modelId];
         ProvenanceRecord[] memory result = new ProvenanceRecord[](ids.length);
-        for (uint i = 0; i < ids.length; i++) {
+        for (uint256 i = 0; i < ids.length; i++) {
             result[i] = records[ids[i]];
         }
         return result;
@@ -150,17 +149,24 @@ contract ModelProvenanceTracker {
 
         bytes32 prevRecordHash = bytes32(0);
 
-        for (uint i = 0; i < ids.length; i++) {
+        for (uint256 i = 0; i < ids.length; i++) {
             ProvenanceRecord storage record = records[ids[i]];
 
             if (record.previousHash != prevRecordHash) {
                 return false;
             }
 
-            bytes32 computed = keccak256(abi.encode(
-                record.recordId, record.modelId, record.eventType,
-                record.timestamp, record.operator, record.previousHash
-            ));
+            bytes32 computed = keccak256(
+                abi.encode(
+                    record.recordId,
+                    record.modelId,
+                    record.eventType,
+                    record.ipfsMetadata,
+                    record.timestamp,
+                    record.operator,
+                    record.previousHash
+                )
+            );
             if (record.recordHash != computed) {
                 return false;
             }
@@ -172,17 +178,19 @@ contract ModelProvenanceTracker {
     }
 
     function getModelsStatus(uint256[] calldata _modelIds)
-        external view returns (uint8[] memory statuses, bool[] memory blacklisted)
+        external
+        view
+        returns (uint8[] memory statuses, bool[] memory blacklisted)
     {
         statuses = new uint8[](_modelIds.length);
         blacklisted = new bool[](_modelIds.length);
-        for (uint i = 0; i < _modelIds.length; i++) {
+        for (uint256 i = 0; i < _modelIds.length; i++) {
             statuses[i] = registry.getModelStatus(_modelIds[i]);
             blacklisted[i] = modelBlacklist[_modelIds[i]];
         }
     }
 
-    // ─── Internal ─────────────────────────────────────────────────────────────
+    // Internal functions
 
     function _appendRecord(
         uint256 _modelId,
@@ -204,17 +212,23 @@ contract ModelProvenanceTracker {
             recordHash: bytes32(0)
         });
 
-        record.recordHash = keccak256(abi.encode(
-            record.recordId, record.modelId, record.eventType,
-            record.timestamp, record.operator, record.previousHash
-        ));
+        record.recordHash = keccak256(
+            abi.encode(
+                record.recordId,
+                record.modelId,
+                record.eventType,
+                record.ipfsMetadata,
+                record.timestamp,
+                record.operator,
+                record.previousHash
+            )
+        );
 
         records[recordId] = record;
         modelHistory[_modelId].push(recordId);
         modelChainHead[_modelId] = record.recordHash;
 
         emit RecordAdded(recordId, _modelId, _eventType, _operator);
-
         return recordId;
     }
 
