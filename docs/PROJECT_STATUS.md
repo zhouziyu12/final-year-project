@@ -168,7 +168,7 @@ Current code-verified state:
 
 - active deployments are recorded on Sepolia and tBNB
 - bridge-related contracts exist in source
-- the default end-to-end runtime path is still centered on single-backend orchestration plus tracked chain state, rather than a fully demonstrated trustless bridge workflow
+- the default end-to-end runtime path is verifier-gated backend orchestration plus tracked chain state, while the fully trustless bridge workflow remains a separate architectural path
 
 ## 3. Not Fully Implemented or Not Verified in Current Mainline
 
@@ -248,14 +248,13 @@ This means the practical center of gravity is:
 
 Safe wording:
 
-- "The current prototype implements model registration, provenance tracking, protected backend relay, local ZK proof generation, IPFS-backed metadata handling, and a frontend audit dashboard."
-- "Cross-chain and ZK-integrated verification capabilities are present in the codebase, but parts of that end-to-end flow remain only partially integrated in the current prototype."
+- "The current prototype implements model registration, verifier-gated provenance tracking, protected backend relay, local ZK proof generation, IPFS-backed metadata handling, and a frontend audit dashboard."
+- "Default provenance submissions are enforced through the verifier-gated backend and `ZKProvenanceTracker`, while cross-chain bridge-oriented settlement remains a separate architectural capability."
 - "NFT and staking support are implemented at contract level, with limited integration at the application layer."
 
 Wording to avoid without qualification:
 
 - "The system fully achieves trustless end-to-end cross-chain settlement."
-- "All provenance submissions are currently enforced by on-chain ZK verification."
 - "The frontend provides complete NFT and staking operations."
 
 ## 7. Immediate Cleanup Priorities

@@ -1,13 +1,17 @@
 import hashlib
+import base64
+import hashlib
 import json
 import os
 import secrets
 import subprocess
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import requests
+from eth_utils import keccak
 
 try:
     from dotenv import load_dotenv
@@ -67,10 +71,9 @@ class ProvenanceSDK:
         return int(hex_part, 16) % 1_000_000_000
 
     @staticmethod
-    def _message_hash_to_field(*parts: str) -> int:
+    def _keccak_to_field(payload: str) -> int:
         field_modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617
-        digest = hashlib.sha256("::".join(parts).encode("utf-8")).hexdigest()
-        return int(digest, 16) % field_modulus
+        return int.from_bytes(keccak(text=payload), byteorder="big") % field_modulus
 
     @staticmethod
     def _safe_json_load(path: Path, default: Any) -> Any:
@@ -80,6 +83,31 @@ class ProvenanceSDK:
         except Exception:
             pass
         return default
+
+    @staticmethod
+    def _canonical_json(payload: Dict[str, Any]) -> str:
+        return json.dumps(payload, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+    @staticmethod
+    def _utc_now_iso() -> str:
+        return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    @staticmethod
+    def _proof_to_contract_args(proof: Dict[str, Any], public_signals: Any) -> Dict[str, Any]:
+        if not proof:
+            raise RuntimeError("Proof JSON is empty")
+        if not isinstance(public_signals, list) or len(public_signals) != 3:
+            raise RuntimeError("Expected exactly 3 public signals for verifier-gated submission")
+
+        return {
+            "pA": [str(proof["pi_a"][0]), str(proof["pi_a"][1])],
+            "pB": [
+                [str(proof["pi_b"][0][1]), str(proof["pi_b"][0][0])],
+                [str(proof["pi_b"][1][1]), str(proof["pi_b"][1][0])],
+            ],
+            "pC": [str(proof["pi_c"][0]), str(proof["pi_c"][1])],
+            "publicSignals": [str(value) for value in public_signals],
+        }
 
     # ------------------------------ ZK Wrapper -------------------------------
 
@@ -183,11 +211,26 @@ class ProvenanceSDK:
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
         if not (self.pinata_api_key and self.pinata_secret_api_key):
-            print("[SDK] Pinata credentials not configured, backend will handle upload.")
+            print("[SDK] Pinata credentials not configured, falling back to backend upload route.")
+            with open(p, "rb") as fp:
+                response = requests.post(
+                    f"{self.base_url}/api/ipfs/upload/file",
+                    json={
+                        "data": base64.b64encode(fp.read()).decode("ascii"),
+                        "fileName": p.name,
+                    },
+                    headers=self._build_write_headers(),
+                    timeout=self.timeout,
+                )
+            if response.status_code >= 400:
+                raise RuntimeError(f"Backend IPFS upload failed: {response.text}")
+            payload = response.json()
+            if not payload.get("success"):
+                raise RuntimeError(f"Backend IPFS upload returned failure: {payload}")
             return {
-                "ok": False,
-                "ipfsCid": None,
-                "reason": "PINATA_API_KEY / PINATA_SECRET_API_KEY not configured; fallback to backend upload",
+                "ok": True,
+                "ipfsCid": payload.get("cid"),
+                "provider": "backend-relay",
             }
 
         url = "https://api.pinata.cloud/pinning/pinFileToIPFS"
@@ -318,56 +361,52 @@ class ProvenanceSDK:
         print(f"[SDK] Step 1/6: Hashing model file...")
         model_hash = self._sha256_file(model_path)
         print(f"[SDK] Model hash: {model_hash}")
+        print(f"\n[SDK] Step 2/6: Resolving on-chain model registration...")
         effective_model_name = model_name or Path(model_path).stem
         registry_model = self._ensure_model_registered(effective_model_name, chain, model_hash)
         model_id = int(registry_model["numericId"] if "numericId" in registry_model else registry_model["id"])
         print(f"[SDK] Resolved on-chain model: {effective_model_name} -> {model_id} ({chain})")
 
-        print(f"\n[SDK] Step 2/6: Generating ZK proof...")
-        message_hash = self._message_hash_to_field(
-            effective_model_name,
-            chain,
-            model_hash,
-            commit_msg,
-            sender,
-            version,
-        )
-        zk_bundle = self._generate_zk_proof(secret=secret, model_id=model_id, message_hash=message_hash)
-        
         print(f"\n[SDK] Step 3/6: Uploading model to IPFS...")
         ipfs_bundle = self._upload_model_to_ipfs(model_path)
+        if not ipfs_bundle.get("ok") or not ipfs_bundle.get("ipfsCid"):
+            raise RuntimeError("Model upload to IPFS did not return a CID")
 
-        print(f"\n[SDK] Step 4/6: Assembling metadata...")
-        training_metadata = {
-            "framework": "PyTorch",
-            "stage": "training",
-            "version": version,
+        print(f"\n[SDK] Step 4/6: Generating ZK proof...")
+        submitted_at = self._utc_now_iso()
+        canonical_metadata_payload = {
+            "action": "UPDATED",
+            "artifactCid": ipfs_bundle["ipfsCid"],
+            "chain": chain,
             "commit": commit_msg,
-            "message_hash": str(message_hash),
-            "weights_path": model_path,
-            "zk_verified": zk_bundle["zk"]["ok"],
-            "zk_engine": zk_bundle["zk"]["engine"],
-            "zk_public_signals": zk_bundle["zk"]["publicSignals"],
-            "zk_calldata": zk_bundle["zk"]["calldata"],
-            "ipfs_upload_mode": "sdk-direct" if ipfs_bundle.get("ok") else "backend-fallback",
-            "sdk_timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
-        }
-
-        print(f"\n[SDK] Step 5/6: Building relayer payload...")
-        payload = {
             "modelHash": model_hash,
+            "modelName": effective_model_name,
+            "sender": sender,
+            "submittedAt": submitted_at,
+            "trainingMetadata": {
+                "framework": "PyTorch",
+                "stage": "training",
+                "version": version,
+                "weights_path": model_path,
+                "zkEngine": "snarkjs.groth16",
+            },
+            "versionTag": version,
+        }
+        canonical_metadata = self._canonical_json(canonical_metadata_payload)
+        statement_hash = self._keccak_to_field(canonical_metadata)
+        zk_bundle = self._generate_zk_proof(secret=secret, model_id=model_id, message_hash=statement_hash)
+        zk_proof = self._proof_to_contract_args(
+            zk_bundle["zk"]["proof"],
+            zk_bundle["zk"]["publicSignals"],
+        )
+
+        print(f"\n[SDK] Step 5/6: Assembling metadata...")
+        payload = {
             "modelId": model_id,
             "modelName": effective_model_name,
             "chain": chain,
-            "action": "UPDATED",
-            "sender": sender,
-            "commit": commit_msg,
-            "versionTag": version,
-            "trainingMetadata": training_metadata,
-            # If SDK uploaded successfully, backend will use this;
-            # otherwise backend can upload from modelFilePath itself.
-            "ipfsHash": ipfs_bundle.get("ipfsCid"),
-            "modelFilePath": model_path,
+            "canonicalMetadata": canonical_metadata,
+            "zkProof": zk_proof,
         }
 
         print(f"\n[SDK] Step 6/6: Submitting to tri-chain relayer...")
@@ -384,8 +423,11 @@ class ProvenanceSDK:
             "modelId": model_id,
             "modelName": effective_model_name,
             "chain": chain,
+            "canonicalMetadata": canonical_metadata_payload,
+            "statementHash": str(statement_hash),
             "zk": {
                 "calldata": zk_bundle["zk"]["calldata"],
+                "proof": zk_proof,
                 "publicSignals": zk_bundle["zk"]["publicSignals"],
             },
             "ipfs": ipfs_bundle,

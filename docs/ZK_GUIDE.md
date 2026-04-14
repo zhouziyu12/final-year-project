@@ -14,7 +14,7 @@ Current implementation boundary:
 - local proof generation and local proof verification are implemented and usable today
 - the Python SDK already generates proof artifacts during provenance submission
 - bridge-related verifier contracts and constraints exist in the codebase
-- the default SDK/backend application path is still centered on provenance submission, with ZK data carried alongside it rather than fully enforced through bridge settlement
+- the default SDK/backend application path is verifier-gated and writes provenance only after proof-linked validation
 
 ## Current End-to-End Runtime Path
 
@@ -37,9 +37,9 @@ The current code-verified ZKP runtime path is:
    - `proof_calldata_debug.txt`
 6. the SDK packages ZK-derived fields into `trainingMetadata`
 7. the backend stores that payload through `POST /api/sdk/provenance`
-8. the backend writes the record through `ModelProvenanceTracker.addRecord(...)`
+8. the backend writes the record through `ZKProvenanceTracker.addVerifiedRecord(...)`
 
-This means the current application path is already ZKP-aware, but not yet ZKP-enforced at the bridge-verifier settlement layer.
+This means the current application path is ZKP-aware and verifier-gated at the provenance acceptance layer.
 
 ## Key Files
 
@@ -188,8 +188,8 @@ This blocks:
 Important runtime note:
 
 - this bridge binding exists in the repository and contract layer
-- it is not yet the default backend write path used by `POST /api/sdk/provenance`
-- the current backend route writes through `addRecord(...)`, not `addZKProofRecord(...)`
+- it is an architectural extension beyond the default backend write path used by `POST /api/sdk/provenance`
+- the current backend route writes through `ZKProvenanceTracker.addVerifiedRecord(...)`
 
 ## Troubleshooting
 
@@ -220,4 +220,4 @@ After a successful `node tests/test_zk_proof.js`, use:
 
 ### `zkReady` looks true even when bridge verification is not active
 
-`GET /api/v2/status` currently exposes `zkReady: true` as a backend readiness flag. Treat it as an operational indicator for the current prototype stack, not as proof that verifier-gated bridge settlement is active in the default write path.
+`GET /api/v2/status` currently exposes `zkReady: true` as a backend readiness flag. Treat it as an operational indicator for the current prototype stack, not as proof that the separate bridge-settlement path is active.

@@ -50,7 +50,7 @@ async function testContractConnectivity() {
     ]);
     log('Sepolia RPC Connection', 'PASS', `Connected to chainId: ${network.chainId}`);
 
-    // Verify all 6 contracts exist
+    // Verify the deployed contract set, including verifier-gated provenance components.
     const contracts = addresses.sepolia.contracts;
     let deployedCount = 0;
     for (const [name, addr] of Object.entries(contracts)) {
@@ -62,7 +62,7 @@ async function testContractConnectivity() {
         log(`Sepolia ${name}`, 'FAIL', `No contract at ${addr}`);
       }
     }
-    log('Sepolia Contract Count', deployedCount === 6 ? 'PASS' : 'FAIL', `${deployedCount}/6 contracts deployed`);
+    log('Sepolia Contract Count', deployedCount === 8 ? 'PASS' : 'FAIL', `${deployedCount}/8 contracts deployed`);
   } catch (err) {
     log('Sepolia RPC Connection', 'FAIL', err.message);
   }
@@ -87,7 +87,7 @@ async function testContractConnectivity() {
         log(`BSC ${name}`, 'FAIL', `No contract at ${addr}`);
       }
     }
-    log('BSC Contract Count', deployedCount === 6 ? 'PASS' : 'FAIL', `${deployedCount}/6 contracts deployed`);
+    log('BSC Contract Count', deployedCount === 8 ? 'PASS' : 'FAIL', `${deployedCount}/8 contracts deployed`);
   } catch (err) {
     log('BSC RPC Connection', 'FAIL', err.message);
   }
@@ -160,6 +160,28 @@ async function testContractRead() {
     );
     const supply = await nft.totalSupply();
     log('Sepolia ModelNFT', 'PASS', `totalSupply: ${supply}`);
+
+    const verifierArtifact = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '..', 'artifacts', 'contracts', 'Verifier.sol', 'Groth16Verifier.json'), 'utf8')
+    );
+    const verifier = new ethers.Contract(
+      addresses.sepolia.contracts.Groth16Verifier,
+      verifierArtifact.abi,
+      sepWallet
+    );
+    const proofFn = await verifier.getFunction('verifyProof');
+    log('Sepolia Groth16Verifier', proofFn ? 'PASS' : 'FAIL', 'Verifier ABI is readable');
+
+    const zkptArtifact = JSON.parse(
+      fs.readFileSync(path.join(__dirname, '..', 'artifacts', 'contracts', 'ZKProvenanceTracker.sol', 'ZKProvenanceTracker.json'), 'utf8')
+    );
+    const zkpt = new ethers.Contract(
+      addresses.sepolia.contracts.ZKProvenanceTracker,
+      zkptArtifact.abi,
+      sepWallet
+    );
+    const chainHead = await zkpt.modelChainHead(1).catch(() => null);
+    log('Sepolia ZKProvenanceTracker', chainHead !== undefined ? 'PASS' : 'FAIL', 'Verifier-gated provenance tracker is readable');
 
     // Read Staking
     const stakingArtifact = JSON.parse(

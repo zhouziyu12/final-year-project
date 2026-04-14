@@ -1,41 +1,42 @@
 # AI Model Provenance System
 
-A working AI model provenance prototype for model registration, lifecycle tracking, audit verification, IPFS-backed metadata, backend-mediated contract writes, and local zero-knowledge proof generation.
+A working AI model provenance prototype for model registration, lifecycle tracking, audit verification, IPFS-backed artifacts, verifier-gated contract writes, and local zero-knowledge proof generation.
 
 Important scope note:
 
-- model registration, provenance tracking, backend relay, frontend audit/registry views, and local ZK tooling are implemented today
-- bridge-oriented cross-chain and some advanced contract features exist in the codebase but are only partially integrated into the main runtime path
+- model registration, verifier-gated provenance tracking, backend relay, frontend audit/registry views, and local ZK tooling are implemented today
+- bridge-oriented cross-chain features still exist in the codebase, but `RealZKBridge.sol` is not the default provenance entry path
 
 ## Current ZKP Path
 
-The current codebase already supports a real ZKP-oriented training submission flow:
+The current codebase now supports a verifier-gated training submission flow:
 
 1. the Python SDK hashes the model artifact
 2. it resolves or auto-registers the on-chain model ID
-3. it generates a Groth16 proof locally from `secret`, `modelId`, and `messageHash`
-4. it exports proof artifacts and Solidity calldata
-5. it uploads the model artifact to IPFS when Pinata credentials are available
-6. it submits provenance through the backend, carrying ZK-derived metadata inside `trainingMetadata`
+3. it uploads the model artifact to IPFS
+4. it builds stable canonical metadata and derives `statementHash = keccak256(bytes(canonicalMetadata)) % field`
+5. it generates a Groth16 proof locally from `secret`, `modelId`, and `statementHash`
+6. it submits provenance through the backend using `canonicalMetadata + zkProof`
 
 What is true today:
 
 - local proof generation is implemented and tested
 - local Groth16 verification is implemented and tested
-- the SDK includes ZK-derived fields such as `message_hash`, `zk_public_signals`, and `zk_calldata` in the provenance payload
-- the backend stores that data through the normal provenance record flow
+- the SDK binds proof generation to the exact canonical metadata string that will be written on-chain
+- the backend recomputes `statementHash` before writing
+- successful writes go through `ZKProvenanceTracker.addVerifiedRecord(...)`
+- submissions without valid proof material are rejected before provenance anchoring
 
 What is not the default runtime path today:
 
-- the backend does not currently route the SDK flow through `addZKProofRecord(...)`
-- the backend does not currently enforce verifier-gated bridge settlement before accepting a provenance record
-- `RealZKBridge.sol` and `Verifier.sol` are present and useful for the ZKP architecture, but they are not yet the default application write path
+- `RealZKBridge.sol` remains in the repository, but it is not the default application write path
+- raw proof blobs and calldata are not stored on-chain; the chain only anchors the canonical metadata string
 
 ## Current System Layout
 
 The repository has five core parts:
 
-- `contracts/`: Solidity contracts for access control, registration, provenance, audit, NFT, staking, and bridge/ZK-related components.
+- `contracts/`: Solidity contracts for access control, registration, provenance, audit, NFT, staking, and verifier/ZK-related components.
 - `server/`: Express backend for REST APIs, write authentication, blockchain read/write orchestration, and Pinata uploads.
 - `client/`: React + Vite frontend for overview, training, registry, audit, system status, and NFT presentation pages.
 - `sdk/python/`: Python SDK for hashing artifacts, generating ZK proofs, uploading to IPFS, and submitting provenance.
@@ -82,6 +83,7 @@ Core contracts:
 - `ModelAccessControl.sol`
 - `ModelRegistry.sol`
 - `ProvenanceTracker.sol` (`ModelProvenanceTracker`)
+- `ZKProvenanceTracker.sol`
 - `ModelAuditLog.sol`
 - `ModelNFT.sol`
 - `ModelStaking.sol`
@@ -95,8 +97,8 @@ Current recorded deployment addresses are stored in [address_v2_multi.json](./ad
 
 Note:
 
-- the repo contains `Verifier.sol` and `RealZKBridge.sol`
-- the current active address file and default deployment path focus on the six main application contracts
+- the active deployment path now includes `Groth16Verifier` and `ZKProvenanceTracker`
+- the legacy `ModelProvenanceTracker` may still exist for compatibility, but the backend default write path is verifier-gated
 
 ## Quick Start
 

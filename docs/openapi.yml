@@ -14,8 +14,9 @@ info:
     - IPFS file and metadata upload through Pinata-backed routes
 
     Scope note:
-    verifier, bridge, and auxiliary contracts exist in the repository, but the
-    default runtime write path is currently the backend relay plus provenance tracker flow.
+    the default runtime write path is now verifier-gated. The SDK submits a
+    canonical metadata string plus proof arguments, and the backend writes
+    through `ZKProvenanceTracker.addVerifiedRecord(...)`.
   contact:
     name: FYP Project
     url: https://github.com/zhouziyu12/final-year-project
@@ -302,11 +303,12 @@ paths:
       summary: Submit a provenance event through the backend relay
       operationId: submitProvenance
       description: |
-        Records a provenance event on the selected chain.
+        Records a provenance event on the selected chain through the verifier-gated
+        runtime path.
 
-        At least one of `modelId` or `modelName` must be supplied.
-        When `modelName` is provided, the backend may auto-register a new model if no
-        known on-chain model mapping exists for that name on the selected chain.
+        The model must already be registered. The backend validates the exact
+        canonical metadata string, recomputes `statementHash`, and rejects the
+        request unless the supplied proof signals match that statement.
       security:
         - ApiKeyAuth: []
       parameters:
@@ -565,6 +567,8 @@ components:
         - totalModels
         - totalAudits
         - zkReady
+        - zkEnforced
+        - contracts
         - writeMode
         - warnings
       properties:
@@ -585,6 +589,14 @@ components:
           type: integer
         zkReady:
           type: boolean
+        zkEnforced:
+          type: boolean
+        contracts:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
         writeMode:
           type: string
           enum: [enabled, read-only]
@@ -892,50 +904,54 @@ components:
 
     ProvenanceRequest:
       type: object
-      required: [action]
+      required: [modelId, modelName, chain, canonicalMetadata, zkProof]
       properties:
         modelId:
           type: integer
           minimum: 1
-          nullable: true
         modelName:
           type: string
-          nullable: true
-        modelHash:
-          type: string
-          nullable: true
-        action:
-          $ref: '#/components/schemas/ProvenanceAction'
-        sender:
-          type: string
-          nullable: true
-        ipfsHash:
-          type: string
-          nullable: true
-        metadataCid:
-          type: string
-          nullable: true
         chain:
           $ref: '#/components/schemas/ChainName'
-        versionTag:
+        canonicalMetadata:
           type: string
-          nullable: true
-        commit:
-          type: string
-          nullable: true
-          description: Accepted by some clients but not currently consumed by the backend route
-        modelFilePath:
-          type: string
-          nullable: true
-          description: Accepted by some clients but not currently consumed by the backend route
-        trainingMetadata:
+          description: Stable canonical JSON string bound directly to the proof statement
+        zkProof:
           type: object
-          nullable: true
-          additionalProperties: true
+          required: [pA, pB, pC, publicSignals]
+          properties:
+            pA:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items:
+                type: string
+            pB:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items:
+                type: array
+                minItems: 2
+                maxItems: 2
+                items:
+                  type: string
+            pC:
+              type: array
+              minItems: 2
+              maxItems: 2
+              items:
+                type: string
+            publicSignals:
+              type: array
+              minItems: 3
+              maxItems: 3
+              items:
+                type: string
 
     ProvenanceResponse:
       type: object
-      required: [success, tx, modelId, eventType, isNewModel]
+      required: [success, tx, modelId, eventType, statementHash, nullifier, proofVerified]
       properties:
         success:
           type: boolean
@@ -946,7 +962,11 @@ components:
           type: integer
         eventType:
           type: integer
-        isNewModel:
+        statementHash:
+          type: string
+        nullifier:
+          type: string
+        proofVerified:
           type: boolean
 
     UploadFileRequest:

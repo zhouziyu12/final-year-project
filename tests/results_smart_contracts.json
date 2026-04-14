@@ -1,6 +1,6 @@
 {
   "suite": "v2 Smart Contract Tests",
-  "timestamp": "2026-04-14T14:21:17.810Z",
+  "timestamp": "2026-04-14T17:25:33.044Z",
   "tests": [
     {
       "name": "Sepolia RPC Connection",
@@ -11,43 +11,55 @@
     {
       "name": "Sepolia ModelAccessControl",
       "status": "PASS",
-      "detail": "Deployed at 0x2b10c15a6e9a4FBDe74705AAd497CBf9013a1E77",
+      "detail": "Deployed at 0x47D5fF516e5194c57688E036AAe4C63078d16854",
       "data": null
     },
     {
       "name": "Sepolia ModelRegistry",
       "status": "PASS",
-      "detail": "Deployed at 0x0416E82F7463f65E22B9209Aa1866c8895Ff4167",
+      "detail": "Deployed at 0x15Ba4EeF35D77a0E70878bc3EAfEF99f24e60004",
+      "data": null
+    },
+    {
+      "name": "Sepolia Groth16Verifier",
+      "status": "PASS",
+      "detail": "Deployed at 0xcDA493168163C2C0CB162a44799692378B89BCD6",
       "data": null
     },
     {
       "name": "Sepolia ModelProvenanceTracker",
       "status": "PASS",
-      "detail": "Deployed at 0xF4DD796B894c79B197E9420350DD59F3602b7095",
+      "detail": "Deployed at 0xb98E5606c1ee3c83F2850eD185cd674743712993",
+      "data": null
+    },
+    {
+      "name": "Sepolia ZKProvenanceTracker",
+      "status": "PASS",
+      "detail": "Deployed at 0x48B037E25bcc55a4943e4Ed0f992224724b72022",
       "data": null
     },
     {
       "name": "Sepolia ModelAuditLog",
       "status": "PASS",
-      "detail": "Deployed at 0x584Bb2E2d2E18d99976779C3bd817B69B3A579bc",
+      "detail": "Deployed at 0x63fE0Cd6aEFF96576857a29c3BAD1dA9B7a9a66B",
       "data": null
     },
     {
       "name": "Sepolia ModelNFT",
       "status": "PASS",
-      "detail": "Deployed at 0x02Ca5220360eb44c0F8c4FB7AEf732115e46f2a0",
+      "detail": "Deployed at 0xE2A3bB1882DECeF4B0b015C7dAB989bA045230aC",
       "data": null
     },
     {
       "name": "Sepolia ModelStaking",
       "status": "PASS",
-      "detail": "Deployed at 0x1D263F7f4B5F36b81138E6c809159090bb383a16",
+      "detail": "Deployed at 0xB8F9F198722795a3CB9c7aCEf6f3f8A37372FA6d",
       "data": null
     },
     {
       "name": "Sepolia Contract Count",
       "status": "PASS",
-      "detail": "6/6 contracts deployed",
+      "detail": "8/8 contracts deployed",
       "data": null
     },
     {
@@ -59,43 +71,55 @@
     {
       "name": "BSC ModelAccessControl",
       "status": "PASS",
-      "detail": "Deployed at 0xF6bD1a729eE2Ae2E8bcE5834127E9e518470e517",
+      "detail": "Deployed at 0xe71C51Dc0a601C6450dF2222bE2856Be25DD5f48",
       "data": null
     },
     {
       "name": "BSC ModelRegistry",
       "status": "PASS",
-      "detail": "Deployed at 0x67fe7a49778674C4152fFe875dFb06C002f85E95",
+      "detail": "Deployed at 0xecE0c341480271455Ab53D6A8D244fda0409e35E",
+      "data": null
+    },
+    {
+      "name": "BSC Groth16Verifier",
+      "status": "PASS",
+      "detail": "Deployed at 0x0d680ed553c14fa44a12ECc9599DA2e7C20d006e",
       "data": null
     },
     {
       "name": "BSC ModelProvenanceTracker",
       "status": "PASS",
-      "detail": "Deployed at 0xDd0C2E81D9134A914fcA7Db9655d9813C87D5701",
+      "detail": "Deployed at 0x09E365878b60D064bB1E0b3fDe6d112336f404A8",
+      "data": null
+    },
+    {
+      "name": "BSC ZKProvenanceTracker",
+      "status": "PASS",
+      "detail": "Deployed at 0x24e60ca5348cdF6EE463f53BA6da5a799CCAE88A",
       "data": null
     },
     {
       "name": "BSC ModelAuditLog",
       "status": "PASS",
-      "detail": "Deployed at 0x2Ee33973d1DbE6355E4a12f2e73E55645744DbD8",
+      "detail": "Deployed at 0x9374b67FCb58A241d945EDfF99EDE0db6C3dc6c4",
       "data": null
     },
     {
       "name": "BSC ModelNFT",
       "status": "PASS",
-      "detail": "Deployed at 0x8Ddfa02851982E964E713CF0d432Fd050962b662",
+      "detail": "Deployed at 0xC60B67CB2ef53E4440f8B12dE89C47ffF29C3b1f",
       "data": null
     },
     {
       "name": "BSC ModelStaking",
       "status": "PASS",
-      "detail": "Deployed at 0x2FAaaC1764CDA120405A390de2D6C86c10934397",
+      "detail": "Deployed at 0xa4E69BDb9dB904A5fD5Bdc60Cdc6FF09E7fFBe10",
       "data": null
     },
     {
       "name": "BSC Contract Count",
       "status": "PASS",
-      "detail": "6/6 contracts deployed",
+      "detail": "8/8 contracts deployed",
       "data": null
     },
     {
@@ -119,13 +143,25 @@
     {
       "name": "Sepolia AuditLog",
       "status": "PASS",
-      "detail": "totalEntries: 15",
+      "detail": "totalEntries: 1",
       "data": null
     },
     {
       "name": "Sepolia ModelNFT",
       "status": "PASS",
-      "detail": "totalSupply: 1",
+      "detail": "totalSupply: 0",
+      "data": null
+    },
+    {
+      "name": "Sepolia Groth16Verifier",
+      "status": "PASS",
+      "detail": "Verifier ABI is readable",
+      "data": null
+    },
+    {
+      "name": "Sepolia ZKProvenanceTracker",
+      "status": "PASS",
+      "detail": "Verifier-gated provenance tracker is readable",
       "data": null
     },
     {
@@ -143,13 +179,13 @@
     {
       "name": "Sepolia Balance",
       "status": "PASS",
-      "detail": "0.3221 ETH ",
+      "detail": "0.3197 ETH ",
       "data": null
     },
     {
       "name": "BSC Balance",
       "status": "PASS",
-      "detail": "9.9907 tBNB ",
+      "detail": "9.9882 tBNB ",
       "data": null
     },
     {
@@ -170,10 +206,10 @@
     }
   ],
   "summary": {
-    "passed": 27,
+    "passed": 33,
     "failed": 0,
     "warned": 0,
     "skipped": 0,
-    "total": 27
+    "total": 33
   }
 }

@@ -30,9 +30,9 @@ export function SystemPage({ health, status, models, auditEvents, writeAccess })
           <p className="metric-footnote">Networks currently exposed by the backend for provenance operations.</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Proof path</p>
-          <p className="metric-value">{status?.zkReady ? 'Ready' : 'Offline'}</p>
-          <p className="metric-footnote">The UI no longer guesses this state; it reads it from `/api/v2/status`.</p>
+          <p className="metric-label">Verifier gate</p>
+          <p className="metric-value">{status?.zkEnforced ? 'Enforced' : 'Unavailable'}</p>
+          <p className="metric-footnote">The UI reads the default provenance mode directly from `/api/v2/status`.</p>
         </article>
         <article className="metric-card">
           <p className="metric-label">Frontend write mode</p>
@@ -78,6 +78,10 @@ export function SystemPage({ health, status, models, auditEvents, writeAccess })
                       <span>Known models</span>
                       <strong>{info.knownModels || 0}</strong>
                     </div>
+                    <div>
+                      <span>Write path</span>
+                      <strong>{info.provenanceMode || '--'}</strong>
+                    </div>
                   </div>
                 </div>
               ))
@@ -112,7 +116,7 @@ export function SystemPage({ health, status, models, auditEvents, writeAccess })
               <Cloud size={18} />
               <div>
                 <p className="insight-title">IPFS and metadata path</p>
-                <p className="insight-copy">Available through backend routes, even though the frontend currently surfaces only the chain-visible state.</p>
+                <p className="insight-copy">Artifacts stay on IPFS while the canonical metadata string is bound to a verifier-gated on-chain provenance record.</p>
               </div>
             </div>
             <div className="insight-item">
@@ -157,8 +161,8 @@ export function SystemPage({ health, status, models, auditEvents, writeAccess })
               <strong>{status?.totalModels ?? '--'}</strong>
             </div>
             <div className="record-card">
-              <span>ZK ready</span>
-              <strong>{status?.zkReady ? 'Yes' : 'No'}</strong>
+              <span>zkEnforced</span>
+              <strong>{status?.zkEnforced ? 'true' : 'false'}</strong>
             </div>
           </div>
         </article>

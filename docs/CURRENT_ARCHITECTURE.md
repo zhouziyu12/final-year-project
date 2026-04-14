@@ -42,18 +42,18 @@ What the runtime does today:
 - the SDK injects ZKP-derived fields into `trainingMetadata`
 - the backend stores those fields through the provenance submission route
 
-What the runtime does not do by default today:
+What the runtime does by default today:
 
-- it does not route normal SDK submissions through `addZKProofRecord(...)`
-- it does not require verifier-gated bridge settlement before a provenance record is accepted
-- it does not use `RealZKBridge.sol` as the default write path for application submissions
+- it routes SDK provenance submissions through the verifier-gated backend path
+- it requires proof-linked metadata validation before a provenance record is accepted
+- it writes through `ZKProvenanceTracker.addVerifiedRecord(...)`
 
 So the current architecture is best described as:
 
-- ZKP-aware at the application layer
+- verifier-gated at the default application write path
 - ZKP-generating at the SDK layer
-- ZKP-testable at the circuit/verifier layer
-- not yet ZKP-enforced as the sole default chain write path
+- ZKP-enforced at the provenance acceptance layer
+- bridge-capable through additional contracts that are present in the repository
 
 ## 3. Module Responsibilities
 
@@ -123,8 +123,8 @@ Boundary:
 
 - the backend is the actual application core
 - it accepts ZKP-derived metadata from the SDK
-- it currently writes normal provenance records through `addRecord(...)`
-- it is not yet the default verifier-gated bridge execution layer
+- it validates canonical metadata and proof arguments before writing
+- it writes provenance through `ZKProvenanceTracker.addVerifiedRecord(...)`
 
 ### 3.4 Smart Contracts
 
@@ -132,29 +132,30 @@ Primary runtime-facing contracts:
 
 - `contracts/ModelAccessControl.sol`
 - `contracts/ModelRegistry.sol`
-- `contracts/ProvenanceTracker.sol`
+- `contracts/ZKProvenanceTracker.sol`
+- `contracts/Verifier.sol`
 - `contracts/ModelAuditLog.sol`
 - `contracts/ModelNFT.sol`
 - `contracts/ModelStaking.sol`
 
-Supporting but not default application-path contracts:
+Supporting contracts and compatibility layers:
 
-- `contracts/Verifier.sol`
+- `contracts/ProvenanceTracker.sol`
 - `contracts/RealZKBridge.sol`
 
 Responsibilities:
 
 - maintain model registry state
 - control write permissions and roles
-- append provenance records
+- append verifier-gated provenance records
 - provide audit-verification support
 - provide optional NFT and staking features
 - expose bridge and verifier logic for the ZKP-oriented design
 
 Boundary:
 
-- contract-level capability is broader than the current application integration level
-- contract presence does not automatically mean default runtime usage
+- contract-level capability is broader than the currently exposed app workflow
+- bridge settlement contracts exist alongside the verifier-gated provenance path
 
 ### 3.5 Frontend Dashboard
 
@@ -225,8 +226,8 @@ flowchart LR
     G --> I["Assemble trainingMetadata"]
     H --> I
     I --> J["POST /api/sdk/provenance"]
-    J --> K["Backend Relay"]
-    K --> L["ModelProvenanceTracker.addRecord(...)"]
+    J --> K["Backend Relay + Proof Validation"]
+    K --> L["ZKProvenanceTracker.addVerifiedRecord(...)"]
     L --> M["Chain State"]
     M --> N["Frontend Audit / Registry Views"]
 ```
@@ -263,7 +264,7 @@ The current code-verified runtime sequence is:
     - `ipfs_upload_mode`
 12. The SDK sends the payload to `POST /api/sdk/provenance`.
 13. The backend validates write authentication.
-14. The backend writes the provenance record through `ModelProvenanceTracker.addRecord(...)`.
+14. The backend writes the provenance record through `ZKProvenanceTracker.addVerifiedRecord(...)`.
 15. The resulting state is visible again through backend read endpoints and the frontend dashboard.
 
 ## 5.3 Current ZKP Artifacts and Their Roles
@@ -334,30 +335,30 @@ These distinctions are important for accurate final-paper wording.
 - SDK-side `messageHash` construction
 - SDK-side proof artifact export
 - ZKP-derived metadata injection into provenance payloads
-- backend storage of that metadata through the standard provenance path
+- backend storage of that metadata through the verifier-gated provenance path
 
-### 7.2 Present in Code but Not the Default Main Path
+### 7.2 Bridge-Oriented Extension Path Present in Code
 
 - `Verifier.sol`
 - `RealZKBridge.sol`
 - bridge nonce and payload binding logic
 - dedicated `addZKProofRecord(...)` support in contract ABI
 
-### 7.3 Not Accurate to Claim as the Default Runtime Today
+### 7.3 Accurate Runtime Claims Today
 
-- full verifier-gated bridge settlement for every SDK submission
-- mandatory on-chain ZKP enforcement before provenance acceptance
-- trustless cross-chain bridge execution as the only normal write path
+- default SDK provenance submissions are verifier-gated before on-chain acceptance
+- the backend writes through `ZKProvenanceTracker.addVerifiedRecord(...)`
+- proofless or mismatched submissions are rejected before anchoring provenance
 
 ## 8. Dissertation-Safe Framing
 
 For the final dissertation, the safest and clearest framing is:
 
-- the system implements a blockchain-backed provenance pipeline with local ZKP generation, backend-mediated model registration, backend-mediated provenance submission, IPFS-backed off-chain storage, and frontend audit visibility
-- the ZKP path is real and operational at the SDK and tooling layers
-- bridge and verifier contracts are part of the architecture and support the intended ZKP trust model
-- however, the default application write path still stores provenance through the normal tracker flow rather than a fully enforced bridge-verifier settlement path
+- the system implements a blockchain-backed provenance pipeline with local ZKP generation, backend-mediated model registration, verifier-gated provenance submission, IPFS-backed off-chain storage, and frontend audit visibility
+- the ZKP path is real and operational at the SDK, backend, and contract-write layers
+- bridge and verifier contracts are part of the architecture and support the broader ZKP trust model
+- the default application write path is now verifier-gated even though the bridge-oriented path remains a separate architectural capability
 
 ## 9. One-Sentence Truthful Summary
 
-The current project is a working AI model provenance prototype with a real ZKP-generating SDK pipeline, real backend-to-chain provenance writes, real dashboard observability, and real bridge/verifier architecture in code, but with verifier-gated bridge settlement still not serving as the default end-to-end runtime path.
+The current project is a working AI model provenance prototype with a real ZKP-generating SDK pipeline, verifier-gated backend-to-chain provenance writes, real dashboard observability, and bridge/verifier architecture in code, with `ZKProvenanceTracker` serving as the default end-to-end provenance write path.

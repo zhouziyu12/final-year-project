@@ -14,7 +14,20 @@ const __dirname = path.dirname(__filename);
 
 // Response helpers
 
-const ok = (res, data) => res.status(200).json({ success: true, ...data });
+function toJsonSafe(value) {
+  if (typeof value === 'bigint') {
+    return value.toString();
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonSafe(item));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, toJsonSafe(item)]));
+  }
+  return value;
+}
+
+const ok = (res, data) => res.status(200).json({ success: true, ...toJsonSafe(data) });
 
 const sendError = (res, message, statusCode = 500) => {
   res.status(statusCode).json({ success: false, error: message });
@@ -260,6 +273,134 @@ function requirePlainObject(value, fieldName) {
   return value;
 }
 
+const SNARK_SCALAR_FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+
+function computeStatementHash(canonicalMetadata) {
+  const hash = ethers.keccak256(ethers.toUtf8Bytes(canonicalMetadata));
+  return BigInt(hash) % SNARK_SCALAR_FIELD;
+}
+
+function parseBigNumberish(value, fieldName) {
+  try {
+    return BigInt(value);
+  } catch {
+    const error = new Error(`${fieldName} must be a valid bigint-compatible value`);
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+function requireArray(value, fieldName, expectedLength) {
+  if (!Array.isArray(value) || (expectedLength !== undefined && value.length !== expectedLength)) {
+    const error = new Error(
+      expectedLength === undefined
+        ? `${fieldName} must be an array`
+        : `${fieldName} must be an array of length ${expectedLength}`
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+  return value;
+}
+
+function parseCanonicalMetadataOrThrow(value) {
+  const canonicalMetadata = requireString(value, 'canonicalMetadata', { maxLength: 50000 });
+  let parsed;
+
+  try {
+    parsed = JSON.parse(canonicalMetadata);
+  } catch {
+    const error = new Error('canonicalMetadata must be valid JSON');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    const error = new Error('canonicalMetadata must encode a JSON object');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return { canonicalMetadata, parsed };
+}
+
+function validateCanonicalMetadataShape(metadata, { modelName, chain }) {
+  const requiredFields = [
+    'action',
+    'artifactCid',
+    'chain',
+    'commit',
+    'modelHash',
+    'modelName',
+    'sender',
+    'submittedAt',
+    'trainingMetadata',
+    'versionTag'
+  ];
+
+  for (const field of requiredFields) {
+    if (!(field in metadata)) {
+      const error = new Error(`canonicalMetadata is missing required field: ${field}`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  requireString(metadata.action, 'canonicalMetadata.action', { maxLength: 64 });
+  requireString(metadata.artifactCid, 'canonicalMetadata.artifactCid', { maxLength: 256 });
+  requireString(metadata.chain, 'canonicalMetadata.chain', { maxLength: 64 });
+  requireString(metadata.commit, 'canonicalMetadata.commit', { maxLength: 2048 });
+  requireString(metadata.modelHash, 'canonicalMetadata.modelHash', { maxLength: 256 });
+  requireString(metadata.modelName, 'canonicalMetadata.modelName', { maxLength: 256 });
+  requireString(metadata.sender, 'canonicalMetadata.sender', { maxLength: 256 });
+  requireString(metadata.submittedAt, 'canonicalMetadata.submittedAt', { maxLength: 128 });
+  requireString(metadata.versionTag, 'canonicalMetadata.versionTag', { maxLength: 64 });
+  requirePlainObject(metadata.trainingMetadata, 'canonicalMetadata.trainingMetadata');
+
+  if (metadata.modelName !== modelName) {
+    const error = new Error('modelName does not match canonicalMetadata.modelName');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (metadata.chain !== chain) {
+    const error = new Error('chain does not match canonicalMetadata.chain');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const forbiddenFields = ['zkProof', 'zk_public_signals', 'zk_calldata', 'proof', 'publicSignals'];
+  for (const field of forbiddenFields) {
+    if (field in metadata || field in metadata.trainingMetadata) {
+      const error = new Error(`canonicalMetadata must not include proof field: ${field}`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  return metadata;
+}
+
+function normalizeZKProof(zkProof) {
+  const proof = requirePlainObject(zkProof, 'zkProof');
+  const pA = requireArray(proof.pA, 'zkProof.pA', 2).map((value, index) =>
+    parseBigNumberish(value, `zkProof.pA[${index}]`).toString()
+  );
+  const pB = requireArray(proof.pB, 'zkProof.pB', 2).map((row, rowIndex) =>
+    requireArray(row, `zkProof.pB[${rowIndex}]`, 2).map((value, colIndex) =>
+      parseBigNumberish(value, `zkProof.pB[${rowIndex}][${colIndex}]`).toString()
+    )
+  );
+  const pC = requireArray(proof.pC, 'zkProof.pC', 2).map((value, index) =>
+    parseBigNumberish(value, `zkProof.pC[${index}]`).toString()
+  );
+  const publicSignals = requireArray(proof.publicSignals, 'zkProof.publicSignals', 3).map((value, index) =>
+    parseBigNumberish(value, `zkProof.publicSignals[${index}]`)
+  );
+
+  return { pA, pB, pC, publicSignals };
+}
+
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ADDR_FILE = path.join(PROJECT_ROOT, 'address_v2_multi.json');
 const MODEL_MAP_FILE = path.join(PROJECT_ROOT, 'model_name_map.json');
@@ -379,6 +520,10 @@ function getRecordMetadata(record) {
   return parseMetadataString(metadataRaw);
 }
 
+function getArtifactCid(metadata) {
+  return metadata?.artifactCid || metadata?.ipfsHash || metadata?.metadataCid || null;
+}
+
 function buildLifecycleFilename(seriesName, versionEntry, metadata) {
   if (versionEntry?.artifact_filename) {
     return versionEntry.artifact_filename;
@@ -419,43 +564,68 @@ async function enrichLifecycleVersion(versionEntry) {
   }
 
   const chainCandidates = versionEntry.chain ? [versionEntry.chain] : ['sepolia', 'tbnb'];
+
+  async function tryResolveFromHistory(chain, history) {
+    const matchingRecord = [...history].reverse().find((record) => {
+      const metadata = getRecordMetadata(record);
+      if (!metadata) return false;
+      return (
+        metadata.modelHash === versionEntry.model_hash ||
+        metadata.versionTag === versionEntry.version
+      );
+    });
+
+    if (!matchingRecord) {
+      return false;
+    }
+
+    const metadata = getRecordMetadata(matchingRecord);
+    const artifactCid = getArtifactCid(metadata);
+    if (artifactCid && !enriched.ipfsCid) {
+      enriched.ipfsCid = artifactCid;
+    }
+    if (!enriched.modelName && (metadata?.modelName || metadata?.trainingMetadata?.model_name)) {
+      enriched.modelName = metadata.modelName || metadata.trainingMetadata.model_name;
+    }
+    if (!enriched.chain) {
+      enriched.chain = chain;
+    }
+    if (!enriched.artifactFileName) {
+      enriched.artifactFileName = buildLifecycleFilename(null, versionEntry, metadata);
+    }
+    if (enriched.ipfsCid) {
+      enriched.downloadReady = true;
+      enriched.downloadSource = 'ipfs';
+    }
+    return enriched.downloadReady;
+  }
+
   for (const chain of chainCandidates) {
     if (!chains[chain]) continue;
 
     try {
       const { mpt } = getContracts(chain);
       const history = await mpt.getModelHistory(modelId);
-      const matchingRecord = [...history].reverse().find((record) => {
-        const metadata = getRecordMetadata(record);
-        if (!metadata) return false;
-        return (
-          metadata.modelHash === versionEntry.model_hash ||
-          metadata.versionTag === versionEntry.version
-        );
-      });
+      if (await tryResolveFromHistory(chain, history)) {
+        return enriched;
+      }
+    } catch {
+      continue;
+    }
+  }
 
-      if (!matchingRecord) {
-        continue;
-      }
+  for (const chain of chainCandidates) {
+    if (!chains[chain]) continue;
 
-      const metadata = getRecordMetadata(matchingRecord);
-      if (metadata?.ipfsHash && !enriched.ipfsCid) {
-        enriched.ipfsCid = metadata.ipfsHash;
+    try {
+      const { mpt } = getContracts(chain);
+      const knownModels = getKnownModels(chain);
+      for (const knownModel of knownModels) {
+        const history = await mpt.getModelHistory(knownModel.id);
+        if (await tryResolveFromHistory(chain, history)) {
+          return enriched;
+        }
       }
-      if (!enriched.modelName && metadata?.trainingMetadata?.model_name) {
-        enriched.modelName = metadata.trainingMetadata.model_name;
-      }
-      if (!enriched.chain) {
-        enriched.chain = chain;
-      }
-      if (!enriched.artifactFileName) {
-        enriched.artifactFileName = buildLifecycleFilename(null, versionEntry, metadata);
-      }
-      if (enriched.ipfsCid) {
-        enriched.downloadReady = true;
-        enriched.downloadSource = 'ipfs';
-      }
-      return enriched;
     } catch {
       continue;
     }
@@ -525,21 +695,28 @@ const MAC_ABI = [
   'function grantRole(bytes32 role, address addr)'
 ];
 
-const MPT_ABI = [
-  'function addRecord(uint256 _modelId, uint8 _eventType,' +
-    ' string calldata _ipfsMetadata) external returns (uint256)',
-  'function addZKProofRecord(uint256 _modelId, string calldata _zkProofCid)' +
-    ' external returns (uint256)',
+const ZKPT_ABI = [
+  'function addVerifiedRecord(uint256 _modelId, uint8 _eventType,' +
+    ' string calldata _canonicalMetadata, uint256[2] calldata _pA,' +
+    ' uint256[2][2] calldata _pB, uint256[2] calldata _pC,' +
+    ' uint256[3] calldata _pubSignals) external returns (uint256)',
   'function getModelHistory(uint256 _modelId) view returns' +
     ' (tuple(uint256,uint256,uint8,string,uint256,address,bytes32,bytes32)[])',
   'function verifyChain(uint256 _modelId) view returns (bool)',
   'function modelChainHead(uint256 _modelId) view returns (bytes32)',
   'function modelBlacklist(uint256 _modelId) view returns (bool)',
+  'function nullifierUsed(uint256 _nullifier) view returns (bool)',
+  'function computeStatementHash(string calldata _canonicalMetadata) view returns (uint256)',
   'event RecordAdded(uint256 indexed recordId,uint256 indexed modelId,uint8 indexed eventType,address operator)'
 ];
 
 const MAL_ABI = [
   'event AuditEntryAdded(uint256 indexed entryId,uint8 indexed action,address indexed actor,uint256 targetId)'
+];
+
+const VERIFIER_ABI = [
+  'function verifyProof(uint256[2] calldata _pA, uint256[2][2] calldata _pB,' +
+    ' uint256[2] calldata _pC, uint256[3] calldata _pubSignals) view returns (bool)'
 ];
 
 function getContracts(chain) {
@@ -556,11 +733,20 @@ function getContracts(chain) {
     error.statusCode = 503;
     throw error;
   }
+  const provenanceAddress = a.ZKProvenanceTracker || a.ModelProvenanceTracker;
+  if (!provenanceAddress) {
+    const error = new Error(`Chain ${chain} is missing a provenance tracker address`);
+    error.statusCode = 503;
+    throw error;
+  }
   return {
     mr: new ethers.Contract(a.ModelRegistry, MR_ABI, reader),
     mac: new ethers.Contract(a.ModelAccessControl, MAC_ABI, reader),
-    mpt: new ethers.Contract(a.ModelProvenanceTracker, MPT_ABI, reader),
-    mal: new ethers.Contract(a.ModelAuditLog, MAL_ABI, reader)
+    mpt: new ethers.Contract(provenanceAddress, ZKPT_ABI, reader),
+    mal: new ethers.Contract(a.ModelAuditLog, MAL_ABI, reader),
+    verifier: a.Groth16Verifier ? new ethers.Contract(a.Groth16Verifier, VERIFIER_ABI, reader) : null,
+    provenanceAddress,
+    provenanceMode: a.ZKProvenanceTracker ? 'verifier-gated' : 'legacy'
   };
 }
 
@@ -582,11 +768,14 @@ function requireWriteChain(chain) {
 async function getChainStatus(chain) {
   const c = chains[chain];
   const knownModels = getKnownModels(chain);
+  const contracts = c.addr?.contracts || {};
   const payload = {
     blockNumber: null,
     connected: false,
     balance: null,
-    knownModels: knownModels.length
+    knownModels: knownModels.length,
+    zkEnforced: Boolean(contracts.ZKProvenanceTracker && contracts.Groth16Verifier),
+    provenanceMode: contracts.ZKProvenanceTracker ? 'verifier-gated' : 'legacy'
   };
 
   try {
@@ -647,18 +836,26 @@ async function getModelOwnerOrNull(contract, modelId) {
 async function buildStatusPayload() {
   const chainsPayload = {};
   let totalModels = 0;
+  const contractsPayload = {};
+  let zkEnforced = true;
 
   for (const chain of ['sepolia', 'tbnb']) {
     const knownModels = getKnownModels(chain);
     totalModels += knownModels.length;
     chainsPayload[chain] = await getChainStatus(chain);
+    contractsPayload[chain] = addrs?.[chain]?.contracts || {};
+    if (!contractsPayload[chain]?.ZKProvenanceTracker || !contractsPayload[chain]?.Groth16Verifier) {
+      zkEnforced = false;
+    }
   }
 
   return {
     chains: chainsPayload,
+    contracts: contractsPayload,
     totalModels,
     totalAudits: totalModels,
-    zkReady: true,
+    zkReady: zkEnforced,
+    zkEnforced,
     writeMode: pk ? 'enabled' : 'read-only',
     warnings: bootWarnings
   };
@@ -912,135 +1109,63 @@ app.get('/api/v2/lifecycle/download', handle(async (req, res) => {
 app.post('/api/sdk/provenance', handle(async (req, res) => {
   validateWriteAuth(req, res, () => {});
   if (res.headersSent) return;
-  const {
-    modelId,
-    modelHash,
-    action,
-    sender,
-    ipfsHash,
-    metadataCid,
-    chain,
-    modelName,
-    versionTag,
-    trainingMetadata
-  } = req.body;
-
-  if (!modelId && !modelName) {
-    return sendError(res, 'Either modelId or modelName is required', 400);
-  }
-
-  const targetChain = chain || 'sepolia';
+  const modelId = requirePositiveInt(req.body.modelId, 'modelId');
+  const modelName = requireString(req.body.modelName, 'modelName', { maxLength: 256 });
+  const targetChain = requireString(req.body.chain || 'sepolia', 'chain', { maxLength: 64 });
   if (!chains[targetChain]) return sendError(res, `Invalid chain: ${targetChain}`, 400);
-  if (!action || !ACTION_MAP[action]) {
-    if (action !== 'REGISTERED') {
-      return sendError(res, `Unsupported action: ${action}`, 400);
-    }
-  }
-
-  if (modelId) {
-    requirePositiveInt(modelId, 'modelId');
-  }
-  if (modelHash !== undefined) requireString(modelHash, 'modelHash', { optional: true, maxLength: 128 });
-  if (sender !== undefined) requireString(sender, 'sender', { optional: true, maxLength: 256 });
-  if (ipfsHash !== undefined) requireString(ipfsHash, 'ipfsHash', { optional: true, maxLength: 256 });
-  if (metadataCid !== undefined) requireString(metadataCid, 'metadataCid', { optional: true, maxLength: 256 });
-  if (modelName !== undefined) requireString(modelName, 'modelName', { optional: true, maxLength: 256 });
-  if (versionTag !== undefined) requireString(versionTag, 'versionTag', { optional: true, maxLength: 64 });
-  if (trainingMetadata !== undefined && trainingMetadata !== null) {
-    requirePlainObject(trainingMetadata, 'trainingMetadata');
-  }
+  const { canonicalMetadata, parsed: parsedMetadata } = parseCanonicalMetadataOrThrow(req.body.canonicalMetadata);
+  validateCanonicalMetadataShape(parsedMetadata, { modelName, chain: targetChain });
+  const normalizedProof = normalizeZKProof(req.body.zkProof);
 
   const writableChain = requireWriteChain(targetChain);
-  const { mr, mpt, mac } = getContracts(targetChain);
+  const { mr, mpt, provenanceMode } = getContracts(targetChain);
+  if (provenanceMode !== 'verifier-gated') {
+    return sendError(res, `Chain ${targetChain} is not configured for verifier-gated provenance`, 503);
+  }
   const mrWriter = mr.connect(writableChain.wallet);
   const mptWriter = mpt.connect(writableChain.wallet);
-  const macReader = mac.connect(writableChain.provider);
 
-  let actualModelId = modelId ? Number(modelId) : null;
-  let isNewModel = false;
-
-  if (modelName) {
-    const mapKey = `${targetChain}:${modelName}`;
-    if (modelNameMap[mapKey]) {
-      actualModelId = Number(modelNameMap[mapKey]);
-      const owner = await getModelOwnerOrNull(mr, actualModelId);
-      if (owner) {
-        console.log(`[PROVENANCE] Using existing model ${actualModelId} for "${modelName}"`);
-      } else {
-        delete modelNameMap[mapKey];
-        saveModelMap(modelNameMap);
-        actualModelId = null;
-        console.warn(`[PROVENANCE] Removed stale mapping for "${modelName}" on ${targetChain}`);
-      }
-    }
-
-    if (!actualModelId) {
-      const registrarRole = await macReader.REGISTRAR();
-      const canRegister = await macReader.hasRole(registrarRole, writableChain.wallet.address);
-      if (!canRegister) {
-        return sendError(res, 'Backend wallet does not have REGISTRAR role', 403);
-      }
-
-      const registerTx = await mrWriter.registerModel(
-        modelName,
-        'Auto-registered',
-        ipfsHash || '',
-        modelHash || '',
-        'PyTorch',
-        'MIT'
-      );
-      const receipt = await registerTx.wait();
-      for (const log of receipt.logs) {
-        try {
-          const parsed = mr.interface.parseLog({ topics: log.topics, data: log.data });
-          if (parsed.name === 'ModelRegistered') {
-            actualModelId = Number(parsed.args[0]);
-            break;
-          }
-        } catch {}
-      }
-
-      if (!actualModelId) {
-        return sendError(res, 'Failed to determine registered model ID', 500);
-      }
-
-      modelNameMap[mapKey] = actualModelId;
-      saveModelMap(modelNameMap);
-      isNewModel = true;
-      console.log(`[PROVENANCE] Registered new model ${actualModelId} for "${modelName}"`);
-    } else {
-      // Existing mapped ID was already verified on-chain.
-    }
-  }
-
-  if (!actualModelId || actualModelId <= 0) {
-    return sendError(res, 'A valid modelId could not be resolved', 400);
-  }
-
-  const owner = await getModelOwnerOrNull(mr, actualModelId);
+  const owner = await getModelOwnerOrNull(mr, modelId);
   if (!owner) {
-    return sendError(res, `Model ${actualModelId} is not registered on ${targetChain}`, 404);
+    return sendError(res, `Model ${modelId} is not registered on ${targetChain}`, 404);
   }
 
-  const eventType = ACTION_MAP[action];
+  const eventType = ACTION_MAP[parsedMetadata.action];
   if (eventType === undefined) {
-    return sendError(res, `Unsupported action: ${action}`, 400);
+    return sendError(res, `Unsupported action: ${parsedMetadata.action}`, 400);
   }
 
-  const metadata = {
-    modelHash,
-    ipfsHash,
-    metadataCid,
-    action,
-    sender,
-    timestamp: Date.now(),
-    versionTag,
-    trainingMetadata: trainingMetadata || null
-  };
+  const statementHash = computeStatementHash(canonicalMetadata);
+  const nullifier = normalizedProof.publicSignals[0];
+  const signalModelId = normalizedProof.publicSignals[1];
+  const signalStatementHash = normalizedProof.publicSignals[2];
 
-  const tx = await mptWriter.addRecord(actualModelId, eventType, JSON.stringify(metadata));
+  if (signalModelId !== BigInt(modelId)) {
+    return sendError(res, 'zkProof.publicSignals[1] does not match modelId', 400);
+  }
+
+  if (signalStatementHash !== statementHash) {
+    return sendError(res, 'zkProof.publicSignals[2] does not match canonicalMetadata statementHash', 400);
+  }
+
+  const tx = await mptWriter.addVerifiedRecord(
+    modelId,
+    eventType,
+    canonicalMetadata,
+    normalizedProof.pA,
+    normalizedProof.pB,
+    normalizedProof.pC,
+    normalizedProof.publicSignals.map((value) => value.toString())
+  );
   await tx.wait();
-  ok(res, { tx: tx.hash, modelId: actualModelId, eventType, isNewModel });
+  ok(res, {
+    tx: tx.hash,
+    modelId,
+    eventType,
+    statementHash: statementHash.toString(),
+    nullifier: nullifier.toString(),
+    proofVerified: true
+  });
 }));
 
 app.post('/api/register', handle(async (req, res) => {
@@ -1087,6 +1212,7 @@ app.post('/api/register', handle(async (req, res) => {
 
   const predictedModelId = Number(await writer.registerModel.staticCall(...registrationArgs));
   const tx = await writer.registerModel(...registrationArgs);
+  await tx.wait();
 
   modelNameMap[mapKey] = predictedModelId;
   saveModelMap(modelNameMap);

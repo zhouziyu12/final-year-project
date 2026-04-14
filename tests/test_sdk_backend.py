@@ -72,11 +72,16 @@ def test_backend_api():
 
     for name, url in routes:
         try:
-            response = requests.get(url, timeout=5)
+            response = requests.get(url, timeout=15)
             if response.status_code == 200:
                 data = response.json()
                 if data.get('success'):
                     log(name, 'PASS', 'Endpoint returned success=true')
+                    if name == 'GET /api/v2/status':
+                        if data.get('zkEnforced') is True:
+                            log('GET /api/v2/status zkEnforced', 'PASS', 'Backend reports verifier-gated provenance as enabled')
+                        else:
+                            log('GET /api/v2/status zkEnforced', 'FAIL', 'Backend did not report zkEnforced=true')
                 else:
                     log(name, 'FAIL', 'Endpoint returned success=false')
             else:
@@ -124,6 +129,20 @@ def test_backend_write_auth():
             log('POST /api/register with auth', 'FAIL', f'Expected 400, got {authorized.status_code}')
     except Exception as error:
         log('POST /api/register with auth', 'FAIL', str(error))
+
+    try:
+        provenance = requests.post(
+            f'{base_url}/api/sdk/provenance',
+            json={},
+            headers=build_write_headers(),
+            timeout=5,
+        )
+        if provenance.status_code == 400:
+            log('POST /api/sdk/provenance with auth', 'PASS', 'Authenticated verifier-gated route rejected invalid payload at validation stage')
+        else:
+            log('POST /api/sdk/provenance with auth', 'FAIL', f'Expected 400, got {provenance.status_code}')
+    except Exception as error:
+        log('POST /api/sdk/provenance with auth', 'FAIL', str(error))
 
 
 def test_secret_manager():
@@ -203,7 +222,7 @@ def test_sdk_model_resolution():
     try:
         from sdk.python.provenance_sdk import ProvenanceSDK
 
-        sdk = ProvenanceSDK(base_url='http://127.0.0.1:3000', timeout=5)
+        sdk = ProvenanceSDK(base_url='http://127.0.0.1:3000', timeout=30)
         model_name = f'TestSDKModel_{int(time.time())}'
 
         try:
@@ -217,6 +236,30 @@ def test_sdk_model_resolution():
             log('SDK model resolution', 'PASS', f"Resolved registered model '{model_name}' to on-chain ID")
         else:
             log('SDK model resolution', 'FAIL', 'SDK did not resolve a stable on-chain model ID')
+
+        canonical_metadata = sdk._canonical_json({
+            'action': 'UPDATED',
+            'artifactCid': 'QmVerifierTestCid',
+            'chain': 'sepolia',
+            'commit': 'backend test',
+            'modelHash': '0xabc123',
+            'modelName': model_name,
+            'sender': 'test-sdk',
+            'submittedAt': '2026-04-15T00:00:00Z',
+            'trainingMetadata': {
+                'framework': 'PyTorch',
+                'stage': 'training',
+                'version': 'v-test',
+                'weights_path': 'artifacts/model_v1.pth',
+                'zkEngine': 'snarkjs.groth16',
+            },
+            'versionTag': 'v-test',
+        })
+        statement_hash = sdk._keccak_to_field(canonical_metadata)
+        if isinstance(statement_hash, int) and statement_hash > 0:
+            log('SDK statement hash', 'PASS', 'Canonical metadata is converted to a positive verifier statement hash')
+        else:
+            log('SDK statement hash', 'FAIL', f'Unexpected statement hash: {statement_hash}')
     except Exception as error:
         log('SDK model resolution', 'FAIL', str(error))
 

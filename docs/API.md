@@ -36,7 +36,12 @@ The current API surface is centered on:
 - audit reads
 - IPFS upload helpers
 
-Bridge-related contracts and some advanced on-chain features exist in the repository, but they are not the primary default API write path today.
+The default provenance write path is now verifier-gated:
+
+- artifacts are stored on IPFS
+- the SDK builds a canonical metadata JSON string
+- the backend recomputes `statementHash`
+- the backend writes through `ZKProvenanceTracker.addVerifiedRecord(...)`
 
 ## Read Endpoints
 
@@ -53,6 +58,8 @@ Returns platform status, including:
 - wallet write mode
 - known model count
 - `zkReady`
+- `zkEnforced`
+- deployed contract addresses per chain
 
 Legacy compatibility route:
 
@@ -180,7 +187,7 @@ Behavior:
 
 - if a same-name model exists and is readable on-chain, the backend returns the existing model ID
 - if the local cache is stale, the backend clears the stale mapping first
-- for new registrations, the backend uses `staticCall` to predict the model ID, then sends the transaction and returns immediately
+- for new registrations, the backend uses `staticCall` to predict the model ID, then sends the transaction and waits for confirmation before returning
 
 Typical response:
 
@@ -199,53 +206,43 @@ Typical response:
 
 ### `POST /api/sdk/provenance`
 
-Primary SDK write endpoint. It can auto-register a model if needed and then writes a provenance event through `ModelProvenanceTracker`.
+Primary SDK write endpoint. It only accepts verifier-gated provenance submissions.
 
 Key request fields:
 
-- `modelId` or `modelName`
+- `modelId`
+- `modelName`
 - `chain`
-- `action`
-- `sender`
-- `versionTag`
-- `commit`
-- `modelHash`
-- `ipfsHash`
-- `metadataCid`
-- `trainingMetadata`
+- `canonicalMetadata`
+- `zkProof`
 
 Notes:
 
-- if `modelName` is provided and there is no valid mapping, the backend attempts auto-registration
-- `action` must be one of the backend-supported actions
-- invalid model IDs, missing models, and invalid object payloads are rejected
-- the SDK may include ZK-related metadata in the payload, but the current mainline backend path still writes through the normal provenance-tracker record flow
-- the current backend route writes `addRecord(...)`, not `addZKProofRecord(...)`
+- the model must already be registered before this route is called
+- `canonicalMetadata` must be valid stable JSON and must not contain raw proof fields
+- the backend validates `modelName` and `chain` against `canonicalMetadata`
+- the backend recomputes `statementHash = keccak256(bytes(canonicalMetadata)) % field`
+- `zkProof.publicSignals[1]` must match `modelId`
+- `zkProof.publicSignals[2]` must match the recomputed `statementHash`
+- if proof validation fails, the route returns an error and does not write on-chain
+- successful writes go through `ZKProvenanceTracker.addVerifiedRecord(...)`
 
-Current SDK-submitted `trainingMetadata` typically includes:
+Expected top-level request shape:
 
-- `framework`
-- `stage`
-- `version`
-- `commit`
-- `message_hash`
-- `weights_path`
-- `zk_verified`
-- `zk_engine`
-- `zk_public_signals`
-- `zk_calldata`
-- `ipfs_upload_mode`
-- `sdk_timestamp`
-
-Important behavior detail:
-
-- `commit` and `modelFilePath` may be sent by the SDK
-- they are accepted in practice as extra request fields
-- they are not currently consumed by the backend route logic
-
-Current default SDK action:
-
-- the SDK currently submits the event with `action="UPDATED"` even for the baseline training flow
+```json
+{
+  "modelId": 12,
+  "modelName": "ExampleModel",
+  "chain": "sepolia",
+  "canonicalMetadata": "{\"action\":\"UPDATED\",...}",
+  "zkProof": {
+    "pA": ["...", "..."],
+    "pB": [["...", "..."], ["...", "..."]],
+    "pC": ["...", "..."],
+    "publicSignals": ["...", "...", "..."]
+  }
+}
+```
 
 ### `POST /api/audit`
 
@@ -307,7 +304,8 @@ Primary runtime-facing contracts:
 
 - `ModelAccessControl`
 - `ModelRegistry`
-- `ModelProvenanceTracker`
+- `Groth16Verifier`
+- `ZKProvenanceTracker`
 - `ModelAuditLog`
 - `ModelNFT`
 - `ModelStaking`

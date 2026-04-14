@@ -21,7 +21,11 @@ const NETWORKS = [
 const OUTPUT = path.join(__dirname, "..", "address_v2_multi.json");
 
 function loadArtifact(name) {
-  const map = { ModelProvenanceTracker: "ProvenanceTracker.sol/ModelProvenanceTracker.json" };
+  const map = {
+    ModelProvenanceTracker: "ProvenanceTracker.sol/ModelProvenanceTracker.json",
+    Groth16Verifier: "Verifier.sol/Groth16Verifier.json",
+    ZKProvenanceTracker: "ZKProvenanceTracker.sol/ZKProvenanceTracker.json"
+  };
   const rel = map[name] || `${name}.sol/${name}.json`;
   return JSON.parse(fs.readFileSync(path.join(__dirname, "..", "artifacts", "contracts", rel), "utf8"));
 }
@@ -56,7 +60,9 @@ async function deployNetwork(net) {
   const CONTRACTS = [
     { name: "ModelAccessControl", args: () => [wallet.address] },
     { name: "ModelRegistry", args: (d) => [d.ModelAccessControl] },
+    { name: "Groth16Verifier", args: () => [] },
     { name: "ModelProvenanceTracker", args: (d) => [d.ModelAccessControl, d.ModelRegistry] },
+    { name: "ZKProvenanceTracker", args: (d) => [d.ModelAccessControl, d.ModelRegistry, d.Groth16Verifier] },
     { name: "ModelAuditLog", args: (d) => [d.ModelAccessControl] },
     { name: "ModelNFT", args: (d) => [d.ModelAccessControl, d.ModelRegistry] },
     { name: "ModelStaking", args: (d) => [d.ModelAccessControl, wallet.address] }

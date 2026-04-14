@@ -98,7 +98,7 @@ export function TrainingPage({
           <div className="orbit-panel orbit-panel-compact">
             <div className="orbit-badge">
               <Fingerprint size={16} />
-              <span>{status?.zkReady ? 'Proof path reported as ready' : 'Proof path currently unavailable'}</span>
+              <span>{status?.zkEnforced ? 'Verifier-gated provenance is enabled' : 'Verifier-gated provenance is currently unavailable'}</span>
             </div>
             <div className="orbit-center">
               <span className="orbit-center-value">{TRAINING_ARTIFACTS.length}</span>
@@ -124,8 +124,8 @@ export function TrainingPage({
           <p className="metric-footnote">Files and configuration surfaces explicitly referenced by the rebuilt UI.</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Proof path</p>
-          <p className="metric-value">{status?.zkReady ? 'Ready' : 'Offline'}</p>
+          <p className="metric-label">Verifier gate</p>
+          <p className="metric-value">{status?.zkEnforced ? 'Enforced' : 'Offline'}</p>
           <p className="metric-footnote">Read directly from the backend status response rather than assumed locally.</p>
         </article>
         <article className="metric-card">
@@ -190,7 +190,7 @@ export function TrainingPage({
               <LockKeyhole size={18} />
               <div>
                 <p className="insight-title">Writes remain protected</p>
-                <p className="insight-copy">Without a local demo key, model registration stays on the SDK path. The UI makes that restriction explicit.</p>
+                <p className="insight-copy">Without a valid proof and canonical metadata pair, the backend no longer accepts provenance writes at all.</p>
               </div>
             </div>
           </div>
@@ -297,8 +297,8 @@ export function TrainingPage({
                     <span>Local training artifacts are defined in the project workspace</span>
                   </div>
                   <div className="submission-chain-stage">
-                    <div className={`submission-chain-dot${status?.zkReady ? ' is-done' : ''}`} />
-                    <span>Proof path is reported as {status?.zkReady ? 'ready' : 'offline'} by the backend</span>
+                    <div className={`submission-chain-dot${status?.zkEnforced ? ' is-done' : ''}`} />
+                    <span>Verifier-gated provenance is reported as {status?.zkEnforced ? 'enforced' : 'offline'} by the backend</span>
                   </div>
                   <div className="submission-chain-stage">
                     <div className={`submission-chain-dot${selectedAudit?.recordCount ? ' is-done' : ''}`} />

@@ -32,8 +32,8 @@ export const PAGE_META = {
   },
   system: {
     eyebrow: 'System Status',
-    title: 'Surface backend, chain, proof, and write-mode readiness',
-    description: 'This page exposes the runtime dependencies that make the project believable during a demo: service health, chain connectivity, proof readiness, and write access mode.'
+    title: 'Surface backend, chain, verifier-gated provenance, and write-mode readiness',
+    description: 'This page exposes the runtime dependencies that make the project believable during a demo: service health, chain connectivity, verifier-gated provenance status, and write access mode.'
   },
   certificates: {
     eyebrow: 'Certificate View',
@@ -85,22 +85,22 @@ export const TRAINING_STEPS = [
   },
   {
     title: 'Fingerprint and proof input',
-    copy: 'The Python SDK computes the model hash and prepares proof inputs before any backend write is attempted.',
+    copy: 'The Python SDK computes the model hash, builds canonical metadata, and derives the verifier statement before any backend write is attempted.',
     icon: Fingerprint
   },
   {
     title: 'Proof generation',
-    copy: 'The standalone prover produces `proof.json`, `public.json`, and calldata outputs that can be reviewed later.',
+    copy: 'The standalone prover produces `proof.json`, `public.json`, and Solidity-ready verifier arguments that can be reviewed later.',
     icon: Binary
   },
   {
-    title: 'Backend relay and IPFS anchoring',
-    copy: 'Metadata and artifact references move through protected backend routes, optionally pinning content to IPFS.',
+    title: 'IPFS anchoring and backend relay',
+    copy: 'The artifact is uploaded to IPFS first, then the backend relays canonical metadata and proof data through the verifier-gated write route.',
     icon: HardDriveUpload
   },
   {
     title: 'Chain-backed provenance record',
-    copy: 'The registry and audit endpoints expose the resulting on-chain model state back to the frontend.',
+    copy: 'The registry and audit endpoints expose the resulting verifier-approved provenance record back to the frontend.',
     icon: Workflow
   }
 ];

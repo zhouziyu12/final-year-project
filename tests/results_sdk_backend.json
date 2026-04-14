@@ -1,6 +1,6 @@
 {
   "suite": "SDK and Backend Integration Tests",
-  "timestamp": "2026-04-14T14:20:38.496910Z",
+  "timestamp": "2026-04-14T17:26:53.344766Z",
   "tests": [
     {
       "name": "SDK Import",
@@ -27,6 +27,12 @@
       "data": null
     },
     {
+      "name": "GET /api/v2/status zkEnforced",
+      "status": "PASS",
+      "detail": "Backend reports verifier-gated provenance as enabled",
+      "data": null
+    },
+    {
       "name": "GET /api/v2/models",
       "status": "PASS",
       "detail": "Endpoint returned success=true",
@@ -48,6 +54,12 @@
       "name": "POST /api/register with auth",
       "status": "PASS",
       "detail": "Authenticated write passed auth and failed at validation",
+      "data": null
+    },
+    {
+      "name": "POST /api/sdk/provenance with auth",
+      "status": "PASS",
+      "detail": "Authenticated verifier-gated route rejected invalid payload at validation stage",
       "data": null
     },
     {
@@ -77,19 +89,19 @@
     {
       "name": "File: server/server.js",
       "status": "PASS",
-      "detail": "Exists (28.58 KB)",
+      "detail": "Exists (40.42 KB)",
       "data": null
     },
     {
       "name": "File: sdk/python/provenance_sdk.py",
       "status": "PASS",
-      "detail": "Exists (14.61 KB)",
+      "detail": "Exists (16.42 KB)",
       "data": null
     },
     {
       "name": "File: sdk/python/model_secret_manager.py",
       "status": "PASS",
-      "detail": "Exists (6.67 KB)",
+      "detail": "Exists (8.20 KB)",
       "data": null
     },
     {
@@ -101,7 +113,7 @@
     {
       "name": "File: address_v2_multi.json",
       "status": "PASS",
-      "detail": "Exists (1.12 KB)",
+      "detail": "Exists (1.40 KB)",
       "data": null
     },
     {
@@ -149,13 +161,19 @@
     {
       "name": "File: scripts/deploy_multi_chain.cjs",
       "status": "PASS",
-      "detail": "Exists (4.60 KB)",
+      "detail": "Exists (4.90 KB)",
       "data": null
     },
     {
       "name": "SDK model resolution",
       "status": "PASS",
-      "detail": "Resolved registered model 'TestSDKModel_1776176446' to on-chain ID",
+      "detail": "Resolved registered model 'TestSDKModel_1776187625' to on-chain ID",
+      "data": null
+    },
+    {
+      "name": "SDK statement hash",
+      "status": "PASS",
+      "detail": "Canonical metadata is converted to a positive verifier statement hash",
       "data": null
     },
     {
@@ -172,10 +190,10 @@
     }
   ],
   "summary": {
-    "passed": 28,
+    "passed": 31,
     "failed": 0,
     "warned": 0,
     "skipped": 0,
-    "total": 28
+    "total": 31
   }
 }
