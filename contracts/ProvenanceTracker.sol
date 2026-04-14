@@ -71,6 +71,7 @@ contract ModelProvenanceTracker {
 
     error ModelIsBlacklisted();
     error NotAuthorized();
+    error ModelNotRegistered();
 
     // Constructor
 
@@ -233,6 +234,7 @@ contract ModelProvenanceTracker {
     }
 
     function _checkModelStatus(uint256 _modelId) internal view {
+        if (registry.getModelOwner(_modelId) == address(0)) revert ModelNotRegistered();
         uint8 status = registry.getModelStatus(_modelId);
         require(status != 3, "Tracker: model is revoked");
     }

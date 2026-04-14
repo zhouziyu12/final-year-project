@@ -100,6 +100,7 @@ contract ModelRegistry {
         address indexed to
     );
     event OwnershipTransferCancelled(uint256 indexed modelId, address indexed cancelledBy);
+    event MetadataUpdated(uint256 indexed id, address indexed operator);
 
     // Errors
 
@@ -111,6 +112,7 @@ contract ModelRegistry {
     error StakedModel();
     error ZeroStake();
     error InsufficientStake();
+    error ModelNotFound(uint256 modelId);
 
     // Constructor
 
@@ -153,7 +155,8 @@ contract ModelRegistry {
         model.staked = false;
 
         // Create the initial version as v1.0.0.
-        _addVersion(id, 1, 1, 0, 0, VersionType.PATCH, "", "");
+        uint256 initialVersionId = ++_versionCounter;
+        _addVersion(id, initialVersionId, 1, 0, 0, VersionType.PATCH, "", "");
 
         emit ModelRegistered(id, msg.sender);
         return id;
@@ -162,7 +165,7 @@ contract ModelRegistry {
     /// @notice Activate a model.
     function activateModel(uint256 _id) external {
         Model storage model = models[_id];
-        _requireOwner(model);
+        _requireOwner(model, _id);
         if (model.status != ModelStatus.DRAFT) {
             revert InvalidStatus(ModelStatus.DRAFT, model.status);
         }
@@ -172,7 +175,7 @@ contract ModelRegistry {
     /// @notice Deprecate a model.
     function deprecateModel(uint256 _id) external {
         Model storage model = models[_id];
-        _requireOwner(model);
+        _requireOwner(model, _id);
         if (model.status != ModelStatus.ACTIVE) {
             revert InvalidStatus(ModelStatus.ACTIVE, model.status);
         }
@@ -182,6 +185,7 @@ contract ModelRegistry {
     /// @notice Revoke a model. The owner or an admin may call this.
     function revokeModel(uint256 _id) external {
         Model storage model = models[_id];
+        _requireExistingModel(model, _id);
         bool isOwner = model.owner == msg.sender;
         bool isAdmin = accessControl.hasRole(accessControl.ADMIN(), msg.sender);
 
@@ -191,10 +195,7 @@ contract ModelRegistry {
         if (model.status == ModelStatus.REVOKED) {
             revert InvalidStatus(ModelStatus.REVOKED, model.status);
         }
-
-        ModelStatus oldStatus = model.status;
-        model.status = ModelStatus.REVOKED;
-        emit ModelStatusChanged(_id, oldStatus, ModelStatus.REVOKED, msg.sender);
+        _setStatus(model, _id, ModelStatus.REVOKED);
     }
 
     /// @notice Update model metadata while the model is ACTIVE.
@@ -205,12 +206,13 @@ contract ModelRegistry {
         string calldata _checksum
     ) external {
         Model storage model = models[_id];
-        _requireOwner(model);
+        _requireOwner(model, _id);
         require(model.status == ModelStatus.ACTIVE, "ModelRegistry: must be ACTIVE");
 
         model.description = _description;
         model.ipfsCid = _ipfsCid;
         model.checksum = _checksum;
+        emit MetadataUpdated(_id, msg.sender);
     }
 
     /// @notice Add a new version to an existing model.
@@ -224,7 +226,8 @@ contract ModelRegistry {
         string calldata _parentHash
     ) external notBlacklisted returns (uint256) {
         Model storage model = models[_modelId];
-        _requireOwner(model);
+        _requireOwner(model, _modelId);
+        require(model.status == ModelStatus.ACTIVE, "ModelRegistry: must be ACTIVE");
 
         uint256 latest = latestVersionId[_modelId];
         if (latest > 0) {
@@ -245,7 +248,7 @@ contract ModelRegistry {
     /// @notice Request ownership transfer for an ACTIVE unstaked model.
     function requestTransfer(uint256 _modelId, address _newOwner) external notBlacklisted {
         Model storage model = models[_modelId];
-        _requireOwner(model);
+        _requireOwner(model, _modelId);
         require(model.status == ModelStatus.ACTIVE, "ModelRegistry: must be ACTIVE");
         require(!model.staked, "ModelRegistry: staked model cannot transfer");
         require(_newOwner != address(0), "ModelRegistry: new owner is zero");
@@ -271,6 +274,10 @@ contract ModelRegistry {
         require(!accessControl.isBlacklisted(msg.sender), "BlacklistedAddress");
 
         Model storage model = models[_modelId];
+        _requireExistingModel(model, _modelId);
+        require(model.owner == transfer.from, "ModelRegistry: owner changed while transfer pending");
+        require(model.status == ModelStatus.ACTIVE, "ModelRegistry: must be ACTIVE");
+        require(!model.staked, "ModelRegistry: staked model cannot transfer");
         address oldOwner = model.owner;
         model.owner = msg.sender;
 
@@ -308,6 +315,11 @@ contract ModelRegistry {
     /// @notice Return the current model owner.
     function getModelOwner(uint256 _id) external view returns (address) {
         return models[_id].owner;
+    }
+
+    /// @notice Return whether a model has been registered on-chain.
+    function modelExists(uint256 _id) external view returns (bool) {
+        return models[_id].owner != address(0);
     }
 
     /// @notice Return whether a model is marked as staked.
@@ -349,12 +361,23 @@ contract ModelRegistry {
     function _setStatus(Model storage _model, uint256 _id, ModelStatus _newStatus) internal {
         ModelStatus oldStatus = _model.status;
         _model.status = _newStatus;
+        if (_newStatus != ModelStatus.ACTIVE && pendingTransfers[_id].from != address(0)) {
+            delete pendingTransfers[_id];
+            emit OwnershipTransferCancelled(_id, msg.sender);
+        }
         emit ModelStatusChanged(_id, oldStatus, _newStatus, msg.sender);
     }
 
-    function _requireOwner(Model storage _model) internal view {
+    function _requireOwner(Model storage _model, uint256 _id) internal view {
+        _requireExistingModel(_model, _id);
         if (_model.owner != msg.sender) {
             revert NotOwner(_model.owner, msg.sender);
+        }
+    }
+
+    function _requireExistingModel(Model storage _model, uint256 _id) internal view {
+        if (_model.owner == address(0)) {
+            revert ModelNotFound(_id);
         }
     }
 

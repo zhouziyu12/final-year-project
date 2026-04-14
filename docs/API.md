@@ -2,95 +2,176 @@
 
 ## Base URL
 
-Local development:
+Default local address:
 
 ```text
 http://127.0.0.1:3000
 ```
 
-## REST Endpoints
+## Authentication
 
-### Health
+All write endpoints require these headers:
 
-`GET /api/health`
+- `x-api-key`
+- `x-auth-timestamp`
+- `x-auth-nonce`
 
-Returns a basic service health response.
+The backend enforces:
 
-### Status
+- API key validation
+- timestamp window validation
+- nonce replay protection
+- IP-based rate limiting
 
-`GET /api/v2/status`
+If `WRITE_API_KEY` is not configured, write endpoints return `503`.
 
-Returns backend and blockchain status information.
+## Read Endpoints
 
-Legacy compatibility:
+### `GET /api/health`
 
-`GET /api/status`
+Returns service health and startup warnings.
 
-### Models
+### `GET /api/v2/status`
 
-`GET /api/v2/models`
+Returns platform status, including:
 
-Returns the current model list.
+- backend status
+- `sepolia` and `tbnb` connectivity
+- wallet write mode
+- known model count
+- `zkReady`
 
-`GET /api/v2/models/:id`
+Legacy compatibility route:
 
-Returns details for a single model.
+- `GET /api/status`
 
-Legacy compatibility:
+### `GET /api/v2/models`
 
-`GET /api/models`
+Returns the model list.
 
-### Audit
+Optional query parameter:
 
-`GET /api/v2/audit/recent`
+- `chain=sepolia|tbnb`
 
-Returns recent audit entries.
+Possible model states include:
 
-`GET /api/v2/audit/verify/:id`
+- `DRAFT`
+- `ACTIVE`
+- `DEPRECATED`
+- `REVOKED`
+- `PENDING_REGISTRATION`
 
-Verifies the audit chain up to a specific entry.
+`PENDING_REGISTRATION` means the backend has already broadcast a registration transaction and predicted the model ID, but the on-chain read path has not confirmed yet.
 
-`POST /api/audit`
+Legacy compatibility route:
 
-Creates an audit-related record through the backend flow.
+- `GET /api/models`
 
-### Provenance Submission
+### `GET /api/v2/models/:id`
 
-`POST /api/sdk/provenance`
+Returns a single model summary.
 
-This endpoint is used by the Python SDK.
+Parameters:
 
-Expected body fields include:
+- path parameter `:id`
+- query parameter `chain`
 
-- `modelId`
+### `GET /api/v2/audit/recent`
+
+Returns recent audit events.
+
+Parameters:
+
+- `chain=sepolia|tbnb`
+- `limit=<number>`
+
+### `GET /api/v2/audit/verify/:id`
+
+Verifies the provenance chain for a model and returns:
+
+- `verified`
+- `recordCount`
+- `latestRecord`
+
+### `GET /api/ipfs/cat/:cid`
+
+Fetches IPFS content by CID.
+
+## Write Endpoints
+
+### `POST /api/register`
+
+Registers model metadata.
+
+Request body:
+
+```json
+{
+  "name": "ExampleModel",
+  "description": "Demo model",
+  "ipfsCid": "optional",
+  "checksum": "optional",
+  "framework": "PyTorch",
+  "license": "MIT",
+  "chain": "sepolia"
+}
+```
+
+Behavior:
+
+- if a same-name model exists and is readable on-chain, the backend returns the existing model ID
+- if the local cache is stale, the backend clears the stale mapping first
+- for new registrations, the backend uses `staticCall` to predict the model ID, then sends the transaction and returns immediately
+
+Typical response:
+
+```json
+{
+  "success": true,
+  "id": "12",
+  "numericId": 12,
+  "name": "ExampleModel",
+  "chain": "sepolia",
+  "verified": false,
+  "pending": true,
+  "txHash": "0x..."
+}
+```
+
+### `POST /api/sdk/provenance`
+
+Primary SDK write endpoint. It can auto-register a model if needed and then writes a provenance event through `ModelProvenanceTracker`.
+
+Key request fields:
+
+- `modelId` or `modelName`
+- `chain`
 - `action`
 - `sender`
 - `versionTag`
 - `commit`
+- `modelHash`
 - `ipfsHash`
+- `metadataCid`
 - `trainingMetadata`
 
-Supported actions are mapped by the backend. Invalid actions are rejected instead of silently downgraded.
+Notes:
 
-### Registration
+- if `modelName` is provided and there is no valid mapping, the backend attempts auto-registration
+- `action` must be one of the backend-supported actions
+- invalid model IDs, missing models, and invalid object payloads are rejected
 
-`POST /api/register`
+### `POST /api/audit`
 
-Registers a model through the backend orchestration flow.
+Triggers an audit verification lookup by model ID.
 
-### IPFS
+### `POST /api/ipfs/upload/file`
 
-`POST /api/ipfs/upload/file`
+Uploads binary file content to Pinata.
 
-Uploads file content to IPFS through Pinata.
+### `POST /api/ipfs/upload/metadata`
 
-`POST /api/ipfs/upload/metadata`
-
-Uploads metadata JSON to IPFS through Pinata.
-
-`GET /api/ipfs/cat/:cid`
-
-Fetches IPFS content by CID.
+Uploads JSON metadata to Pinata.
 
 ## Example Requests
 
@@ -106,10 +187,21 @@ curl http://127.0.0.1:3000/api/health
 curl http://127.0.0.1:3000/api/v2/status
 ```
 
-### List Models
+### List Models on Sepolia
 
 ```bash
-curl http://127.0.0.1:3000/api/v2/models
+curl "http://127.0.0.1:3000/api/v2/models?chain=sepolia"
+```
+
+### Register a Model
+
+```bash
+curl -X POST http://127.0.0.1:3000/api/register \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: <WRITE_API_KEY>" \
+  -H "x-auth-timestamp: <unix-ms>" \
+  -H "x-auth-nonce: <random-nonce>" \
+  -d "{\"name\":\"ExampleModel\",\"chain\":\"sepolia\"}"
 ```
 
 ### Submit Provenance
@@ -117,12 +209,13 @@ curl http://127.0.0.1:3000/api/v2/models
 ```bash
 curl -X POST http://127.0.0.1:3000/api/sdk/provenance \
   -H "Content-Type: application/json" \
-  -d "{\"modelId\":1,\"action\":\"UPDATED\",\"sender\":\"0xYourAddress\",\"versionTag\":\"v1.0.0\",\"commit\":\"Initial training\"}"
+  -H "x-api-key: <WRITE_API_KEY>" \
+  -H "x-auth-timestamp: <unix-ms>" \
+  -H "x-auth-nonce: <random-nonce>" \
+  -d "{\"modelName\":\"ExampleModel\",\"chain\":\"sepolia\",\"action\":\"UPDATED\",\"sender\":\"0xYourAddress\",\"versionTag\":\"v1.0.0\",\"commit\":\"Initial training\"}"
 ```
 
-## Smart Contract Surface
-
-Main deployed contract groups:
+## Contracts Behind the API
 
 - `ModelAccessControl`
 - `ModelRegistry`
@@ -133,8 +226,4 @@ Main deployed contract groups:
 - `Verifier`
 - `RealZKBridge`
 
-See `address_v2_multi.json` for current deployed addresses.
-
-## OpenAPI
-
-The OpenAPI source is available at `docs/openapi.yml`.
+Current deployment addresses are stored in `address_v2_multi.json`.

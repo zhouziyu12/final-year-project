@@ -1,74 +1,117 @@
 import React from 'react';
-import { useDevice } from '../hooks';
+import { Award, Blocks, FileBadge2, Gem, ShieldEllipsis } from 'lucide-react';
 
-export function NFTPage({ nfts, loading }) {
-  const { isMobile } = useDevice();
+function buildCertificateCandidates(models) {
+  return models.slice(0, 6).map((model, index) => ({
+    key: `${model.chain}-${model.id}`,
+    title: model.name || `Model ${model.id}`,
+    subtitle: model.chain || 'Unknown chain',
+    tokenLabel: `CERT-${String(model.numericId || model.id).padStart(4, '0')}`,
+    state: model.verified ? 'Ready' : 'Pending',
+    accent: index % 2 === 0 ? 'marine' : 'ice'
+  }));
+}
 
-  if (isMobile) {
-    // =========================================
-    // MOBILE: Vertical list
-    // =========================================
-    return (
-      <div className="space-y-4 animate-fade-in">
-        <div>
-          <h1 className="text-xl font-bold text-white">NFTs</h1>
-          <p className="text-zinc-400 text-sm">Ownership records</p>
+export function NFTPage({ models, loading }) {
+  const candidates = buildCertificateCandidates(models);
+
+  return (
+    <div className="page-grid">
+      <section className="content-split content-split-wide">
+        <article className="panel-card panel-card-spotlight">
+          <div className="panel-heading">
+            <div>
+              <p className="panel-eyebrow">Ownership Story</p>
+              <h3 className="panel-title">From verified model to certificate-style deliverable</h3>
+            </div>
+          </div>
+
+          <div className="nft-hero">
+            <div className="nft-hero-card">
+              <div className="nft-hero-badge">
+                <FileBadge2 size={14} />
+                <span>Presentation view</span>
+              </div>
+              <p className="nft-hero-copy">
+                Even without a full minting workflow, the project can already show how a verified registry record becomes a certificate-style output for presentation and extension planning.
+              </p>
+            </div>
+            <div className="nft-hero-stat">
+              <p>Certificate candidates</p>
+              <strong>{models.length}</strong>
+            </div>
+          </div>
+        </article>
+
+        <article className="panel-card">
+          <div className="panel-heading">
+            <div>
+              <p className="panel-eyebrow">Roadmap</p>
+              <h3 className="panel-title">How the certificate layer can evolve</h3>
+            </div>
+          </div>
+
+          <div className="pipeline-list">
+            {[
+              { title: 'Mint per verified model', copy: 'Issue a certificate after registration and audit both pass.', icon: Award },
+              { title: 'Attach provenance metadata', copy: 'Expose proof state, CID, chain, and ownership metadata to the certificate.', icon: ShieldEllipsis },
+              { title: 'Public showcase gallery', copy: 'Turn verified project outputs into a presentable model gallery.', icon: Blocks }
+            ].map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <div className="pipeline-item" key={item.title}>
+                  <div className="pipeline-index">{String(index + 1).padStart(2, '0')}</div>
+                  <div className="pipeline-icon">
+                    <Icon size={18} />
+                  </div>
+                  <div className="pipeline-content">
+                    <p className="pipeline-title">{item.title}</p>
+                    <p className="pipeline-copy">{item.copy}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </article>
+      </section>
+
+      <section className="panel-card">
+        <div className="panel-heading">
+          <div>
+            <p className="panel-eyebrow">Certificate Gallery</p>
+            <h3 className="panel-title">Visualized ownership outputs for the current registry entries</h3>
+          </div>
         </div>
 
-        {nfts.length === 0 ? (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-zinc-800 flex items-center justify-center">
-              <svg className="w-8 h-8 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
-              </svg>
+        {loading ? (
+          <div className="table-empty">Loading certificate-ready cards...</div>
+        ) : candidates.length === 0 ? (
+            <div className="empty-state">
+              <Gem size={32} />
+              <p className="empty-state-title">No certificate candidates yet</p>
+              <p className="empty-state-copy">Once models are registered, this view can show how provenance records become certificate-ready deliverables.</p>
             </div>
-            <p className="text-zinc-400">No NFTs yet</p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {nfts.map((nft, i) => (
-              <div key={i} className="p-4 rounded-2xl bg-white/5 border border-white/5">
-                <h3 className="font-semibold text-white truncate">{nft.name || 'NFT'}</h3>
-                <p className="text-zinc-500 text-sm">{nft.tokenId}</p>
-              </div>
+          ) : (
+          <div className="certificate-grid">
+            {candidates.map((item) => (
+              <article className={`certificate-card certificate-card-${item.accent}`} key={item.key}>
+                <div className="certificate-header">
+                  <span className="certificate-chip">{item.tokenLabel}</span>
+                  <span className={`status-pill${item.state === 'Ready' ? ' is-online' : ''}`}>{item.state}</span>
+                </div>
+                <div className="certificate-body">
+                  <p className="certificate-title">{item.title}</p>
+                  <p className="certificate-subtitle">{item.subtitle}</p>
+                </div>
+                <div className="certificate-footer">
+                  <span>Provenance-linked</span>
+                  <Award size={16} />
+                </div>
+              </article>
             ))}
           </div>
         )}
-      </div>
-    );
-  }
-
-  // =========================================
-  // DESKTOP: Grid gallery
-  // =========================================
-  return (
-    <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-bold text-white mb-2">NFT Gallery</h1>
-        <p className="text-zinc-400">Ownership records and provenance</p>
-      </div>
-
-      {nfts.length === 0 ? (
-        <div className="text-center py-20 rounded-xl border border-dashed border-white/10">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-zinc-800/50 flex items-center justify-center">
-            <svg className="w-10 h-10 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" />
-            </svg>
-          </div>
-          <p className="text-zinc-400">No NFTs minted yet</p>
-          <p className="text-zinc-500 text-sm mt-1">Register a model to mint its NFT</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-4 gap-4">
-          {nfts.map((nft, i) => (
-            <div key={i} className="p-4 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
-              <div className="aspect-square rounded-lg bg-gradient-to-br from-purple-500/20 to-cyan-500/20 mb-3" />
-              <h3 className="font-semibold text-white truncate">{nft.name || 'NFT'}</h3>
-              <p className="text-zinc-500 text-sm font-mono">#{nft.tokenId}</p>
-            </div>
-          ))}
-        </div>
-      )}
+      </section>
     </div>
   );
 }

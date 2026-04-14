@@ -7,12 +7,18 @@ the current model and audit APIs, and basic local file layout assumptions.
 
 import json
 import os
+import secrets
 import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
 
 import requests
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - optional dependency fallback
+    load_dotenv = None
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -21,6 +27,9 @@ RESULTS = {
     'timestamp': datetime.now(UTC).isoformat().replace('+00:00', 'Z'),
     'tests': []
 }
+
+if load_dotenv:
+    load_dotenv(Path(__file__).parent.parent / '.env', override=False)
 
 
 def log(name, status, detail, data=None):
@@ -78,6 +87,45 @@ def test_backend_api():
             log(name, 'FAIL', str(error))
 
 
+def build_write_headers():
+    api_key = os.getenv('WRITE_API_KEY')
+    if not api_key:
+        raise RuntimeError('WRITE_API_KEY is not configured for authenticated backend tests')
+    return {
+        'x-api-key': api_key,
+        'x-auth-timestamp': str(int(time.time() * 1000)),
+        'x-auth-nonce': secrets.token_hex(16),
+    }
+
+
+def test_backend_write_auth():
+    print('\n=== Test Group 2B: Backend Write Authentication ===')
+    base_url = 'http://127.0.0.1:3000'
+
+    try:
+        unauthorized = requests.post(f'{base_url}/api/register', json={}, timeout=5)
+        if unauthorized.status_code == 401:
+            log('POST /api/register without auth', 'PASS', 'Unauthenticated write rejected with 401')
+        else:
+            log('POST /api/register without auth', 'FAIL', f'Expected 401, got {unauthorized.status_code}')
+    except Exception as error:
+        log('POST /api/register without auth', 'FAIL', str(error))
+
+    try:
+        authorized = requests.post(
+            f'{base_url}/api/register',
+            json={},
+            headers=build_write_headers(),
+            timeout=5,
+        )
+        if authorized.status_code == 400:
+            log('POST /api/register with auth', 'PASS', 'Authenticated write passed auth and failed at validation')
+        else:
+            log('POST /api/register with auth', 'FAIL', f'Expected 400, got {authorized.status_code}')
+    except Exception as error:
+        log('POST /api/register with auth', 'FAIL', str(error))
+
+
 def test_secret_manager():
     print('\n=== Test Group 3: Secret Manager ===')
     import io
@@ -97,15 +145,21 @@ def test_secret_manager():
         sys.stdout = old_stdout
 
         log('Secret Manager Init', 'PASS', 'Initialized successfully')
-        if secret and len(str(secret)) == 6:
-            log('Secret Generation', 'PASS', f'Generated 6-digit secret: {secret}')
+        if secret and len(str(secret)) >= 32:
+            log('Secret Generation', 'PASS', f'Generated high-entropy secret ({len(str(secret))} chars)')
         else:
             log('Secret Generation', 'FAIL', f'Invalid secret format: {secret}')
 
         if retrieved_secret == secret:
-            log('Version Tracking', 'PASS', f'Version recorded and secret verified: {retrieved_secret}')
+            log('Version Tracking', 'PASS', 'Version recorded and secret verified')
         else:
             log('Version Tracking', 'FAIL', 'Secret mismatch after version recording')
+
+        raw_store = manager.secrets_file.read_text(encoding='utf-8')
+        if str(secret) not in raw_store and 'secret_ciphertext' in raw_store:
+            log('Secret Storage Encryption', 'PASS', 'Secret file stores ciphertext instead of plaintext')
+        else:
+            log('Secret Storage Encryption', 'FAIL', 'Secret file still exposes plaintext')
     except Exception as error:
         try:
             sys.stdout = old_stdout
@@ -143,12 +197,33 @@ def test_file_structure():
             log(f'File: {file_path}', 'FAIL', 'Not found')
 
 
+def test_sdk_model_resolution():
+    print('\n=== Test Group 4B: SDK Model Resolution ===')
+
+    try:
+        from sdk.python.provenance_sdk import ProvenanceSDK
+
+        sdk = ProvenanceSDK(base_url='http://127.0.0.1:3000', timeout=5)
+        model_name = f'TestSDKModel_{int(time.time())}'
+
+        try:
+            created = sdk._ensure_model_registered(model_name, 'sepolia', '0xabc123')
+            resolved = sdk._find_model_by_name(model_name, 'sepolia')
+        except requests.exceptions.ConnectionError:
+            log('SDK model resolution', 'FAIL', 'Backend not running (connection refused)')
+            return
+
+        if created and resolved and str(created.get('id') or created.get('numericId')) == str(resolved.get('id') or resolved.get('numericId')):
+            log('SDK model resolution', 'PASS', f"Resolved registered model '{model_name}' to on-chain ID")
+        else:
+            log('SDK model resolution', 'FAIL', 'SDK did not resolve a stable on-chain model ID')
+    except Exception as error:
+        log('SDK model resolution', 'FAIL', str(error))
+
+
 def test_ipfs_config():
     print('\n=== Test Group 5: IPFS Configuration ===')
     try:
-        from dotenv import load_dotenv
-        load_dotenv()
-
         pinata_key = os.getenv('PINATA_API_KEY')
         pinata_secret = os.getenv('PINATA_SECRET') or os.getenv('PINATA_SECRET_API_KEY')
 
@@ -173,8 +248,10 @@ def main():
 
     test_sdk_imports()
     test_backend_api()
+    test_backend_write_auth()
     test_secret_manager()
     test_file_structure()
+    test_sdk_model_resolution()
     test_ipfs_config()
 
     passed = len([test for test in RESULTS['tests'] if test['status'] == 'PASS'])

@@ -3,13 +3,13 @@ import React from 'react';
 /**
  * Cyber Badge Component
  */
-export function Badge({ 
-  children, 
+export function Badge({
+  children,
   variant = 'default',
   size = 'md',
   pulse = false,
   className = '',
-  ...props 
+  ...props
 }) {
   const variants = {
     default: 'bg-slate-700/50 text-slate-300 border-slate-600/30',
@@ -27,7 +27,7 @@ export function Badge({
   };
 
   return (
-    <span 
+    <span
       className={`
         inline-flex items-center gap-1.5
         border rounded-full font-medium
@@ -38,7 +38,6 @@ export function Badge({
       `}
       {...props}
     >
-      {/* Dot indicator */}
       <span className={`w-1.5 h-1.5 rounded-full ${
         variant === 'cyan' ? 'bg-cyan-400' :
         variant === 'emerald' ? 'bg-emerald-400' :
@@ -71,7 +70,7 @@ export function StatusDot({ status, pulse = false, size = 'md', className = '' }
   };
 
   return (
-    <span 
+    <span
       className={`
         inline-block rounded-full
         ${colors[status] || colors.offline}
@@ -92,17 +91,10 @@ export function StatusDot({ status, pulse = false, size = 'md', className = '' }
  * Progress Badge
  */
 export function ProgressBadge({ progress, showLabel = true }) {
-  const getVariant = () => {
-    if (progress >= 100) return 'emerald';
-    if (progress >= 50) return 'cyan';
-    if (progress > 0) return 'amber';
-    return 'default';
-  };
-
   return (
     <div className="flex items-center gap-2">
       <div className="w-16 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-        <div 
+        <div
           className={`h-full rounded-full transition-all duration-300 ${
             progress >= 100 ? 'bg-emerald-400' :
             progress >= 50 ? 'bg-cyan-400' :

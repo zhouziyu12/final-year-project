@@ -1,12 +1,12 @@
 import React from 'react';
 
-export function Card({ 
-  children, 
-  className = '', 
+export function Card({
+  children,
+  className = '',
   hover = true,
   glow = false,
   gradient = false,
-  ...props 
+  ...props
 }) {
   const baseStyles = `
     relative overflow-hidden rounded-xl sm:rounded-2xl
@@ -15,13 +15,13 @@ export function Card({
     ${hover ? 'hover:border-white/10 hover:shadow-xl hover:shadow-cyan-500/5' : ''}
     ${glow ? 'shadow-[0_0_30px_rgba(34,211,238,0.15)]' : ''}
   `;
-  
+
   const gradientStyle = gradient ? {
     background: 'linear-gradient(135deg, rgba(22, 24, 34, 0.9) 0%, rgba(18, 20, 28, 0.95) 100%)',
   } : {};
-  
+
   return (
-    <div className={baseStyles + ' ' + className} style={gradientStyle}>
+    <div className={baseStyles + ' ' + className} style={gradientStyle} {...props}>
       {gradient && (
         <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/5 via-transparent to-purple-500/5 pointer-events-none" />
       )}

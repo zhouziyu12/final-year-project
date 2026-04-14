@@ -1,16 +1,91 @@
-# React + Vite
+# Frontend App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Overview
 
-Currently, two official plugins are available:
+`client/` is the React + Vite frontend for the AI Model Provenance System.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Current pages:
 
-## React Compiler
+- `Overview`
+- `Training`
+- `Registry`
+- `Audit`
+- `System`
+- `NFT`
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Development
 
-## Expanding the ESLint configuration
+Install dependencies:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+cd client
+npm install
+```
+
+Start the dev server:
+
+```bash
+npm run dev
+```
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Run lint:
+
+```bash
+npm run lint
+```
+
+## Environment Variables
+
+The frontend primarily reads:
+
+- `VITE_API_URL`
+- `VITE_WRITE_API_KEY`
+
+Behavior:
+
+- if `VITE_API_URL` is missing, the frontend uses relative `/api/...` requests
+- if `VITE_WRITE_API_KEY` is missing, the UI stays read-only
+
+## API Usage
+
+The frontend calls:
+
+- `GET /api/health`
+- `GET /api/v2/status`
+- `GET /api/v2/models`
+- `GET /api/v2/models/:id`
+- `GET /api/v2/audit/recent`
+- `GET /api/v2/audit/verify/:id`
+- `POST /api/register`
+
+`POST /api/register` includes:
+
+- `x-api-key`
+- `x-auth-timestamp`
+- `x-auth-nonce`
+
+## UX Rules
+
+- first-load critical data depends on `health`, `status`, and `models`
+- audit feed failures must not collapse the entire app into a backend-unavailable state
+- registrations may appear as `PENDING_REGISTRATION` before final chain confirmation
+- read-only mode must be explicit when write access is not configured
+
+## File Map
+
+- `src/App.jsx`: page state and data orchestration
+- `src/lib/api.js`: API client helpers
+- `src/pages/`: page components
+- `src/components/`: layout and UI components
+- `src/assets/`: static visual assets
+
+## Notes
+
+- This is no longer the default Vite template README.
+- If API behavior changes, update `src/lib/api.js` first and then sync the relevant docs in the repo root and `docs/`.

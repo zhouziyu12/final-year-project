@@ -1,5 +1,5 @@
 pragma circom 2.0.0;
-include "node_modules/circomlib/circuits/poseidon.circom";
+include "circomlib/circuits/poseidon.circom";
 
 /**
  * ModelProver Circuit
@@ -8,12 +8,13 @@ include "node_modules/circomlib/circuits/poseidon.circom";
  * 
  * Public inputs:
  *   - modelId: The AI model's unique identifier
+ *   - messageHash: Canonical hash of the bridged payload context
  * 
  * Private inputs:
  *   - secret: The prover's secret key (never revealed on-chain)
  * 
  * Output:
- *   - commitment: Poseidon hash of (secret, modelId) for on-chain verification
+ *   - commitment: Poseidon hash of (secret, modelId, messageHash) for on-chain verification
  * 
  * Use case:
  *   Model owners can prove ownership without exposing their private key.
@@ -22,6 +23,7 @@ include "node_modules/circomlib/circuits/poseidon.circom";
 template ModelProver() {
     // Public input: AI model ID (everyone knows this)
     signal input modelId;
+    signal input messageHash;
     
     // Private input: Prover's secret key (never revealed)
     signal input secret;
@@ -29,10 +31,11 @@ template ModelProver() {
     // Output: Commitment hash for on-chain storage
     signal output commitment;
     
-    // Hash secret and modelId together using Poseidon
-    component poseidon = Poseidon(2);
+    // Hash secret, modelId, and payload context together using Poseidon
+    component poseidon = Poseidon(3);
     poseidon.inputs[0] <== secret;
     poseidon.inputs[1] <== modelId;
+    poseidon.inputs[2] <== messageHash;
     
     commitment <== poseidon.out;
 }
@@ -104,5 +107,5 @@ template ModelUpdateProver() {
     commitment * (commitment - prevCommitment) === 0;
 }
 
-// Main component: ModelProver with public modelId
-component main {public [modelId]} = ModelProver();
+// Main component: ModelProver with public modelId and messageHash
+component main {public [modelId, messageHash]} = ModelProver();

@@ -1,24 +1,57 @@
 # Deployment Notes
 
-## Verified Local Build Chain
+## Purpose
 
-The following commands are currently verified in this repository:
+This document records the current runtime behavior, write-mode requirements, test outputs, and Windows-specific operational notes. It is an operational reference, not a one-shot deployment script.
+
+## Runtime Modes
+
+### Read-only
+
+Triggered when:
+
+- `.env` does not contain `PRIVATE_KEY`
+
+Behavior:
+
+- read endpoints remain available
+- write endpoints return `503`
+- `/api/v2/status` reports `writeMode: read-only`
+
+### Write-enabled
+
+Triggered when:
+
+- `.env` contains `PRIVATE_KEY`
+- `.env` contains `WRITE_API_KEY`
+
+Behavior:
+
+- model registration, SDK submission, and IPFS uploads are enabled
+- the backend persists used nonces and enforces replay protection and rate limiting
+
+## Verified Commands
+
+Commands verified in the current repository state:
 
 ```bash
-npx hardhat compile
+npx hardhat compile --show-stack-traces
+cd client && npm run lint
 cd client && npm run build
-python -m py_compile sdk/python/provenance_sdk.py sdk/python/model_secret_manager.py tests/test_sdk_backend.py
+node tests/test_zk_proof.js
+python tests/test_sdk_backend.py
+node tests/test_smart_contracts.js
 ```
 
-Full regression:
+Full Windows regression:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
 ```
 
-## Backend Startup
+## Local Startup
 
-Run the API server from the repository root:
+### Backend
 
 ```bash
 node server/server.js
@@ -30,9 +63,7 @@ Health check:
 curl http://127.0.0.1:3000/api/health
 ```
 
-## Frontend Startup
-
-Development:
+### Frontend
 
 ```bash
 cd client
@@ -46,21 +77,25 @@ cd client
 npm run build
 ```
 
-## Common Outputs
+## Important Runtime Files
 
-- `client/dist/` for the frontend build
-- `artifacts/` for Hardhat compile output
-- `tests/test_summary.json` for the test-run summary
+- `address_v2_multi.json`: current multi-chain deployment addresses
+- `model_name_map.json`: backend cache from model name to model ID
+- `server/write_auth_state.json`: persisted nonce state for write authentication
+- `client/dist/`: frontend build output
+- `artifacts/`: Hardhat compile output
 
-## Current Deployment Metadata
+## Windows Notes
 
-Addresses are stored in `address_v2_multi.json` for:
+- Hardhat, snarkjs, and circom2 all run directly on Windows.
+- The project no longer requires WSL to complete circuit compilation.
+- The working circuit compile path is the local `node_modules/.bin/circom2.cmd` invocation inside `zk/`.
+
+## Deployment Address Metadata
+
+The repository currently tracks:
 
 - `sepolia`
 - `tbnb`
-- `somnia`
 
-## Notes on Windows
-
-- Hardhat compile is expected to work directly from PowerShell or `cmd`
-- the project no longer requires WSL to complete the normal compile/build/test path
+Treat `address_v2_multi.json` as the source of truth for addresses.

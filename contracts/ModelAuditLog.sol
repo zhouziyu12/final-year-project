@@ -278,6 +278,7 @@ contract ModelAuditLog {
         bool isAuditor = accessControl.hasRole(accessControl.AUDITOR(), msg.sender);
         bool isAdmin = accessControl.hasRole(accessControl.ADMIN(), msg.sender);
         if (!isAuditor && !isAdmin) revert OnlyAuditor();
+        require(!accessControl.isBlacklisted(msg.sender), "AuditLog: caller is blacklisted");
         _;
     }
 }

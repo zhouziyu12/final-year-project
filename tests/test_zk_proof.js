@@ -6,12 +6,11 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import * as snarkjs from 'snarkjs';
 
-const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const PROJECT_ROOT = path.join(__dirname, '..');
 
 const RESULTS = {
   suite: 'ZK Proof System Tests',
@@ -22,27 +21,38 @@ const RESULTS = {
 const log = (name, status, detail, data = null) => {
   const result = { name, status, detail, data };
   RESULTS.tests.push(result);
-  const icon = status === 'PASS' ? '✅' : status === 'FAIL' ? '❌' : '⚠️';
+  const icon = status === 'PASS' ? '[OK]' : status === 'FAIL' ? '[X]' : '[!]';
   console.log(`${icon} [${status}] ${name}: ${detail}`);
 };
+
+function resolveExistingPath(candidates) {
+  for (const candidate of candidates) {
+    const fullPath = path.join(PROJECT_ROOT, candidate);
+    if (fs.existsSync(fullPath)) {
+      return { relativePath: candidate, fullPath };
+    }
+  }
+
+  return null;
+}
 
 async function testCircuitFiles() {
   console.log('\n=== Test Group 1: Circuit Files ===');
 
   const files = [
-    { path: 'circuit.circom', name: 'Circuit Source' },
-    { path: 'build/circuit_js/circuit.wasm', name: 'WASM File' },
-    { path: 'circuit_final.zkey', name: 'Proving Key' },
-    { path: 'verification_key.json', name: 'Verification Key' }
+    { paths: ['zk/circuit.circom', 'circuit.circom'], name: 'Circuit Source' },
+    { paths: ['zk/build/circuit_js/circuit.wasm', 'build/circuit_js/circuit.wasm'], name: 'WASM File' },
+    { paths: ['zk/circuit_final.zkey', 'circuit_final.zkey'], name: 'Proving Key' },
+    { paths: ['zk/verification_key.json', 'verification_key.json'], name: 'Verification Key' }
   ];
 
   for (const file of files) {
-    const fullPath = path.join(__dirname, '..', file.path);
-    if (fs.existsSync(fullPath)) {
-      const stats = fs.statSync(fullPath);
-      log(file.name, 'PASS', `Found (${(stats.size / 1024).toFixed(2)} KB)`);
+    const resolved = resolveExistingPath(file.paths);
+    if (resolved) {
+      const stats = fs.statSync(resolved.fullPath);
+      log(file.name, 'PASS', `Found at ${resolved.relativePath} (${(stats.size / 1024).toFixed(2)} KB)`);
     } else {
-      log(file.name, 'FAIL', `Not found at ${file.path}`);
+      log(file.name, 'FAIL', `Not found. Checked: ${file.paths.join(', ')}`);
     }
   }
 }
@@ -52,36 +62,62 @@ async function testProofGeneration() {
 
   const testInput = {
     secret: 123456,
-    modelId: 999999999
+    modelId: 999999999,
+    messageHash: 424242
   };
 
-  const inputPath = path.join(__dirname, '..', 'test_proof_input.json');
-  fs.writeFileSync(inputPath, JSON.stringify(testInput));
-  log('Test Input Created', 'PASS', `Secret: ${testInput.secret}, ModelId: ${testInput.modelId}`);
+  const inputDir = path.join(PROJECT_ROOT, 'scripts');
+  fs.mkdirSync(inputDir, { recursive: true });
+  const inputPath = path.join(inputDir, 'last_proof_input.json');
+  fs.writeFileSync(inputPath, JSON.stringify(testInput, null, 2));
+  log(
+    'Test Input Created',
+    'PASS',
+    `Secret: ${testInput.secret}, ModelId: ${testInput.modelId}, MessageHash: ${testInput.messageHash}`
+  );
 
   try {
-    const scriptPath = path.join(__dirname, '..', 'test_zk_standalone.js');
-    const { stdout, stderr } = await execAsync(`node "${scriptPath}"`, {
-      cwd: path.join(__dirname, '..'),
-      timeout: 30000
-    });
-
-    if (stderr && !stderr.includes('Warning')) {
-      log('Proof Generation', 'WARN', 'Warnings during generation', { stderr: stderr.substring(0, 200) });
+    const wasm = resolveExistingPath(['zk/build/circuit_js/circuit.wasm', 'build/circuit_js/circuit.wasm']);
+    const zkey = resolveExistingPath(['zk/circuit_final.zkey', 'circuit_final.zkey']);
+    if (!wasm || !zkey) {
+      throw new Error('Missing wasm or zkey artifacts for proof generation');
     }
 
-    // Check output files
-    const proofPath = path.join(__dirname, '..', 'proof.json');
-    const publicPath = path.join(__dirname, '..', 'public.json');
+    const { proof, publicSignals } = await snarkjs.groth16.fullProve(
+      {
+        secret: String(testInput.secret),
+        modelId: String(testInput.modelId),
+        messageHash: String(testInput.messageHash)
+      },
+      wasm.fullPath,
+      zkey.fullPath
+    );
+
+    const proofPath = path.join(PROJECT_ROOT, 'proof.json');
+    const publicPath = path.join(PROJECT_ROOT, 'public.json');
+    const calldataPath = path.join(PROJECT_ROOT, 'proof_calldata_debug.txt');
+    const calldata = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
+    const verificationKey = JSON.parse(
+      fs.readFileSync(resolveExistingPath(['zk/verification_key.json', 'verification_key.json']).fullPath, 'utf8')
+    );
+    const verified = await snarkjs.groth16.verify(verificationKey, publicSignals, proof);
+
+    fs.writeFileSync(proofPath, JSON.stringify(proof, null, 2));
+    fs.writeFileSync(publicPath, JSON.stringify(publicSignals, null, 2));
+    fs.writeFileSync(
+      calldataPath,
+      `========== Solidity Calldata ==========\n${calldata}\n=======================================\n`
+    );
 
     if (fs.existsSync(proofPath) && fs.existsSync(publicPath)) {
-      const proof = JSON.parse(fs.readFileSync(proofPath, 'utf8'));
-      const publicSignals = JSON.parse(fs.readFileSync(publicPath, 'utf8'));
+      const savedProof = JSON.parse(fs.readFileSync(proofPath, 'utf8'));
+      const savedSignals = JSON.parse(fs.readFileSync(publicPath, 'utf8'));
 
       log('Proof Generation', 'PASS', 'Proof and public signals generated successfully');
-      log('Proof Structure', 'PASS', `pi_a: ${proof.pi_a.length} elements, pi_b: ${proof.pi_b.length} arrays`, {
-        publicSignals: publicSignals.length
+      log('Proof Structure', 'PASS', `pi_a: ${savedProof.pi_a.length} elements, pi_b: ${savedProof.pi_b.length} arrays`, {
+        publicSignals: savedSignals.length
       });
+      log('Proof Verification', verified ? 'PASS' : 'FAIL', `groth16.verify returned ${verified}`);
     } else {
       log('Proof Generation', 'FAIL', 'Output files not created');
     }
@@ -93,16 +129,16 @@ async function testProofGeneration() {
 async function testProofCalldata() {
   console.log('\n=== Test Group 3: Proof Calldata ===');
 
-  const calldataPath = path.join(__dirname, '..', 'proof_calldata_debug.txt');
+  const calldataPath = path.join(PROJECT_ROOT, 'proof_calldata_debug.txt');
   if (fs.existsSync(calldataPath)) {
     const calldata = fs.readFileSync(calldataPath, 'utf8');
-    const lines = calldata.trim().split('\n').filter(l => l.trim().length > 0);
+    const lines = calldata.trim().split('\n').filter((line) => line.trim().length > 0);
 
     if (lines.length >= 3) {
       log('Calldata Format', 'PASS', `${lines.length} lines generated (pi_a, pi_b, pi_c + signals)`);
       log('Calldata Structure', 'PASS', 'ZK calldata components present', {
         lines: lines.length,
-        total_length: calldata.length
+        totalLength: calldata.length
       });
     } else {
       log('Calldata Format', 'FAIL', `Expected at least 3 lines, got ${lines.length}`);
@@ -122,9 +158,9 @@ async function main() {
   await testProofGeneration();
   await testProofCalldata();
 
-  const passed = RESULTS.tests.filter(t => t.status === 'PASS').length;
-  const failed = RESULTS.tests.filter(t => t.status === 'FAIL').length;
-  const warned = RESULTS.tests.filter(t => t.status === 'WARN').length;
+  const passed = RESULTS.tests.filter((test) => test.status === 'PASS').length;
+  const failed = RESULTS.tests.filter((test) => test.status === 'FAIL').length;
+  const warned = RESULTS.tests.filter((test) => test.status === 'WARN').length;
 
   console.log('\n====================================');
   console.log(`  Results: ${passed} passed, ${failed} failed, ${warned} warned`);
@@ -135,6 +171,8 @@ async function main() {
   const outPath = path.join(__dirname, 'results_zk_proof.json');
   fs.writeFileSync(outPath, JSON.stringify(RESULTS, null, 2));
   console.log(`Results saved to: ${outPath}`);
+
+  process.exit(failed > 0 ? 1 : 0);
 }
 
 main().catch(console.error);

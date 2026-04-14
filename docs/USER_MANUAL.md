@@ -1,33 +1,73 @@
 # User Manual
 
-## What This System Does
+## What the System Does
 
-The AI Model Provenance System records AI model lifecycle events across blockchain-backed components and exposes that data through a backend API, a frontend UI, and a Python SDK.
+This system treats an AI model as a traceable asset and records its path from registration to provenance submission and audit verification.
 
 Core capabilities:
 
 - model registration
-- status transitions
-- provenance event recording
-- immutable audit logs
-- NFT minting
-- staking and slashing
-- ZK proof generation support
+- lifecycle status tracking
+- provenance event writes
+- audit log queries and verification
 - IPFS-backed file and metadata storage
+- SDK-driven ZK proof generation and submission
+- NFT and staking presentation and extension points
 
-## Main Workflows
+## Main Interfaces
 
-### 1. Register a Model
+### Frontend
 
-Use the backend registration route or the contract flow to create a new model entry.
+The frontend has six primary pages:
 
-Backend route:
+- `Overview`
+- `Training`
+- `Registry`
+- `Audit`
+- `System`
+- `NFT`
 
-`POST /api/register`
+Start it with:
 
-### 2. Record Provenance from a Training Pipeline
+```bash
+cd client
+npm run dev
+```
 
-Use the Python SDK:
+### Backend
+
+Default address:
+
+```text
+http://127.0.0.1:3000
+```
+
+Primary endpoints:
+
+- `GET /api/health`
+- `GET /api/v2/status`
+- `GET /api/v2/models`
+- `GET /api/v2/audit/recent`
+- `POST /api/register`
+- `POST /api/sdk/provenance`
+
+## Common Workflows
+
+### 1. Register a Model from the Frontend
+
+Requirements:
+
+- the backend is running
+- `VITE_WRITE_API_KEY` is configured
+
+Flow:
+
+1. Open `Registry`
+2. Fill in the model name, chain, and metadata
+3. Submit the form, which calls `POST /api/register`
+4. The new model may appear as `PENDING_REGISTRATION` before chain confirmation completes
+
+### 2. Submit Provenance from Python
 
 ```python
 from sdk.python.provenance_sdk import ProvenanceSDK
@@ -35,109 +75,78 @@ from sdk.python.provenance_sdk import ProvenanceSDK
 sdk = ProvenanceSDK()
 result = sdk.submit_provenance(
     model_path="artifacts/model.bin",
-    model_series="ExampleModel",
+    model_name="ExampleModel",
     version="v1.0.0",
-    commit="Initial training",
+    commit_msg="Initial training",
     sender="0xYourAddress",
-    training_metadata={"accuracy": 0.95, "epochs": 10},
+    chain="sepolia",
 )
 
 print(result)
 ```
 
-### 3. Browse Models
+The SDK will:
 
-Use:
+1. hash the model file
+2. resolve or register a real on-chain `modelId`
+3. generate a ZK proof
+4. upload the model to IPFS
+5. call the backend to submit the provenance record
 
-- `GET /api/v2/models`
-- `GET /api/v2/models/:id`
+### 3. Verify a Model
 
-or open the frontend app from the `client` project.
+Option A:
 
-### 4. Review Audit Activity
+- open the `Audit` page
+- pick a model or enter a model ID
 
-Use:
-
-- `GET /api/v2/audit/recent`
-- `GET /api/v2/audit/verify/:id`
-
-## Running the System Locally
-
-### Compile Contracts
+Option B:
 
 ```bash
-npx hardhat compile
+curl "http://127.0.0.1:3000/api/v2/audit/verify/1?chain=sepolia"
 ```
 
-### Start the Backend
+## Start the System Locally
+
+### Compile
+
+```bash
+npx hardhat compile --show-stack-traces
+```
+
+### Start Backend
 
 ```bash
 node server/server.js
 ```
 
-### Start the Frontend
+### Start Frontend
 
 ```bash
 cd client
 npm run dev
 ```
 
-### Run All Tests
-
-```powershell
-powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
-```
-
-## File Guide
-
-Important files and directories:
-
-- `contracts/`
-- `scripts/deploy_multi_chain.cjs`
-- `scripts/test_contracts.cjs`
-- `server/server.js`
-- `sdk/python/provenance_sdk.py`
-- `sdk/python/model_secret_manager.py`
-- `tests/run_all_tests.ps1`
-- `zk/circuit.circom`
-
-## Current API Surface
-
-Primary backend endpoints:
-
-- `/api/health`
-- `/api/v2/status`
-- `/api/v2/models`
-- `/api/v2/models/:id`
-- `/api/v2/audit/recent`
-- `/api/v2/audit/verify/:id`
-- `/api/sdk/provenance`
-- `/api/register`
-- `/api/audit`
-
 ## Troubleshooting
 
-### Contract compile fails
+### Backend is read-only
 
-Run:
+This means `.env` is missing `PRIVATE_KEY` or `WRITE_API_KEY`.
 
-```bash
-npx hardhat compile --show-stack-traces
-```
+### Frontend registration is disabled
 
-### Frontend build fails
+This means `VITE_WRITE_API_KEY` is not configured, so the UI stays in read-only mode.
 
-Run:
+### Registration returns but model detail is not immediately available
 
-```bash
-cd client
-npm run build
-```
+This is expected. `/api/register` now returns a predicted ID and a `PENDING_REGISTRATION` state before the transaction is confirmed on-chain.
 
-### SDK/backend tests fail
+### ZK proof fails
 
-Run the full orchestrated flow instead of running the Python script alone:
+Rebuild the circuit and confirm these files exist:
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
-```
+- `zk/build/circuit_js/circuit.wasm`
+- `zk/circuit_final.zkey`
+- `zk/verification_key.json`
+
+See `docs/ZK_GUIDE.md` for the full flow.

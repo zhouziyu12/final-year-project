@@ -1,234 +1,213 @@
 /**
- * ZK Circuit Input Generator
- * 
- * Utility for generating valid circuit inputs and verifying proofs.
- * 
+ * ZK Circuit Utilities
+ *
  * Usage:
- *   node utils.js generate <modelId> <secret>
- *   node utils.js prove <modelId> <secret>
- *   node utils.js verify <proof.json> <public.json>
+ *   node utils.js generate <modelId> [secret] [messageHash]
+ *   node utils.js prove <modelId> <secret> [messageHash]
+ *   node utils.js verify [proof.json] [public.json]
+ *   node utils.js export
  */
 
 import { execSync } from 'child_process';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import crypto from 'crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BUILD_DIR = path.join(__dirname, 'build');
+const PROJECT_ROOT = path.join(__dirname, '..');
+const SNARK_FIELD =
+  21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 
-// ─── Poseidon Hash (simplified for demo) ───────────────────────────────────────
-// For production, use proper circomlibjs or snarkjs hash functions
-
-/**
- * Generate a simple hash for input generation
- * Note: For actual circuit, use the WASM-generated witness
- */
-function simpleHash(modelId, secret) {
-  // This is a placeholder - real hash requires circuit execution
-  const data = `${modelId}:${secret}`;
-  return crypto.createHash('sha256').update(data).digest('hex');
+function normalizeBigInt(value, fieldName) {
+  try {
+    if (typeof value === 'bigint') return value;
+    if (typeof value === 'number') return BigInt(value);
+    if (typeof value === 'string' && value.startsWith('0x')) return BigInt(value);
+    return BigInt(String(value));
+  } catch {
+    throw new Error(`Invalid ${fieldName}: ${value}`);
+  }
 }
 
-/**
- * Generate circuit input JSON
- */
-function generateInput(modelId, secret) {
-  // Convert inputs to field elements
-  // Note: Real Circom circuits use babyjubjub field, this is simplified
-  const input = {
-    modelId: BigInt(modelId),
-    secret: BigInt(secret)
+function toFieldHash(value) {
+  const digest = crypto.createHash('sha256').update(String(value)).digest('hex');
+  return BigInt(`0x${digest}`) % SNARK_FIELD;
+}
+
+function generateInput(modelId, secret, messageHash = null) {
+  return {
+    modelId: normalizeBigInt(modelId, 'modelId'),
+    secret: normalizeBigInt(secret, 'secret'),
+    messageHash: messageHash === null
+      ? toFieldHash(`${modelId}:${secret}`)
+      : normalizeBigInt(messageHash, 'messageHash')
   };
-  
-  return input;
 }
 
-/**
- * Generate proof using snarkjs
- */
-async function generateProof(modelId, secret) {
-  console.log(`\n🔐 Generating proof for modelId=${modelId}, secret hidden...`);
-  
-  // Step 1: Create input file
-  const input = generateInput(modelId, secret);
+async function generateProof(modelId, secret, messageHash = null) {
+  console.log(`\n[proof] Generating proof for modelId=${modelId}`);
+
+  const input = generateInput(modelId, secret, messageHash);
   const inputPath = path.join(BUILD_DIR, 'input.json');
-  fs.writeFileSync(inputPath, JSON.stringify(input, null, 2));
-  console.log(`📝 Input written to: ${inputPath}`);
-  
-  // Step 2: Calculate witness
+  fs.writeFileSync(
+    inputPath,
+    JSON.stringify(input, (key, value) => (typeof value === 'bigint' ? value.toString() : value), 2)
+  );
+  console.log(`[proof] Input written to ${inputPath}`);
+
   const wasmPath = path.join(BUILD_DIR, 'circuit_js', 'circuit.wasm');
   const wtnsPath = path.join(BUILD_DIR, 'witness.wtns');
-  
-  if (fs.existsSync(wasmPath)) {
-    console.log('🧮 Calculating witness...');
-    execSync(`npx snarkjs wtns calculate "${wasmPath}" "${inputPath}" "${wtnsPath}"`, {
-      cwd: BUILD_DIR,
-      stdio: 'inherit'
-    });
-    console.log('✅ Witness calculated');
-  } else {
-    console.log('⚠️  WASM not found. Compile circuit first with: ./compile.sh');
+  if (!fs.existsSync(wasmPath)) {
+    console.log('[proof] WASM not found. Compile circuit first with: ./compile.sh');
     return null;
   }
-  
-  // Step 3: Generate proof
-  const zkeyPath = path.join(BUILD_DIR, 'circuit_final.zkey');
-  const provePath = path.join(BUILD_DIR, 'proof.json');
-  const publicPath = path.join(BUILD_DIR, 'public.json');
-  
-  if (fs.existsSync(zkeyPath)) {
-    console.log('🔐 Generating proof...');
-    execSync(`npx snarkjs groth16 prove "${zkeyPath}" "${wtnsPath}" "${provePath}" "${publicPath}"`, {
-      cwd: BUILD_DIR,
-      stdio: 'inherit'
-    });
-    console.log('✅ Proof generated!');
-    
-    // Step 4: Verify proof
-    const vkPath = path.join(BUILD_DIR, 'verification_key.json');
-    console.log('✅ Verifying proof...');
-    const result = execSync(`npx snarkjs groth16 verify "${vkPath}" "${publicPath}" "${provePath}"`, {
-      cwd: BUILD_DIR,
-      encoding: 'utf8'
-    });
-    
-    if (result.includes('OK!')) {
-      console.log('✅ Proof is valid!');
-    } else {
-      console.log('❌ Proof verification failed');
-    }
-    
-    return { proof: provePath, public: publicPath };
-  } else {
-    console.log('⚠️  Final zkey not found. Complete trusted setup first.');
+
+  console.log('[proof] Calculating witness');
+  execSync(`npx snarkjs wtns calculate "${wasmPath}" "${inputPath}" "${wtnsPath}"`, {
+    cwd: BUILD_DIR,
+    stdio: 'inherit'
+  });
+
+  const zkeyPath = path.join(__dirname, 'circuit_final.zkey');
+  const proofPath = path.join(PROJECT_ROOT, 'proof.json');
+  const publicPath = path.join(PROJECT_ROOT, 'public.json');
+  if (!fs.existsSync(zkeyPath)) {
+    console.log('[proof] Final zkey not found. Complete trusted setup first.');
     return null;
   }
+
+  console.log('[proof] Generating proof');
+  execSync(`npx snarkjs groth16 prove "${zkeyPath}" "${wtnsPath}" "${proofPath}" "${publicPath}"`, {
+    cwd: BUILD_DIR,
+    stdio: 'inherit'
+  });
+  console.log('[proof] Proof generated');
+
+  const vkPath = path.join(__dirname, 'verification_key.json');
+  console.log('[proof] Verifying proof');
+  const result = execSync(`npx snarkjs groth16 verify "${vkPath}" "${publicPath}" "${proofPath}"`, {
+    cwd: BUILD_DIR,
+    encoding: 'utf8'
+  });
+
+  if (result.includes('OK!')) {
+    console.log('[proof] Proof is valid');
+  } else {
+    console.log('[proof] Proof verification failed');
+  }
+
+  return { proof: proofPath, public: publicPath };
 }
 
-/**
- * Verify an existing proof
- */
 function verifyProof(proofPath, publicPath) {
-  const vkPath = path.join(BUILD_DIR, 'verification_key.json');
-  
-  console.log(`\n🔍 Verifying proof...`);
+  const vkPath = path.join(__dirname, 'verification_key.json');
+
+  console.log('\n[verify] Verifying proof');
   console.log(`Proof: ${proofPath}`);
   console.log(`Public: ${publicPath}`);
-  
+
   try {
     const result = execSync(
       `npx snarkjs groth16 verify "${vkPath}" "${publicPath}" "${proofPath}"`,
       { cwd: BUILD_DIR, encoding: 'utf8' }
     );
-    
+
     if (result.includes('OK!')) {
-      console.log('✅ Proof is valid!\n');
+      console.log('[verify] Proof is valid\n');
       return true;
-    } else {
-      console.log('❌ Proof verification failed\n');
-      return false;
     }
-  } catch (e) {
-    console.log('❌ Verification error:', e.message);
+
+    console.log('[verify] Proof verification failed\n');
+    return false;
+  } catch (error) {
+    console.log('[verify] Verification error:', error.message);
     return false;
   }
 }
 
-/**
- * Export Solidity verifier
- */
 function exportSolidityVerifier() {
-  const zkeyPath = path.join(BUILD_DIR, 'circuit_final.zkey');
-  const outputPath = path.join(__dirname, '..', 'contracts', 'ZKVerifier.sol');
-  
+  const zkeyPath = path.join(__dirname, 'circuit_final.zkey');
+  const outputPath = path.join(PROJECT_ROOT, 'contracts', 'Verifier.sol');
+
   if (!fs.existsSync(zkeyPath)) {
-    console.log('⚠️  Final zkey not found. Complete trusted setup first.');
+    console.log('[export] Final zkey not found. Complete trusted setup first.');
     return;
   }
-  
-  console.log(`\n📝 Exporting Solidity verifier to: ${outputPath}`);
+
+  console.log(`\n[export] Exporting Solidity verifier to ${outputPath}`);
   execSync(`npx snarkjs zkey export solidityverifier "${zkeyPath}" "${outputPath}"`, {
     cwd: BUILD_DIR,
     stdio: 'inherit'
   });
-  console.log('✅ Solidity verifier exported!');
+  console.log('[export] Solidity verifier exported');
 }
-
-// ─── CLI Interface ─────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
 const command = args[0] || 'help';
 
 switch (command) {
-  case 'generate':
-    // node utils.js generate <modelId> <secret>
-    const modelId = parseInt(args[1] || '1');
-    const secret = args[2] || crypto.randomBytes(16).toString('hex');
-    const input = generateInput(modelId, secret);
-    console.log('\n📄 Generated Input:');
-    console.log(JSON.stringify(input, (k, v) => typeof v === 'bigint' ? v.toString() : v, 2));
-    console.log(`\n🔒 Secret: ${secret} (SAVE THIS - needed for proof generation)`);
+  case 'generate': {
+    const modelId = parseInt(args[1] || '1', 10);
+    const secret = args[2] || '123456';
+    const messageHash = args[3] || toFieldHash(`${modelId}:${secret}`).toString();
+    const input = generateInput(modelId, secret, messageHash);
+    console.log('\n[input] Generated Input:');
+    console.log(JSON.stringify(input, (key, value) => (typeof value === 'bigint' ? value.toString() : value), 2));
+    console.log(`\n[input] Secret: ${secret}`);
     break;
-    
-  case 'prove':
-    // node utils.js prove <modelId> <secret>
-    const mid = parseInt(args[1] || '1');
-    const sec = args[2];
-    if (!sec) {
-      console.log('❌ Secret required: node utils.js prove <modelId> <secret>');
+  }
+
+  case 'prove': {
+    const modelId = parseInt(args[1] || '1', 10);
+    const secret = args[2];
+    const messageHash = args[3] || null;
+    if (!secret) {
+      console.log('Secret required: node utils.js prove <modelId> <secret> [messageHash]');
       process.exit(1);
     }
-    generateProof(mid, sec).then(result => {
+    generateProof(modelId, secret, messageHash).then((result) => {
       if (result) {
-        console.log('\n📄 Proof files:');
+        console.log('\n[proof] Proof files:');
         console.log(`  Proof: ${result.proof}`);
         console.log(`  Public: ${result.public}`);
       }
     });
     break;
-    
-  case 'verify':
-    // node utils.js verify <proof.json> <public.json>
-    const proofPath = args[1] || path.join(BUILD_DIR, 'proof.json');
-    const publicPath = args[2] || path.join(BUILD_DIR, 'public.json');
+  }
+
+  case 'verify': {
+    const proofPath = args[1] || path.join(PROJECT_ROOT, 'proof.json');
+    const publicPath = args[2] || path.join(PROJECT_ROOT, 'public.json');
     verifyProof(proofPath, publicPath);
     break;
-    
+  }
+
   case 'export':
     exportSolidityVerifier();
     break;
-    
+
   case 'help':
   default:
     console.log(`
-🔐 ZK Circuit Utilities
+ZK Circuit Utilities
 
 Usage:
   node utils.js <command> [args]
 
 Commands:
-  generate <modelId> [secret]
+  generate <modelId> [secret] [messageHash]
     Generate circuit input JSON
-  
-  prove <modelId> <secret>
+
+  prove <modelId> <secret> [messageHash]
     Generate a proof for the given model
-  
+
   verify [proof.json] [public.json]
     Verify an existing proof
-  
+
   export
     Export Solidity verifier contract
-  
-  help
-    Show this help message
-
-Examples:
-  node utils.js generate 123
-  node utils.js prove 123 mysecret123
-  node utils.js verify
-  node utils.js export
 `);
     break;
 }

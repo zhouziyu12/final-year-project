@@ -7,7 +7,7 @@ import { Button, Input } from '../ui';
 export function ModelForm({ 
   onSubmit, 
   loading = false,
-  networks = ['sepolia', 'tbnb', 'somnia']
+  networks = ['sepolia', 'tbnb']
 }) {
   const [formData, setFormData] = useState({
     name: '',

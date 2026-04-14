@@ -51,14 +51,6 @@ const config = {
       accounts: PRIVATE_KEY_A ? [PRIVATE_KEY_A] : [],
       chainId: 11155111
     },
-
-    // Somnia testnet
-    somnia: {
-      url: "https://dream-rpc.somnia.network",
-      accounts: PRIVATE_KEY_A ? [PRIVATE_KEY_A] : [],
-      chainId: 50312
-    },
-
     // BSC testnet
     tbnb: {
       url: "https://data-seed-prebsc-1-s1.binance.org:8545",

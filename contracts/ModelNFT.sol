@@ -85,6 +85,7 @@ contract ModelNFT {
 
         address modelOwner = registry.getModelOwner(_modelId);
         if (modelOwner == address(0)) revert ModelNotRegistered();
+        if (accessControl.isBlacklisted(modelOwner)) revert BlacklistedAddress();
         require(
             msg.sender == modelOwner || accessControl.hasRole(accessControl.ADMIN(), msg.sender),
             "ModelNFT: only owner or admin can mint"
@@ -103,6 +104,7 @@ contract ModelNFT {
     }
 
     function burn(uint256 _tokenId) external {
+        if (accessControl.isBlacklisted(msg.sender)) revert BlacklistedAddress();
         require(ownerOf(_tokenId) == msg.sender, "ModelNFT: not owner");
 
         uint256 modelId = tokenToModel[_tokenId];
@@ -123,6 +125,8 @@ contract ModelNFT {
         uint256 _tokenId
     ) public {
         if (_to == address(0)) revert ZeroAddress();
+        if (accessControl.isBlacklisted(msg.sender)) revert BlacklistedAddress();
+        if (accessControl.isBlacklisted(_from)) revert BlacklistedAddress();
         if (accessControl.isBlacklisted(_to)) revert BlacklistedAddress();
 
         address owner = ownerOf(_tokenId);
@@ -150,6 +154,8 @@ contract ModelNFT {
     }
 
     function approve(address _to, uint256 _tokenId) external {
+        if (accessControl.isBlacklisted(msg.sender)) revert BlacklistedAddress();
+        if (_to != address(0) && accessControl.isBlacklisted(_to)) revert BlacklistedAddress();
         address owner = ownerOf(_tokenId);
         require(msg.sender == owner, "ModelNFT: not owner");
         tokenApprovals[_tokenId] = _to;
@@ -162,6 +168,8 @@ contract ModelNFT {
     }
 
     function setApprovalForAll(address _operator, bool _approved) external {
+        if (accessControl.isBlacklisted(msg.sender)) revert BlacklistedAddress();
+        if (_approved && accessControl.isBlacklisted(_operator)) revert BlacklistedAddress();
         operatorApprovals[msg.sender][_operator] = _approved;
         emit ApprovalForAll(msg.sender, _operator, _approved);
     }
@@ -242,6 +250,9 @@ contract ModelNFT {
     modifier onlyAdmin() {
         if (!accessControl.hasRole(accessControl.ADMIN(), msg.sender)) {
             revert NotAdmin();
+        }
+        if (accessControl.isBlacklisted(msg.sender)) {
+            revert BlacklistedAddress();
         }
         _;
     }

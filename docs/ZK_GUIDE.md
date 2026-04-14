@@ -1,85 +1,156 @@
 # Zero-Knowledge Proof Guide
 
-## ZK Assets
+## Overview
 
-The current repository stores ZK proof assets under `zk/`.
+The ZK flow binds model submission and bridge data to a Groth16 proof. The current circuit and bridge constraints are aligned around:
 
-Important paths:
+- `modelId`
+- `messageHash`
+- proof public signals
+- destination chain, nonce, and payload binding in `RealZKBridge`
+
+## Key Files
 
 - `zk/circuit.circom`
+- `zk/build/circuit.r1cs`
+- `zk/build/circuit.sym`
 - `zk/build/circuit_js/circuit.wasm`
+- `zk/circuit_0000.zkey`
 - `zk/circuit_final.zkey`
 - `zk/verification_key.json`
 - `zk/utils.js`
-- `zk/compile.sh`
+- `contracts/Verifier.sol`
+- `contracts/RealZKBridge.sol`
 
-Proof input used by the standalone test:
+Test and debug outputs:
 
 - `scripts/last_proof_input.json`
+- `proof.json`
+- `public.json`
+- `proof_calldata_debug.txt`
 
-## Compile the Circuit
+## Current Circuit Inputs
 
-From the repository root:
+The circuit now uses:
+
+- `secret`
+- `modelId`
+- `messageHash`
+
+Notes:
+
+- `secret` is private input
+- `modelId` and `messageHash` are public signals
+- the circuit computes a `Poseidon(3)` commitment internally
+
+Example input:
+
+```json
+{
+  "secret": "123456",
+  "modelId": "999999999",
+  "messageHash": "424242"
+}
+```
+
+## Compile on Windows
+
+The repository has already verified native Windows compilation:
 
 ```bash
 cd zk
-./compile.sh
+cmd /c ..\node_modules\.bin\circom2.cmd circuit.circom --r1cs --wasm --sym -o build -l ..\node_modules
 ```
 
-This produces the circuit build output and proving artifacts used by the standalone flow.
+This produces:
 
-## Standalone Proof Test
+- `build/circuit.r1cs`
+- `build/circuit.sym`
+- `build/circuit_js/circuit.wasm`
 
-Run:
+## Generate Proving Assets
+
+```bash
+cd zk
+cmd /c ..\node_modules\.bin\snarkjs.cmd groth16 setup build\circuit.r1cs pot12_final.ptau circuit_0000.zkey
+cmd /c ..\node_modules\.bin\snarkjs.cmd zkey contribute circuit_0000.zkey circuit_final.zkey --name="local" -e="local"
+cmd /c ..\node_modules\.bin\snarkjs.cmd zkey export verificationkey circuit_final.zkey verification_key.json
+cmd /c ..\node_modules\.bin\snarkjs.cmd zkey export solidityverifier circuit_final.zkey ..\contracts\Verifier.sol
+```
+
+After that, recompile contracts:
+
+```bash
+cd ..
+npx hardhat compile --show-stack-traces
+```
+
+## Run the Proof Regression
+
+```bash
+node tests/test_zk_proof.js
+```
+
+This script:
+
+- creates or reads a test input
+- uses wasm + zkey to generate a proof
+- writes `proof.json` and `public.json`
+- exports Solidity calldata
+- calls `groth16.verify` locally
+
+## Standalone Flow
+
+The older standalone smoke path is still available:
 
 ```bash
 node test_zk_standalone.js
 ```
 
-The script now:
+## Bridge Binding
 
-- loads `scripts/last_proof_input.json`
-- creates a default input file if it is missing
-- resolves artifacts from the current `zk/` layout
-- generates `proof.json`
-- generates `public.json`
-- writes Solidity calldata to `proof_calldata_debug.txt`
+`RealZKBridge.sol` now binds the bridge proof to:
 
-## Proof Input Format
+- `modelId`
+- `dstChainId`
+- `bridgeNonce`
+- `payload`
+- `msg.sender`
+- `block.chainid`
 
-Example:
+It also tracks:
 
-```json
-{
-  "secret": "123456",
-  "modelId": "999999999"
-}
-```
+- `usedBridgeNonces`
+- `usedNullifiers`
 
-## Related Files
+This blocks:
 
-- `contracts/Verifier.sol`
-- `contracts/RealZKBridge.sol`
-- `sdk/python/provenance_sdk.py`
+- cross-chain replay
+- same-chain replay
+- proof reuse with a modified payload
 
 ## Troubleshooting
 
-### Missing WASM or proving key
+### `circom2` cannot write output
 
-Rebuild the circuit:
+Delete old `zk/build/circuit_js`, `zk/build/circuit_cpp`, `zk/build/circuit.r1cs`, and `zk/build/circuit.sym`, then rerun the compile command inside `zk/`.
+
+### Verifier and circuit do not match
+
+Regenerate:
+
+- `zk/verification_key.json`
+- `contracts/Verifier.sol`
+
+Then rerun:
 
 ```bash
-cd zk
-./compile.sh
+npx hardhat compile --show-stack-traces
 ```
 
-### Proof test cannot find input
+### Need calldata for contract debugging
 
-The standalone script will now generate a default `scripts/last_proof_input.json` automatically.
-
-### Need Solidity calldata for debugging
-
-After a successful standalone run, use:
+After a successful `node tests/test_zk_proof.js`, use:
 
 - `proof.json`
 - `public.json`

@@ -1,35 +1,35 @@
 {
   "suite": "ZK Proof System Tests",
-  "timestamp": "2026-03-04T17:29:07.224Z",
+  "timestamp": "2026-04-14T14:21:09.239Z",
   "tests": [
     {
       "name": "Circuit Source",
       "status": "PASS",
-      "detail": "Found (0.52 KB)",
+      "detail": "Found at zk/circuit.circom (3.32 KB)",
       "data": null
     },
     {
       "name": "WASM File",
       "status": "PASS",
-      "detail": "Found (1706.68 KB)",
+      "detail": "Found at zk/build/circuit_js/circuit.wasm (1792.95 KB)",
       "data": null
     },
     {
       "name": "Proving Key",
       "status": "PASS",
-      "detail": "Found (248.76 KB)",
+      "detail": "Found at zk/circuit_final.zkey (278.42 KB)",
       "data": null
     },
     {
       "name": "Verification Key",
       "status": "PASS",
-      "detail": "Found (3.04 KB)",
+      "detail": "Found at zk/verification_key.json (3.21 KB)",
       "data": null
     },
     {
       "name": "Test Input Created",
       "status": "PASS",
-      "detail": "Secret: 123456, ModelId: 999999999",
+      "detail": "Secret: 123456, ModelId: 999999999, MessageHash: 424242",
       "data": null
     },
     {
@@ -43,8 +43,14 @@
       "status": "PASS",
       "detail": "pi_a: 3 elements, pi_b: 3 arrays",
       "data": {
-        "publicSignals": 2
+        "publicSignals": 3
       }
+    },
+    {
+      "name": "Proof Verification",
+      "status": "PASS",
+      "detail": "groth16.verify returned true",
+      "data": null
     },
     {
       "name": "Calldata Format",
@@ -58,14 +64,14 @@
       "detail": "ZK calldata components present",
       "data": {
         "lines": 3,
-        "total_length": 786
+        "totalLength": 855
       }
     }
   ],
   "summary": {
-    "passed": 9,
+    "passed": 10,
     "failed": 0,
     "warned": 0,
-    "total": 9
+    "total": 10
   }
 }

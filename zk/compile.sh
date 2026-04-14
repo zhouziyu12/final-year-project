@@ -88,7 +88,8 @@ echo "📝 Step 3: Creating sample input..."
 cat > "$BUILD_DIR/input.json" << 'EOF'
 {
     "modelId": 123,
-    "secret": 42
+    "secret": 42,
+    "messageHash": 424242
 }
 EOF
 
@@ -99,7 +100,7 @@ echo ""
 echo "🧮 Step 4: Testing witness generation..."
 if [ -f "$BUILD_DIR/${CIRCUIT_NAME}_js/${CIRCUIT_NAME}.wasm" ]; then
     npx snarkjs wtns calculate \
-        "$BUILD_DIR/${CIRCUIT_NAME}.wasm" \
+        "$BUILD_DIR/${CIRCUIT_NAME}_js/${CIRCUIT_NAME}.wasm" \
         "$BUILD_DIR/input.json" \
         "$BUILD_DIR/witness.wtns"
     

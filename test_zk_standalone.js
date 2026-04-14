@@ -11,7 +11,6 @@ function setupUtf8ForWindows() {
   if (process.platform !== "win32") return;
 
   try {
-    // Ensure console output is UTF-8 friendly on Windows terminals.
     if (process.stdout && typeof process.stdout.setDefaultEncoding === "function") {
       process.stdout.setDefaultEncoding("utf8");
     }
@@ -41,6 +40,7 @@ function logError(message) {
 function normalizeInput(raw) {
   const secret = raw?.secret;
   const modelId = raw?.modelId;
+  const messageHash = raw?.messageHash ?? "424242";
 
   if (secret === undefined || modelId === undefined) {
     throw new Error("Input JSON must contain both 'secret' and 'modelId'.");
@@ -49,6 +49,7 @@ function normalizeInput(raw) {
   return {
     secret: secret.toString(),
     modelId: modelId.toString(),
+    messageHash: messageHash.toString(),
   };
 }
 
@@ -84,26 +85,33 @@ async function main() {
     ],
     "ZKey"
   );
+  const verificationKeyPath = resolveExistingPath(
+    [
+      path.resolve(__dirname, "verification_key.json"),
+      path.resolve(__dirname, "zk", "verification_key.json"),
+    ],
+    "Verification key"
+  );
 
   logStep(2, `Loading input file: ${inputPath}`);
   let rawInput;
   if (!fs.existsSync(inputPath)) {
-    rawInput = { secret: "123456", modelId: "999999999" };
+    rawInput = { secret: "123456", modelId: "999999999", messageHash: "424242" };
     fs.writeFileSync(inputPath, JSON.stringify(rawInput, null, 2), "utf8");
     logInfo("Input file was missing. Created a default proof input for standalone testing.");
   } else {
     rawInput = JSON.parse(fs.readFileSync(inputPath, "utf8"));
   }
   const input = normalizeInput(rawInput);
-  logInfo(`Input loaded. secret=${input.secret}, modelId=${input.modelId}`);
+  logInfo(
+    `Input loaded. secret=${input.secret}, modelId=${input.modelId}, messageHash=${input.messageHash}`
+  );
 
   logStep(3, "Checking circuit artifacts...");
   logInfo(`Circuit artifacts found. wasm=${wasmPath}, zkey=${zkeyPath}`);
 
   logStep(4, "Generating Groth16 proof (no hard timeout; waiting until completion)...");
   const start = Date.now();
-
-  // Verbose heartbeat so you can see progress during long witness/proof generation.
   const heartbeat = setInterval(() => {
     const sec = Math.floor((Date.now() - start) / 1000);
     logInfo(`Proof generation in progress... elapsed=${sec}s`);
@@ -127,12 +135,18 @@ async function main() {
   fs.writeFileSync(publicOutPath, JSON.stringify(publicSignals, null, 2), "utf8");
   logInfo("proof.json and public.json generated successfully.");
 
+  logStep(5.5, "Verifying proof against verification_key.json...");
+  const verificationKey = JSON.parse(fs.readFileSync(verificationKeyPath, "utf8"));
+  const verified = await snarkjs.groth16.verify(verificationKey, publicSignals, proof);
+  if (!verified) {
+    throw new Error("Generated proof did not verify against verification_key.json");
+  }
+  logInfo("Generated proof verified successfully.");
+
   logStep(6, "Converting proof to Solidity calldata...");
   const calldata = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
-
   logInfo("Calldata conversion completed.");
-  
-  // Write to file for Python SDK file-bridge mode (Windows pipe deadlock workaround)
+
   const calldataDebugPath = path.resolve(__dirname, "proof_calldata_debug.txt");
   const calldataContent = `========== Solidity Calldata ==========\n${calldata}\n=======================================\n`;
   fs.writeFileSync(calldataDebugPath, calldataContent, "utf8");
@@ -143,7 +157,7 @@ async function main() {
   console.log("=======================================\n");
 
   logStep(7, "Standalone ZK test finished successfully.");
-  process.exit(0);  // Explicit success exit
+  process.exit(0);
 }
 
 main().catch((err) => {

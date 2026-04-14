@@ -1,77 +1,67 @@
 # AI Model Provenance System
 
-A multi-chain AI model provenance platform with smart-contract-backed lifecycle tracking, audit logging, NFT minting, staking, IPFS storage, and zero-knowledge proof support.
+A multi-chain AI model provenance platform for model registration, lifecycle tracking, audit verification, IPFS-backed metadata, NFT and staking extensions, and zero-knowledge proof bridging.
 
-## Overview
+## System Layout
 
-The repository contains:
+The repository has five core parts:
 
-- Solidity contracts for access control, model registration, provenance, audit logs, NFTs, staking, and ZK verification
-- A Node.js backend that exposes REST APIs and bridges the contracts to the SDK and frontend
-- A React + Vite frontend for browsing models and audit records
-- A Python SDK for submitting provenance records from training pipelines
-- A Circom/snarkjs ZK proof workflow under `zk/`
+- `contracts/`: Solidity contracts for access control, registration, provenance, audit, NFT, staking, and ZK verification.
+- `server/`: Express backend for REST APIs, write authentication, blockchain read/write orchestration, and Pinata uploads.
+- `client/`: React + Vite frontend for overview, training, registry, audit, system status, and NFT pages.
+- `sdk/python/`: Python SDK for hashing artifacts, generating ZK proofs, uploading to IPFS, and submitting provenance.
+- `zk/`: Circom circuit, wasm, zkeys, verification key, and verifier export flow.
 
-## Current Status
+## Verified State
 
-Latest local verification on April 14, 2026:
+Verified locally on `2026-04-14`:
 
-- `npx hardhat compile` passes
-- `cd client && npm run build` passes
-- `powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1` passes
+- `npx hardhat compile --show-stack-traces`
+- `cd client && npm run lint`
+- `cd client && npm run build`
+- `node tests/test_zk_proof.js`
+- `python tests/test_sdk_backend.py`
+- `node tests/test_smart_contracts.js`
 
-Test suites currently passing:
+The circuit now compiles successfully on native Windows without relying on WSL.
 
-- Smart contract suite across Sepolia and BSC Testnet
-- Standalone ZK proof generation flow
-- SDK and backend integration flow
-
-## Repository Layout
+## Repository Structure
 
 ```text
 ai-project/
-  contracts/              Solidity contracts
-  scripts/                Deployment and contract test scripts
-  server/                 Express backend
-  client/                 React frontend
-  sdk/python/             Python SDK and secret manager
-  tests/                  Test runners and result summaries
-  zk/                     Circom circuit, proving keys, and build artifacts
-  docs/                   Project documentation
+  client/                  React frontend
+  contracts/               Solidity contracts
+  docs/                    Project documentation
+  scripts/                 Deployment and test scripts
+  sdk/python/              Python SDK
+  server/                  REST backend
+  tests/                   Integration and regression tests
+  zk/                      Circuit and proving assets
+  address_v2_multi.json    Multi-chain deployment addresses
+  model_name_map.json      Backend-side model name cache
 ```
 
-## Smart Contracts
+## Contracts
 
-Main contracts:
+Core contracts:
 
 - `ModelAccessControl.sol`
 - `ModelRegistry.sol`
-- `ProvenanceTracker.sol` (contract name: `ModelProvenanceTracker`)
+- `ProvenanceTracker.sol` (`ModelProvenanceTracker`)
 - `ModelAuditLog.sol`
 - `ModelNFT.sol`
 - `ModelStaking.sol`
 - `Verifier.sol`
 - `RealZKBridge.sol`
 
-## Deployed Addresses
-
-Contract addresses are stored in [`address_v2_multi.json`](./address_v2_multi.json).
-
-Networks currently tracked:
+Deployment addresses are stored in [address_v2_multi.json](./address_v2_multi.json) for:
 
 - `sepolia`
 - `tbnb`
-- `somnia`
 
 ## Quick Start
 
-### Prerequisites
-
-- Node.js 18+
-- Python 3.10+
-- npm
-
-### Install Dependencies
+### 1. Install Dependencies
 
 ```bash
 npm install
@@ -79,44 +69,64 @@ cd client && npm install
 cd ..
 ```
 
-### Compile Contracts
+### 2. Configure Environment
+
+Copy `.env.example` to `.env` and populate at least:
+
+- `PRIVATE_KEY`
+- `WRITE_API_KEY`
+- `VITE_WRITE_API_KEY`
+- `PINATA_API_KEY`
+- `PINATA_SECRET`
+
+If `PRIVATE_KEY` is missing, the backend runs in read-only mode.
+
+### 3. Compile Contracts
 
 ```bash
 npx hardhat compile
 ```
 
-### Start the Backend
+### 4. Start the Backend
 
 ```bash
 node server/server.js
 ```
 
-### Start the Frontend
+Default API address: `http://127.0.0.1:3000`
+
+### 5. Start the Frontend
 
 ```bash
 cd client
 npm run dev
 ```
 
-### Run the Full Test Flow
+### 6. Run Regression Tests
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
 ```
 
-## Build Commands
+## Common Commands
 
-Backend sanity check:
+Contract compile:
 
 ```bash
-node --check server/server.js
+npx hardhat compile --show-stack-traces
 ```
 
-Frontend production build:
+Frontend build:
 
 ```bash
 cd client
 npm run build
+```
+
+Backend syntax check:
+
+```bash
+node --check server/server.js
 ```
 
 Python syntax check:
@@ -125,9 +135,16 @@ Python syntax check:
 python -m py_compile sdk/python/provenance_sdk.py sdk/python/model_secret_manager.py tests/test_sdk_backend.py
 ```
 
-## API Summary
+Native Windows circuit rebuild:
 
-Main backend endpoints:
+```bash
+cd zk
+cmd /c ..\node_modules\.bin\circom2.cmd circuit.circom --r1cs --wasm --sym -o build -l ..\node_modules
+```
+
+## Main API Surface
+
+Read endpoints:
 
 - `GET /api/health`
 - `GET /api/v2/status`
@@ -135,40 +152,33 @@ Main backend endpoints:
 - `GET /api/v2/models/:id`
 - `GET /api/v2/audit/recent`
 - `GET /api/v2/audit/verify/:id`
-- `POST /api/sdk/provenance`
+- `GET /api/ipfs/cat/:cid`
+
+Write endpoints:
+
 - `POST /api/register`
+- `POST /api/sdk/provenance`
 - `POST /api/audit`
 - `POST /api/ipfs/upload/file`
 - `POST /api/ipfs/upload/metadata`
-- `GET /api/ipfs/cat/:cid`
 
-Legacy compatibility routes still exposed:
+Legacy compatibility routes:
 
 - `GET /api/status`
 - `GET /api/models`
 
-See [`docs/API.md`](./docs/API.md) for details.
-
-## Zero-Knowledge Workflow
-
-The ZK assets live under `zk/`:
-
-- `zk/circuit.circom`
-- `zk/build/circuit_js/circuit.wasm`
-- `zk/circuit_final.zkey`
-- `zk/verification_key.json`
-
-See [`docs/ZK_GUIDE.md`](./docs/ZK_GUIDE.md) for the full flow.
+See [docs/API.md](./docs/API.md) for details.
 
 ## Documentation
 
-- [`docs/API.md`](./docs/API.md)
-- [`docs/DEPLOY_GUIDE.md`](./docs/DEPLOY_GUIDE.md)
-- [`docs/DEPLOYMENT.md`](./docs/DEPLOYMENT.md)
-- [`docs/USER_MANUAL.md`](./docs/USER_MANUAL.md)
-- [`docs/ZK_GUIDE.md`](./docs/ZK_GUIDE.md)
-- [`tests/README.md`](./tests/README.md)
-- [`tests/TEST_SUMMARY.md`](./tests/TEST_SUMMARY.md)
+- [docs/API.md](./docs/API.md)
+- [docs/DEPLOY_GUIDE.md](./docs/DEPLOY_GUIDE.md)
+- [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md)
+- [docs/FRONTEND_RESTRUCTURE_PLAN.md](./docs/FRONTEND_RESTRUCTURE_PLAN.md)
+- [docs/USER_MANUAL.md](./docs/USER_MANUAL.md)
+- [docs/ZK_GUIDE.md](./docs/ZK_GUIDE.md)
+- [tests/README.md](./tests/README.md)
+- [client/README.md](./client/README.md)
 
 ## License
 

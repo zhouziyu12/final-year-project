@@ -9,7 +9,6 @@ export function NetworkSelector({
   networks = [
     { id: 'sepolia', name: 'Sepolia', color: '#3b82f6' },
     { id: 'tbnb', name: 'BNB Testnet', color: '#f59e0b' },
-    { id: 'somnia', name: 'Somnia', color: '#8b5cf6' },
   ],
   className = ''
 }) {

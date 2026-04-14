@@ -100,7 +100,7 @@ contract ModelStaking {
     }
 
     /// @notice Withdraw stake after the lock period expires.
-    function withdraw(uint256 _modelId) external {
+    function withdraw(uint256 _modelId) external notBlacklisted {
         StakeInfo storage info = stakes[_modelId];
         if (info.staker != msg.sender) revert StakerMismatch();
         if (info.withdrawn) revert AlreadyWithdrawn();
@@ -158,6 +158,7 @@ contract ModelStaking {
 
     function updateTreasury(address _treasury) external onlyAdmin {
         require(_treasury != address(0), "Staking: treasury is zero");
+        if (accessControl.isBlacklisted(_treasury)) revert BlacklistedAddress();
         address old = treasury;
         treasury = _treasury;
         emit TreasuryUpdated(old, _treasury);
@@ -218,6 +219,9 @@ contract ModelStaking {
     modifier onlyAdmin() {
         if (!accessControl.hasRole(accessControl.ADMIN(), msg.sender)) {
             revert NotAdmin();
+        }
+        if (accessControl.isBlacklisted(msg.sender)) {
+            revert BlacklistedAddress();
         }
         _;
     }

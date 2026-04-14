@@ -22,6 +22,9 @@ const sendError = (res, message, statusCode = 500) => {
 const handle = (fn) => (req, res, next) => {
   Promise.resolve(fn(req, res, next)).catch((error) => {
     console.error(`[ERROR] ${req.method} ${req.path}:`, error.message);
+    if (error.statusCode) {
+      return sendError(res, error.message, error.statusCode);
+    }
     if (error.code === 'CALL_EXCEPTION') {
       const reason = error.reason || error.message || 'Unknown blockchain error';
       return sendError(res, `Blockchain error: ${reason}`, 502);
@@ -35,19 +38,226 @@ const handle = (fn) => (req, res, next) => {
 // App setup
 
 const app = express();
-app.use(express.json({ limit: '50mb' }));
+const TRUST_PROXY = ['1', 'true', 'yes'].includes(String(process.env.TRUST_PROXY || '').toLowerCase());
+if (TRUST_PROXY) {
+  app.set('trust proxy', true);
+}
 
-const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:5174,http://localhost:5175')
+app.use(express.json({
+  limit: '50mb',
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString('utf8');
+  }
+}));
+
+const allowedOrigins = (process.env.CORS_ORIGINS || 'http://localhost:5173,http://localhost:5174,http://localhost:5175,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:5175')
   .split(',')
   .map((value) => value.trim())
   .filter(Boolean);
 
-app.use(cors({ origin: allowedOrigins }));
+function isPrivateDevOrigin(origin) {
+  if (!origin) return true;
+
+  try {
+    const parsed = new URL(origin);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+
+    const host = parsed.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') return true;
+    if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+    if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+    if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(host)) return true;
+  } catch {
+    return false;
+  }
+
+  return false;
+}
+
+app.use(cors({
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin) || isPrivateDevOrigin(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  }
+}));
 
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
+
+const WRITE_API_KEY = process.env.WRITE_API_KEY || '';
+const WRITE_AUTH_WINDOW_MS = Number(process.env.WRITE_AUTH_WINDOW_MS || 5 * 60 * 1000);
+const WRITE_RATE_LIMIT_WINDOW_MS = Number(process.env.WRITE_RATE_LIMIT_WINDOW_MS || 60 * 1000);
+const WRITE_RATE_LIMIT_MAX = Number(process.env.WRITE_RATE_LIMIT_MAX || 30);
+const AUTH_STATE_FILE = path.join(__dirname, 'write_auth_state.json');
+
+function loadNonceStore() {
+  try {
+    if (!fs.existsSync(AUTH_STATE_FILE)) {
+      return new Map();
+    }
+
+    const parsed = JSON.parse(fs.readFileSync(AUTH_STATE_FILE, 'utf8'));
+    const entries = Array.isArray(parsed?.nonces) ? parsed.nonces : [];
+    const current = nowMs();
+    return new Map(
+      entries
+        .filter((entry) => entry?.key && Number(entry?.expiresAt) > current)
+        .map((entry) => [entry.key, { expiresAt: Number(entry.expiresAt) }])
+    );
+  } catch {
+    return new Map();
+  }
+}
+
+function persistNonceStore() {
+  const payload = {
+    nonces: Array.from(nonceStore.entries()).map(([key, value]) => ({
+      key,
+      expiresAt: value.expiresAt
+    }))
+  };
+  fs.writeFileSync(AUTH_STATE_FILE, JSON.stringify(payload, null, 2));
+}
+
+const nonceStore = loadNonceStore();
+const rateLimitStore = new Map();
+
+function nowMs() {
+  return Date.now();
+}
+
+function getClientIp(req) {
+  return req.ip || req.socket?.remoteAddress || 'unknown';
+}
+
+function cleanupMap(store, timeKey, onChange) {
+  const current = nowMs();
+  let changed = false;
+  for (const [key, value] of store.entries()) {
+    if (!value || value[timeKey] <= current) {
+      store.delete(key);
+      changed = true;
+    }
+  }
+  if (changed && onChange) {
+    onChange();
+  }
+}
+
+function validateWriteRateLimit(req, res) {
+  cleanupMap(rateLimitStore, 'resetAt');
+  const clientIp = getClientIp(req);
+  const key = `${clientIp}:${req.path}`;
+  const current = nowMs();
+  const existing = rateLimitStore.get(key);
+
+  if (!existing || existing.resetAt <= current) {
+    rateLimitStore.set(key, { count: 1, resetAt: current + WRITE_RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (existing.count >= WRITE_RATE_LIMIT_MAX) {
+    res.set('Retry-After', Math.ceil((existing.resetAt - current) / 1000).toString());
+    sendError(res, 'Write rate limit exceeded', 429);
+    return false;
+  }
+
+  existing.count += 1;
+  return true;
+}
+
+function validateWriteAuth(req, res, next) {
+  if (!WRITE_API_KEY) {
+    console.error('WRITE_API_KEY not configured. Refusing write request.');
+    return sendError(res, 'Write authentication is not configured', 503);
+  }
+
+  if (!validateWriteRateLimit(req, res)) {
+    return;
+  }
+
+  const apiKey = req.get('x-api-key');
+  const timestampHeader = req.get('x-auth-timestamp');
+  const nonce = req.get('x-auth-nonce');
+
+  if (!apiKey || apiKey !== WRITE_API_KEY) {
+    return sendError(res, 'Invalid write API key', 401);
+  }
+
+  if (!timestampHeader || !nonce) {
+    return sendError(res, 'Missing write authentication headers', 401);
+  }
+
+  const timestamp = Number(timestampHeader);
+  if (!Number.isFinite(timestamp)) {
+    return sendError(res, 'Invalid write authentication timestamp', 401);
+  }
+
+  const age = Math.abs(nowMs() - timestamp);
+  if (age > WRITE_AUTH_WINDOW_MS) {
+    return sendError(res, 'Expired write authentication timestamp', 401);
+  }
+
+  cleanupMap(nonceStore, 'expiresAt', persistNonceStore);
+  const nonceKey = `${apiKey}:${nonce}`;
+  if (nonceStore.has(nonceKey)) {
+    return sendError(res, 'Replay detected for write request', 409);
+  }
+
+  nonceStore.set(nonceKey, { expiresAt: nowMs() + WRITE_AUTH_WINDOW_MS });
+  persistNonceStore();
+  req.writeAuth = {
+    clientIp: getClientIp(req),
+    authenticatedAt: new Date().toISOString()
+  };
+  next();
+}
+
+function requireString(value, fieldName, { optional = false, maxLength = 2000 } = {}) {
+  if (optional && (value === undefined || value === null || value === '')) {
+    return null;
+  }
+  if (typeof value !== 'string') {
+    const error = new Error(`${fieldName} must be a string`);
+    error.statusCode = 400;
+    throw error;
+  }
+  const trimmed = value.trim();
+  if (!optional && !trimmed) {
+    const error = new Error(`${fieldName} is required`);
+    error.statusCode = 400;
+    throw error;
+  }
+  if (trimmed.length > maxLength) {
+    const error = new Error(`${fieldName} is too long`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return trimmed;
+}
+
+function requirePositiveInt(value, fieldName) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    const error = new Error(`${fieldName} must be a positive integer`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return parsed;
+}
+
+function requirePlainObject(value, fieldName) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    const error = new Error(`${fieldName} must be an object`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return value;
+}
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ADDR_FILE = path.join(PROJECT_ROOT, 'address_v2_multi.json');
@@ -84,16 +294,16 @@ const SEPOLIA_RPC =
     : 'https://rpc.sepolia.org');
 const TBNB_RPC = process.env.BNB_TESTNET_URL || 'https://bsc-testnet.publicnode.com';
 
-const pk = process.env.PRIVATE_KEY;
+const pk = process.env.PRIVATE_KEY?.trim() || '';
+const bootWarnings = [];
 if (!pk) {
-  console.error('PRIVATE_KEY not set in environment');
-  process.exit(1);
+  bootWarnings.push('PRIVATE_KEY missing: backend will start in read-only mode and write routes will be unavailable.');
 }
 
 const sepProvider = new ethers.JsonRpcProvider(SEPOLIA_RPC);
 const bnbProvider = new ethers.JsonRpcProvider(TBNB_RPC);
-const sepWallet = new ethers.Wallet(pk, sepProvider);
-const bnbWallet = new ethers.Wallet(pk, bnbProvider);
+const sepWallet = pk ? new ethers.Wallet(pk, sepProvider) : null;
+const bnbWallet = pk ? new ethers.Wallet(pk, bnbProvider) : null;
 
 const chains = {
   sepolia: { provider: sepProvider, wallet: sepWallet, addr: addrs.sepolia },
@@ -138,13 +348,73 @@ const MAL_ABI = [
 
 function getContracts(chain) {
   const c = chains[chain];
+  if (!c || !c.addr?.contracts) {
+    const error = new Error(`Chain ${chain} is not configured`);
+    error.statusCode = 503;
+    throw error;
+  }
   const a = c.addr.contracts;
+  const reader = c.wallet || c.provider;
+  if (!reader) {
+    const error = new Error(`Chain ${chain} has no available provider`);
+    error.statusCode = 503;
+    throw error;
+  }
   return {
-    mr: new ethers.Contract(a.ModelRegistry, MR_ABI, c.wallet),
-    mac: new ethers.Contract(a.ModelAccessControl, MAC_ABI, c.wallet),
-    mpt: new ethers.Contract(a.ModelProvenanceTracker, MPT_ABI, c.wallet),
-    mal: new ethers.Contract(a.ModelAuditLog, MAL_ABI, c.wallet)
+    mr: new ethers.Contract(a.ModelRegistry, MR_ABI, reader),
+    mac: new ethers.Contract(a.ModelAccessControl, MAC_ABI, reader),
+    mpt: new ethers.Contract(a.ModelProvenanceTracker, MPT_ABI, reader),
+    mal: new ethers.Contract(a.ModelAuditLog, MAL_ABI, reader)
   };
+}
+
+function requireWriteChain(chain) {
+  const selected = chains[chain];
+  if (!selected) {
+    const error = new Error(`Invalid chain: ${chain}`);
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!selected.wallet) {
+    const error = new Error(`Chain ${chain} is running in read-only mode because PRIVATE_KEY is not configured`);
+    error.statusCode = 503;
+    throw error;
+  }
+  return selected;
+}
+
+async function getChainStatus(chain) {
+  const c = chains[chain];
+  const knownModels = getKnownModels(chain);
+  const payload = {
+    blockNumber: null,
+    connected: false,
+    balance: null,
+    knownModels: knownModels.length
+  };
+
+  try {
+    payload.blockNumber = await c.provider.getBlockNumber();
+    payload.connected = true;
+  } catch (error) {
+    payload.error = `RPC unavailable: ${error.message}`;
+    return payload;
+  }
+
+  if (c.wallet) {
+    try {
+      const balance = await c.provider.getBalance(c.wallet.address);
+      payload.balance = ethers.formatEther(balance);
+      payload.walletAddress = c.wallet.address;
+    } catch (error) {
+      payload.balance = null;
+      payload.balanceError = error.message;
+    }
+  } else {
+    payload.balance = 'read-only';
+  }
+
+  return payload;
 }
 
 const ACTION_MAP = {
@@ -173,12 +443,48 @@ function getKnownModels(chain) {
     .map(([key, id]) => ({ chain, name: key.slice(prefix.length), id: Number(id) }));
 }
 
+async function getModelOwnerOrNull(contract, modelId) {
+  const owner = await contract.getModelOwner(modelId);
+  return owner === ethers.ZeroAddress ? null : owner;
+}
+
+async function buildStatusPayload() {
+  const chainsPayload = {};
+  let totalModels = 0;
+
+  for (const chain of ['sepolia', 'tbnb']) {
+    const knownModels = getKnownModels(chain);
+    totalModels += knownModels.length;
+    chainsPayload[chain] = await getChainStatus(chain);
+  }
+
+  return {
+    chains: chainsPayload,
+    totalModels,
+    totalAudits: totalModels,
+    zkReady: true,
+    writeMode: pk ? 'enabled' : 'read-only',
+    warnings: bootWarnings
+  };
+}
+
 async function getModelSummary(chain, entry) {
   const { mr } = getContracts(chain);
   try {
     const owner = await mr.getModelOwner(entry.id);
     if (owner === ethers.ZeroAddress) {
-      return null;
+      return {
+        id: String(entry.id),
+        numericId: entry.id,
+        name: entry.name,
+        description: 'Registration submitted through backend relayer',
+        chain,
+        owner: null,
+        status: 'PENDING_REGISTRATION',
+        verified: false,
+        staked: false,
+        pending: true
+      };
     }
     const status = await mr.getModelStatus(entry.id);
     const staked = await mr.isModelStaked(entry.id);
@@ -201,68 +507,19 @@ async function getModelSummary(chain, entry) {
 // Health and status
 
 app.get('/api/health', (req, res) => {
-  ok(res, { status: 'ok', timestamp: Date.now() });
+  ok(res, {
+    status: bootWarnings.length === 0 ? 'ok' : 'degraded',
+    timestamp: Date.now(),
+    warnings: bootWarnings
+  });
 });
 
 app.get('/api/v2/status', handle(async (req, res) => {
-  const result = {};
-  let totalModels = 0;
-  for (const chain of ['sepolia', 'tbnb']) {
-    const c = chains[chain];
-    const block = await c.provider.getBlockNumber();
-    const balance = await c.provider.getBalance(c.wallet.address);
-    const knownModels = getKnownModels(chain);
-    totalModels += knownModels.length;
-    result[chain] = {
-      blockNumber: block,
-      connected: true,
-      balance: ethers.formatEther(balance),
-      knownModels: knownModels.length
-    };
-  }
-  ok(res, {
-    chains: result,
-    totalModels,
-    totalAudits: totalModels,
-    zkReady: true
-  });
+  ok(res, await buildStatusPayload());
 }));
 
 app.get('/api/status', handle(async (req, res) => {
-  const payload = await new Promise((resolve, reject) => {
-    const mockRes = {
-      status() {
-        return this;
-      },
-      json(data) {
-        resolve(data);
-      }
-    };
-    handle(async (_req, realRes) => {
-      const result = {};
-      let totalModels = 0;
-      for (const chain of ['sepolia', 'tbnb']) {
-        const c = chains[chain];
-        const block = await c.provider.getBlockNumber();
-        const balance = await c.provider.getBalance(c.wallet.address);
-        const knownModels = getKnownModels(chain);
-        totalModels += knownModels.length;
-        result[chain] = {
-          blockNumber: block,
-          connected: true,
-          balance: ethers.formatEther(balance),
-          knownModels: knownModels.length
-        };
-      }
-      ok(realRes, {
-        chains: result,
-        totalModels,
-        totalAudits: totalModels,
-        zkReady: true
-      });
-    })({}, mockRes, reject);
-  });
-  res.json(payload);
+  ok(res, await buildStatusPayload());
 }));
 
 // Audit events
@@ -330,8 +587,7 @@ app.post('/api/audit', handle(async (req, res) => {
   const targetChain = chain || 'sepolia';
   if (!chains[targetChain]) return sendError(res, `Invalid chain: ${targetChain}`, 400);
 
-  const id = parseInt(modelId, 10);
-  if (Number.isNaN(id) || id <= 0) return sendError(res, 'Invalid model ID', 400);
+  const id = requirePositiveInt(modelId, 'modelId');
 
   const { mpt } = getContracts(targetChain);
   const history = await mpt.getModelHistory(id);
@@ -406,6 +662,8 @@ app.get('/api/models', handle(async (req, res) => {
 // Provenance tracking
 
 app.post('/api/sdk/provenance', handle(async (req, res) => {
+  validateWriteAuth(req, res, () => {});
+  if (res.headersSent) return;
   const {
     modelId,
     modelHash,
@@ -431,7 +689,24 @@ app.post('/api/sdk/provenance', handle(async (req, res) => {
     }
   }
 
+  if (modelId) {
+    requirePositiveInt(modelId, 'modelId');
+  }
+  if (modelHash !== undefined) requireString(modelHash, 'modelHash', { optional: true, maxLength: 128 });
+  if (sender !== undefined) requireString(sender, 'sender', { optional: true, maxLength: 256 });
+  if (ipfsHash !== undefined) requireString(ipfsHash, 'ipfsHash', { optional: true, maxLength: 256 });
+  if (metadataCid !== undefined) requireString(metadataCid, 'metadataCid', { optional: true, maxLength: 256 });
+  if (modelName !== undefined) requireString(modelName, 'modelName', { optional: true, maxLength: 256 });
+  if (versionTag !== undefined) requireString(versionTag, 'versionTag', { optional: true, maxLength: 64 });
+  if (trainingMetadata !== undefined && trainingMetadata !== null) {
+    requirePlainObject(trainingMetadata, 'trainingMetadata');
+  }
+
+  const writableChain = requireWriteChain(targetChain);
   const { mr, mpt, mac } = getContracts(targetChain);
+  const mrWriter = mr.connect(writableChain.wallet);
+  const mptWriter = mpt.connect(writableChain.wallet);
+  const macReader = mac.connect(writableChain.provider);
 
   let actualModelId = modelId ? Number(modelId) : null;
   let isNewModel = false;
@@ -440,15 +715,25 @@ app.post('/api/sdk/provenance', handle(async (req, res) => {
     const mapKey = `${targetChain}:${modelName}`;
     if (modelNameMap[mapKey]) {
       actualModelId = Number(modelNameMap[mapKey]);
-      console.log(`[PROVENANCE] Using existing model ${actualModelId} for "${modelName}"`);
-    } else {
-      const registrarRole = await mac.REGISTRAR();
-      const canRegister = await mac.hasRole(registrarRole, chains[targetChain].wallet.address);
+      const owner = await getModelOwnerOrNull(mr, actualModelId);
+      if (owner) {
+        console.log(`[PROVENANCE] Using existing model ${actualModelId} for "${modelName}"`);
+      } else {
+        delete modelNameMap[mapKey];
+        saveModelMap(modelNameMap);
+        actualModelId = null;
+        console.warn(`[PROVENANCE] Removed stale mapping for "${modelName}" on ${targetChain}`);
+      }
+    }
+
+    if (!actualModelId) {
+      const registrarRole = await macReader.REGISTRAR();
+      const canRegister = await macReader.hasRole(registrarRole, writableChain.wallet.address);
       if (!canRegister) {
         return sendError(res, 'Backend wallet does not have REGISTRAR role', 403);
       }
 
-      const registerTx = await mr.registerModel(
+      const registerTx = await mrWriter.registerModel(
         modelName,
         'Auto-registered',
         ipfsHash || '',
@@ -475,11 +760,18 @@ app.post('/api/sdk/provenance', handle(async (req, res) => {
       saveModelMap(modelNameMap);
       isNewModel = true;
       console.log(`[PROVENANCE] Registered new model ${actualModelId} for "${modelName}"`);
+    } else {
+      // Existing mapped ID was already verified on-chain.
     }
   }
 
   if (!actualModelId || actualModelId <= 0) {
     return sendError(res, 'A valid modelId could not be resolved', 400);
+  }
+
+  const owner = await getModelOwnerOrNull(mr, actualModelId);
+  if (!owner) {
+    return sendError(res, `Model ${actualModelId} is not registered on ${targetChain}`, 404);
   }
 
   const eventType = ACTION_MAP[action];
@@ -498,60 +790,79 @@ app.post('/api/sdk/provenance', handle(async (req, res) => {
     trainingMetadata: trainingMetadata || null
   };
 
-  const tx = await mpt.addRecord(actualModelId, eventType, JSON.stringify(metadata));
+  const tx = await mptWriter.addRecord(actualModelId, eventType, JSON.stringify(metadata));
   await tx.wait();
   ok(res, { tx: tx.hash, modelId: actualModelId, eventType, isNewModel });
 }));
 
 app.post('/api/register', handle(async (req, res) => {
+  validateWriteAuth(req, res, () => {});
+  if (res.headersSent) return;
   const { name, description, ipfsCid, checksum, framework, license, chain } = req.body;
-  if (!name) return sendError(res, 'name is required', 400);
+  const modelName = requireString(name, 'name', { maxLength: 256 });
 
   const targetChain = chain || 'sepolia';
   if (!chains[targetChain]) return sendError(res, `Invalid chain: ${targetChain}`, 400);
+  const writableChain = requireWriteChain(targetChain);
+  const mapKey = `${targetChain}:${modelName}`;
 
   const { mr } = getContracts(targetChain);
-  const tx = await mr.registerModel(
-    name,
-    description || '',
-    ipfsCid || '',
-    checksum || '',
-    framework || 'PyTorch',
-    license || 'MIT'
-  );
-  const receipt = await tx.wait();
+  if (modelNameMap[mapKey]) {
+    const existingId = Number(modelNameMap[mapKey]);
+    const existingOwner = await getModelOwnerOrNull(mr, existingId);
+    if (existingOwner) {
+      return ok(res, {
+        id: String(existingId),
+        numericId: existingId,
+        name: modelName,
+        description: description || '',
+        chain: targetChain,
+        owner: existingOwner,
+        verified: false,
+        existing: true
+      });
+    }
 
-  let modelId = null;
-  for (const log of receipt.logs) {
-    try {
-      const parsed = mr.interface.parseLog({ topics: log.topics, data: log.data });
-      if (parsed.name === 'ModelRegistered') {
-        modelId = Number(parsed.args[0]);
-        break;
-      }
-    } catch {}
+    delete modelNameMap[mapKey];
+    saveModelMap(modelNameMap);
   }
 
-  if (!modelId) return sendError(res, 'Registration succeeded but model ID was not found', 500);
+  const writer = mr.connect(writableChain.wallet);
+  const registrationArgs = [
+    modelName,
+    requireString(description, 'description', { optional: true, maxLength: 2048 }) || '',
+    requireString(ipfsCid, 'ipfsCid', { optional: true, maxLength: 256 }) || '',
+    requireString(checksum, 'checksum', { optional: true, maxLength: 256 }) || '',
+    requireString(framework, 'framework', { optional: true, maxLength: 128 }) || 'PyTorch',
+    requireString(license, 'license', { optional: true, maxLength: 128 }) || 'MIT'
+  ];
 
-  modelNameMap[`${targetChain}:${name}`] = modelId;
+  const predictedModelId = Number(await writer.registerModel.staticCall(...registrationArgs));
+  const tx = await writer.registerModel(...registrationArgs);
+
+  modelNameMap[mapKey] = predictedModelId;
   saveModelMap(modelNameMap);
 
   ok(res, {
-    id: String(modelId),
-    numericId: modelId,
-    name,
+    id: String(predictedModelId),
+    numericId: predictedModelId,
+    name: modelName,
     description: description || '',
     chain: targetChain,
-    verified: false
+    verified: false,
+    pending: true,
+    txHash: tx.hash
   });
 }));
 
 // IPFS
 
 app.post('/api/ipfs/upload/file', handle(async (req, res) => {
+  validateWriteAuth(req, res, () => {});
+  if (res.headersSent) return;
   const { data, fileName } = req.body;
   if (!data) return sendError(res, 'Missing data field', 400);
+  requireString(fileName, 'fileName', { optional: true, maxLength: 256 });
 
   const apiKey = process.env.PINATA_API_KEY;
   const apiSecret = process.env.PINATA_SECRET;
@@ -569,14 +880,20 @@ app.post('/api/ipfs/upload/file', handle(async (req, res) => {
     pinata_secret_api_key: apiSecret
   };
 
-  const resp = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, { headers });
+  const resp = await axios.post('https://api.pinata.cloud/pinning/pinFileToIPFS', formData, {
+    headers,
+    timeout: 15000
+  });
   const cid = resp.data.IpfsHash;
   ok(res, { cid, gatewayUrl: `https://gateway.pinata.cloud/ipfs/${cid}` });
 }));
 
 app.post('/api/ipfs/upload/metadata', handle(async (req, res) => {
+  validateWriteAuth(req, res, () => {});
+  if (res.headersSent) return;
   const { metadata } = req.body;
   if (!metadata) return sendError(res, 'Missing metadata field', 400);
+  requirePlainObject(metadata, 'metadata');
 
   const apiKey = process.env.PINATA_API_KEY;
   const apiSecret = process.env.PINATA_SECRET;
@@ -587,7 +904,10 @@ app.post('/api/ipfs/upload/metadata', handle(async (req, res) => {
   const resp = await axios.post(
     'https://api.pinata.cloud/pinning/pinJSONToIPFS',
     { pinataContent: metadata, pinataMetadata: { name: 'metadata' } },
-    { headers: { pinata_api_key: apiKey, pinata_secret_api_key: apiSecret } }
+    {
+      headers: { pinata_api_key: apiKey, pinata_secret_api_key: apiSecret },
+      timeout: 15000
+    }
   );
 
   const cid = resp.data.IpfsHash;

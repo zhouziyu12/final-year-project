@@ -1,11 +1,18 @@
 import hashlib
 import json
 import os
+import secrets
 import subprocess
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import requests
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - optional dependency fallback
+    load_dotenv = None
 
 
 class ProvenanceSDK:
@@ -23,6 +30,7 @@ class ProvenanceSDK:
         project_root: Optional[str] = None,
         pinata_api_key: Optional[str] = None,
         pinata_secret_api_key: Optional[str] = None,
+        write_api_key: Optional[str] = None,
         timeout: int = 300,
     ):
         self.base_url = base_url.rstrip("/")
@@ -32,6 +40,12 @@ class ProvenanceSDK:
             else Path(__file__).resolve().parent.parent.parent
         )
         self.timeout = timeout
+
+        env_path = self.project_root / ".env"
+        if load_dotenv and env_path.exists():
+            load_dotenv(env_path, override=False)
+
+        self.write_api_key = write_api_key or os.getenv("WRITE_API_KEY")
 
         # Pinata credentials can come from ctor or env
         self.pinata_api_key = pinata_api_key or os.getenv("PINATA_API_KEY")
@@ -53,6 +67,12 @@ class ProvenanceSDK:
         return int(hex_part, 16) % 1_000_000_000
 
     @staticmethod
+    def _message_hash_to_field(*parts: str) -> int:
+        field_modulus = 21888242871839275222246405745257275088548364400416034343698204186575808495617
+        digest = hashlib.sha256("::".join(parts).encode("utf-8")).hexdigest()
+        return int(digest, 16) % field_modulus
+
+    @staticmethod
     def _safe_json_load(path: Path, default: Any) -> Any:
         try:
             if path.exists():
@@ -63,7 +83,7 @@ class ProvenanceSDK:
 
     # ------------------------------ ZK Wrapper -------------------------------
 
-    def _generate_zk_proof(self, secret: str, model_id: int) -> Dict[str, Any]:
+    def _generate_zk_proof(self, secret: str, model_id: int, message_hash: int) -> Dict[str, Any]:
         """
         Windows-safe file-bridge mode:
         1) write scripts/last_proof_input.json
@@ -79,7 +99,10 @@ class ProvenanceSDK:
 
         input_path.parent.mkdir(parents=True, exist_ok=True)
         input_path.write_text(
-            json.dumps({"secret": str(secret), "modelId": str(model_id)}, ensure_ascii=False),
+            json.dumps(
+                {"secret": str(secret), "modelId": str(model_id), "messageHash": str(message_hash)},
+                ensure_ascii=False,
+            ),
             encoding="utf-8",
         )
         print(f"[SDK] Input written: {input_path}")
@@ -195,11 +218,22 @@ class ProvenanceSDK:
 
     # --------------------------- Backend Communication -----------------------
 
+    def _build_write_headers(self) -> Dict[str, str]:
+        if not self.write_api_key:
+            raise RuntimeError("WRITE_API_KEY is required for backend write operations")
+
+        return {
+            "x-api-key": self.write_api_key,
+            "x-auth-timestamp": str(int(time.time() * 1000)),
+            "x-auth-nonce": secrets.token_hex(16),
+        }
+
     def _send_to_relayer(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         print(f"[SDK] Submitting to tri-chain relayer: {self.base_url}/api/sdk/provenance")
         resp = requests.post(
             f"{self.base_url}/api/sdk/provenance",
             json=payload,
+            headers=self._build_write_headers(),
             timeout=self.timeout,
         )
         resp.raise_for_status()
@@ -208,6 +242,52 @@ class ProvenanceSDK:
             raise RuntimeError(f"Relayer returned failure: {data}")
         print("[SDK] Relayer submission successful.")
         return data
+
+    def _list_models(self, chain: str) -> Dict[str, Any]:
+        response = requests.get(
+            f"{self.base_url}/api/v2/models",
+            params={"chain": chain},
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not payload.get("success"):
+            raise RuntimeError(f"Model list request failed: {payload}")
+        return payload
+
+    def _find_model_by_name(self, model_name: str, chain: str) -> Optional[Dict[str, Any]]:
+        payload = self._list_models(chain)
+        normalized = model_name.strip().lower()
+        for model in payload.get("models", []):
+            if str(model.get("name", "")).strip().lower() == normalized:
+                return model
+        return None
+
+    def _register_model(self, model_name: str, chain: str, model_hash: str) -> Dict[str, Any]:
+        response = requests.post(
+            f"{self.base_url}/api/register",
+            json={
+                "name": model_name,
+                "description": f"Auto-registered by ProvenanceSDK for {model_name}",
+                "checksum": model_hash,
+                "framework": "PyTorch",
+                "license": "MIT",
+                "chain": chain,
+            },
+            headers=self._build_write_headers(),
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not payload.get("success"):
+            raise RuntimeError(f"Model registration failed: {payload}")
+        return payload
+
+    def _ensure_model_registered(self, model_name: str, chain: str, model_hash: str) -> Dict[str, Any]:
+        existing = self._find_model_by_name(model_name, chain)
+        if existing:
+            return existing
+        return self._register_model(model_name, chain, model_hash)
 
     # ----------------------------- Public API --------------------------------
 
@@ -218,6 +298,8 @@ class ProvenanceSDK:
         sender: str,
         version: str,
         secret: str = "123456",
+        model_name: Optional[str] = None,
+        chain: str = "sepolia",
     ) -> Dict[str, Any]:
         """
         One-call full pipeline:
@@ -235,12 +317,22 @@ class ProvenanceSDK:
         model_path = str(Path(model_path).resolve())
         print(f"[SDK] Step 1/6: Hashing model file...")
         model_hash = self._sha256_file(model_path)
-        model_id = self._model_id_from_hash(model_hash)
         print(f"[SDK] Model hash: {model_hash}")
-        print(f"[SDK] Model ID: {model_id}")
+        effective_model_name = model_name or Path(model_path).stem
+        registry_model = self._ensure_model_registered(effective_model_name, chain, model_hash)
+        model_id = int(registry_model["numericId"] if "numericId" in registry_model else registry_model["id"])
+        print(f"[SDK] Resolved on-chain model: {effective_model_name} -> {model_id} ({chain})")
 
         print(f"\n[SDK] Step 2/6: Generating ZK proof...")
-        zk_bundle = self._generate_zk_proof(secret=secret, model_id=model_id)
+        message_hash = self._message_hash_to_field(
+            effective_model_name,
+            chain,
+            model_hash,
+            commit_msg,
+            sender,
+            version,
+        )
+        zk_bundle = self._generate_zk_proof(secret=secret, model_id=model_id, message_hash=message_hash)
         
         print(f"\n[SDK] Step 3/6: Uploading model to IPFS...")
         ipfs_bundle = self._upload_model_to_ipfs(model_path)
@@ -251,6 +343,7 @@ class ProvenanceSDK:
             "stage": "training",
             "version": version,
             "commit": commit_msg,
+            "message_hash": str(message_hash),
             "weights_path": model_path,
             "zk_verified": zk_bundle["zk"]["ok"],
             "zk_engine": zk_bundle["zk"]["engine"],
@@ -264,6 +357,8 @@ class ProvenanceSDK:
         payload = {
             "modelHash": model_hash,
             "modelId": model_id,
+            "modelName": effective_model_name,
+            "chain": chain,
             "action": "UPDATED",
             "sender": sender,
             "commit": commit_msg,
@@ -287,6 +382,8 @@ class ProvenanceSDK:
             "modelPath": model_path,
             "modelHash": model_hash,
             "modelId": model_id,
+            "modelName": effective_model_name,
+            "chain": chain,
             "zk": {
                 "calldata": zk_bundle["zk"]["calldata"],
                 "publicSignals": zk_bundle["zk"]["publicSignals"],

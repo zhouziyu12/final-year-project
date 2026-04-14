@@ -22,12 +22,5 @@
       "ModelStaking": "0x2FAaaC1764CDA120405A390de2D6C86c10934397"
     },
     "timestamp": "2026-03-18T12:22:00.103Z"
-  },
-  "somnia": {
-    "deployer": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1",
-    "contracts": {
-      "ModelAccessControl": "0x5218C37411Fe49c15F3889DF131EA405Fe491703"
-    },
-    "timestamp": "2026-03-18T12:22:20.191Z"
   }
 }

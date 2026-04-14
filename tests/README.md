@@ -1,114 +1,113 @@
-# Test Suite Guide
+# Test Guide
 
-This directory contains the project-level test runners, summaries, and integration checks.
+## Purpose
+
+The `tests/` directory contains project-level regression tests and result files. The current suite covers:
+
+- contract connectivity and read paths
+- ZK proof generation and local verification
+- Python SDK and backend integration
 
 ## Main Entry Point
 
-Run the full test flow on Windows:
+On Windows, the recommended command is:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
 ```
 
-The runner executes:
+This script runs:
 
 1. `node scripts/test_contracts.cjs`
 2. `node test_zk_standalone.js`
-3. `python tests/test_sdk_backend.py`
+3. starts `server/server.js`
+4. `python tests/test_sdk_backend.py`
+5. shuts down the backend process it started
 
-For the SDK/backend phase, the runner now starts `server/server.js` automatically and shuts it down after the test completes.
+## Direct Test Commands
 
-## Test Files
+### Smart Contracts
 
-### Contract Test Script
-
-`scripts/test_contracts.cjs`
-
-Covers:
-
-- access control
-- model registration
-- status transitions
-- version history
-- provenance chain verification
-- audit log chain verification
-- NFT mint/burn checks
-- staking and slashing
-
-### Standalone ZK Test
-
-`test_zk_standalone.js`
+```bash
+node tests/test_smart_contracts.js
+```
 
 Covers:
 
-- loading proof input from `scripts/last_proof_input.json`
-- fallback creation of a default test input if the file is missing
-- proof generation using `zk/build/circuit_js/circuit.wasm`
-- proving with `zk/circuit_final.zkey`
-- calldata export for Solidity verifier usage
+- Sepolia and BSC Testnet contract reachability
+- read access to `ModelRegistry`, `ModelAccessControl`, `ModelAuditLog`, `ModelNFT`, and `ModelStaking`
+- wallet balance checks
+- basic database reads
 
-### SDK and Backend Integration Test
+### ZK Regression
 
-`tests/test_sdk_backend.py`
+```bash
+node tests/test_zk_proof.js
+```
 
 Covers:
 
-- Python SDK imports
-- backend health and status routes
-- model and audit API responses
-- secret manager behavior
-- expected file layout checks
-- Pinata environment configuration presence
+- circuit artifacts exist
+- proof generation succeeds
+- `groth16.verify` returns `true`
+- Solidity calldata export works
+
+### Standalone ZK Smoke Test
+
+```bash
+node test_zk_standalone.js
+```
+
+Useful for quickly checking:
+
+- `scripts/last_proof_input.json`
+- `zk/build/circuit_js/circuit.wasm`
+- `zk/circuit_final.zkey`
+
+### SDK and Backend
+
+```bash
+python tests/test_sdk_backend.py
+```
+
+If you run it directly, start the backend first:
+
+```bash
+node server/server.js
+```
+
+Covers:
+
+- SDK imports
+- write authentication
+- backend health, status, models, and audit endpoints
+- secret manager encrypted storage
+- SDK model resolution and auto-registration
 
 ## Output Files
 
-The current flow writes:
+Common outputs:
 
 - `test_results.json`
+- `tests/results_sdk_backend.json`
+- `tests/results_smart_contracts.json`
+- `tests/results_zk_proof.json`
+- `tests/test_summary.json`
 - `proof.json`
 - `public.json`
 - `proof_calldata_debug.txt`
-- `tests/results_sdk_backend.json`
-- `tests/test_summary.json`
 
 ## Expected Environment
 
 - Node.js 18+
 - Python 3.10+
 - installed npm dependencies
-- valid `.env` for blockchain-backed tests
-- RPC connectivity for deployed testnet contracts
-
-## Useful Direct Commands
-
-Compile contracts:
-
-```bash
-npx hardhat compile
-```
-
-Run the frontend build:
-
-```bash
-cd client
-npm run build
-```
-
-Run only the SDK/backend test:
-
-```bash
-python tests/test_sdk_backend.py
-```
-
-Run only the ZK proof flow:
-
-```bash
-node test_zk_standalone.js
-```
+- a configured `.env`
+- working testnet RPC access
 
 ## Status Labels
 
-- `PASS`: the check completed successfully
-- `FAIL`: the check completed but failed validation
-- `WARN`: the check passed with a non-blocking issue
-- `SKIP`: the check was intentionally skipped
+- `PASS`: check completed successfully
+- `FAIL`: assertion failed
+- `WARN`: non-blocking issue
+- `SKIP`: intentionally skipped

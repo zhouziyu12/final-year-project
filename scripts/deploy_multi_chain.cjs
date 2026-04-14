@@ -15,8 +15,7 @@ if (!PRIVATE_KEY) {
 
 const NETWORKS = [
   { name: "sepolia", label: "Sepolia", rpc: "https://ethereum-sepolia-rpc.publicnode.com", chainId: 11155111 },
-  { name: "tbnb", label: "BSC-Testnet", rpc: "https://bsc-testnet.publicnode.com", chainId: 97 },
-  { name: "somnia", label: "Somnia", rpc: "https://dream-rpc.somnia.network", chainId: 50312 }
+  { name: "tbnb", label: "BSC-Testnet", rpc: "https://bsc-testnet.publicnode.com", chainId: 97 }
 ];
 
 const OUTPUT = path.join(__dirname, "..", "address_v2_multi.json");
@@ -101,7 +100,14 @@ async function main() {
   console.log(`  ${new Date().toLocaleString()}`);
   console.log("=".repeat(55));
 
-  const results = {};
+  let results = {};
+  if (fs.existsSync(OUTPUT)) {
+    try {
+      results = JSON.parse(fs.readFileSync(OUTPUT, "utf8"));
+    } catch {
+      results = {};
+    }
+  }
   for (const net of NETWORKS) {
     const deployed = await deployNetwork(net);
     if (deployed) {

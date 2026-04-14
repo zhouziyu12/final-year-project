@@ -1,6 +1,6 @@
 {
   "suite": "Contract Verification",
-  "timestamp": "2026-04-13T18:05:51.672Z",
+  "timestamp": "2026-04-14T10:17:27.404Z",
   "summary": {
     "passed": 30,
     "failed": 0,
@@ -18,17 +18,17 @@
       {
         "name": "Grant registrar role",
         "status": "PASS",
-        "msg": "0x87290caE03e155724011Aa2b635878Bd5F0446c2"
+        "msg": "0xAB172B41363cd396aC47E5993fbff89aBF674dBB"
       },
       {
         "name": "Revoke registrar role",
         "status": "PASS",
-        "msg": "0x87290caE03e155724011Aa2b635878Bd5F0446c2"
+        "msg": "0xAB172B41363cd396aC47E5993fbff89aBF674dBB"
       },
       {
         "name": "Register model",
         "status": "PASS",
-        "msg": "modelId=24"
+        "msg": "modelId=29"
       },
       {
         "name": "Initial status is DRAFT",
@@ -53,7 +53,7 @@
       {
         "name": "Audit entry appended",
         "status": "PASS",
-        "msg": "9 -> 10"
+        "msg": "14 -> 15"
       },
       {
         "name": "Audit chain verification",
@@ -63,7 +63,7 @@
       {
         "name": "Mint NFT",
         "status": "PASS",
-        "msg": "tokenId=10"
+        "msg": "tokenId=15"
       },
       {
         "name": "NFT owner check",
@@ -95,17 +95,17 @@
       {
         "name": "Grant registrar role",
         "status": "PASS",
-        "msg": "0x53084080CA273574ad504E5FA1Db978852ddBd1E"
+        "msg": "0x5E2D0c99779f2D88b8478c1c9d1D3E3FF0558a1D"
       },
       {
         "name": "Revoke registrar role",
         "status": "PASS",
-        "msg": "0x53084080CA273574ad504E5FA1Db978852ddBd1E"
+        "msg": "0x5E2D0c99779f2D88b8478c1c9d1D3E3FF0558a1D"
       },
       {
         "name": "Register model",
         "status": "PASS",
-        "msg": "modelId=19"
+        "msg": "modelId=24"
       },
       {
         "name": "Initial status is DRAFT",
@@ -130,7 +130,7 @@
       {
         "name": "Audit entry appended",
         "status": "PASS",
-        "msg": "8 -> 9"
+        "msg": "13 -> 14"
       },
       {
         "name": "Audit chain verification",
@@ -140,7 +140,7 @@
       {
         "name": "Mint NFT",
         "status": "PASS",
-        "msg": "tokenId=9"
+        "msg": "tokenId=14"
       },
       {
         "name": "NFT owner check",

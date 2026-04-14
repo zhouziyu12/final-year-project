@@ -29,8 +29,9 @@ contract ModelAccessControl {
 
     // Modifiers
 
-    modifier onlyAdmin() {
+    modifier onlyActiveAdmin() {
         require(hasRole(ADMIN, msg.sender), "AccessControl: caller is not admin");
+        require(!isBlacklisted(msg.sender), "AccessControl: caller is blacklisted");
         _;
     }
 
@@ -52,17 +53,18 @@ contract ModelAccessControl {
     // External functions
 
     /// @notice Grant a role. Admin only.
-    function grantRole(bytes32 role, address account) external onlyAdmin {
+    function grantRole(bytes32 role, address account) external onlyActiveAdmin {
+        require(!isBlacklisted(account), "AccessControl: account is blacklisted");
         _grantRole(role, account);
     }
 
     /// @notice Revoke a role. Admin only.
-    function revokeRole(bytes32 role, address account) external onlyAdmin {
+    function revokeRole(bytes32 role, address account) external onlyActiveAdmin {
         _revokeRole(role, account);
     }
 
     /// @notice Add an address to the blacklist. Admin only.
-    function addBlacklist(address account) external onlyAdmin {
+    function addBlacklist(address account) external onlyActiveAdmin {
         require(account != address(0), "AccessControl: cannot blacklist zero");
         require(!_blacklist[account], "AccessControl: already blacklisted");
         _blacklist[account] = true;
@@ -70,21 +72,22 @@ contract ModelAccessControl {
     }
 
     /// @notice Remove an address from the blacklist. Admin only.
-    function removeBlacklist(address account) external onlyAdmin {
+    function removeBlacklist(address account) external onlyActiveAdmin {
         require(_blacklist[account], "AccessControl: not blacklisted");
         _blacklist[account] = false;
         emit Unblacklisted(account, msg.sender);
     }
 
     /// @notice Transfer the admin role to a new address.
-    function transferAdmin(address newAdmin) external onlyAdmin {
+    function transferAdmin(address newAdmin) external onlyActiveAdmin {
         require(newAdmin != address(0), "AccessControl: new admin is zero");
+        require(!isBlacklisted(newAdmin), "AccessControl: new admin is blacklisted");
         _revokeRole(ADMIN, msg.sender);
         _grantRole(ADMIN, newAdmin);
     }
 
     /// @notice Update the governance address. Admin only.
-    function updateGovernance(address newGov) external onlyAdmin {
+    function updateGovernance(address newGov) external onlyActiveAdmin {
         require(newGov != address(0), "AccessControl: governance is zero");
         address oldGov = governance;
         governance = newGov;
@@ -92,8 +95,9 @@ contract ModelAccessControl {
     }
 
     /// @notice Grant the same role to multiple accounts. Admin only.
-    function grantRoles(bytes32 role, address[] calldata accounts) external onlyAdmin {
+    function grantRoles(bytes32 role, address[] calldata accounts) external onlyActiveAdmin {
         for (uint256 i = 0; i < accounts.length; i++) {
+            require(!isBlacklisted(accounts[i]), "AccessControl: account is blacklisted");
             _grantRole(role, accounts[i]);
         }
     }

@@ -2,16 +2,16 @@
 
 ## Scope
 
-This guide covers the local deployment and verification flow for the current repository layout.
+This guide takes a clean checkout to a state where the project compiles, runs, and validates successfully.
 
 ## Prerequisites
 
 - Node.js 18+
 - Python 3.10+
 - npm
-- a populated `.env` file for blockchain-backed operations
+- a populated `.env`
 
-## Install Dependencies
+## 1. Install Dependencies
 
 ```bash
 npm install
@@ -19,13 +19,25 @@ cd client && npm install
 cd ..
 ```
 
-## Compile Contracts
+## 2. Configure Environment
+
+Copy `.env.example` to `.env` and populate:
+
+- `PRIVATE_KEY`
+- `SEPOLIA_URL`
+- `BNB_TESTNET_URL`
+- `WRITE_API_KEY`
+- `VITE_WRITE_API_KEY`
+- `PINATA_API_KEY`
+- `PINATA_SECRET`
+
+## 3. Compile Contracts
 
 ```bash
-npx hardhat compile
+npx hardhat compile --show-stack-traces
 ```
 
-## Deploy Contracts
+## 4. Deploy Contracts
 
 Use the multi-chain deployment script:
 
@@ -33,48 +45,67 @@ Use the multi-chain deployment script:
 node scripts/deploy_multi_chain.cjs
 ```
 
-The deployment metadata is written to `address_v2_multi.json`.
+Deployment metadata is merged into:
 
-## Start the Backend
+- `address_v2_multi.json`
+
+## 5. Build ZK Assets
+
+If the circuit changed, rebuild inside `zk/`:
+
+```bash
+cd zk
+cmd /c ..\node_modules\.bin\circom2.cmd circuit.circom --r1cs --wasm --sym -o build -l ..\node_modules
+cmd /c ..\node_modules\.bin\snarkjs.cmd groth16 setup build\circuit.r1cs pot12_final.ptau circuit_0000.zkey
+cmd /c ..\node_modules\.bin\snarkjs.cmd zkey contribute circuit_0000.zkey circuit_final.zkey --name="local" -e="local"
+cmd /c ..\node_modules\.bin\snarkjs.cmd zkey export verificationkey circuit_final.zkey verification_key.json
+cmd /c ..\node_modules\.bin\snarkjs.cmd zkey export solidityverifier circuit_final.zkey ..\contracts\Verifier.sol
+```
+
+Then recompile contracts from the repo root:
+
+```bash
+cd ..
+npx hardhat compile --show-stack-traces
+```
+
+## 6. Start the Backend
 
 ```bash
 node server/server.js
 ```
 
-Default local API base:
+Default API base:
 
 ```text
 http://127.0.0.1:3000
 ```
 
-## Build the Frontend
+## 7. Start the Frontend
 
 ```bash
 cd client
-npm run build
+npm run dev
 ```
 
-## Run the Full Verification Flow
+## 8. Validate
+
+```bash
+cd client && npm run lint && npm run build && cd ..
+node tests/test_zk_proof.js
+python tests/test_sdk_backend.py
+node tests/test_smart_contracts.js
+```
+
+Or run the Windows regression wrapper:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
 ```
 
-## Repository Paths
+## Notes
 
-```text
-contracts/      smart contracts
-scripts/        deployment and contract test scripts
-server/         backend service
-client/         frontend app
-sdk/python/     Python SDK
-tests/          test runners and summaries
-zk/             Circom circuit and proof artifacts
-docs/           documentation
-```
-
-## Current Notes
-
-- `ModelNFT` deployment depends on both `ModelAccessControl` and `ModelRegistry`
-- the backend exposes both current `/api/v2/*` routes and selected legacy compatibility routes
-- ZK proving assets live under `zk/`, not the repository root
+- `ModelNFT` depends on `ModelAccessControl` and `ModelRegistry`.
+- `/api/register` now predicts a model ID and returns a pending registration response immediately.
+- ZK artifacts live under `zk/`, not the repository root.
+- Native Windows circuit compilation is supported and already verified.

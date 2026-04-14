@@ -1,6 +1,6 @@
 # Contributing
 
-## Setup
+## Local Setup
 
 ```bash
 git clone https://github.com/zhouziyu12/final-year-project.git
@@ -10,62 +10,73 @@ cd client && npm install
 cd ..
 ```
 
+Copy `.env.example` to `.env` and provide testnet private keys, backend write key, and Pinata credentials.
+
 ## Branching
 
-Use a short feature or fix branch name:
+Use short, readable branch names:
 
 ```bash
-git checkout -b feature/your-change
+git checkout -b feat/zk-bridge-hardening
+git checkout -b fix/backend-write-auth
+git checkout -b docs/rewrite-guides
 ```
 
 ## Commit Style
 
-Use conventional commit messages:
+Use conventional commits:
 
 ```text
-feat: add model lifecycle endpoint
-fix: correct audit chain verification
-docs: refresh deployment guide
-test: update backend integration flow
-refactor: simplify nft mint validation
+feat: add pending registration status
+fix: bind zk bridge payload to nonce and chain
+docs: rewrite project markdown set
+test: harden sdk backend regression suite
+refactor: simplify registry transfer checks
 ```
 
-## Before Opening a Pull Request
+## Required Checks
 
-Make sure these pass:
+Before submitting work, confirm:
 
 ```bash
-npx hardhat compile
-cd client && npm run build && cd ..
-python -m py_compile sdk/python/provenance_sdk.py sdk/python/model_secret_manager.py tests/test_sdk_backend.py
+npx hardhat compile --show-stack-traces
+cd client && npm run lint && npm run build && cd ..
+node tests/test_zk_proof.js
+python tests/test_sdk_backend.py
+node tests/test_smart_contracts.js
+```
+
+For the full Windows regression flow:
+
+```powershell
 powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
 ```
 
-## Code Expectations
+## Contribution Rules
 
-- Keep Solidity comments and documentation in English
-- Keep Markdown documentation in English
-- Do not introduce new mojibake or mixed-encoding files
-- Prefer updating existing scripts and docs instead of adding duplicate files
-- Do not remove deployed-address references unless they are actually obsolete
+- Keep documentation aligned with the current implementation.
+- Do not introduce `.backup`, `.old`, handoff, or summary-only temporary files.
+- Avoid mojibake, mixed encodings, or mixed-language comments without a reason.
+- Update `README.md` and the relevant topical doc when behavior changes.
+- Do not rewrite `address_v2_multi.json` or deployment notes unless the deployment metadata actually changed.
 
 ## Pull Request Checklist
 
 - [ ] Scope is limited to the intended change
 - [ ] Contracts compile successfully
-- [ ] Frontend builds successfully
-- [ ] Tests pass or failures are explained
-- [ ] Documentation is updated when behavior changes
+- [ ] Frontend lint and build pass
+- [ ] Relevant tests pass, or failures are explained
+- [ ] Documentation is updated
 
-## Reporting Issues
+## Bug Reports
 
 Include:
 
-- exact command that failed
-- full error output
+- the exact failing command
+- the complete error output
 - affected file paths
-- network or environment used
+- the network or environment used
 
 ## Questions
 
-Open an issue or start a discussion in the repository.
+Prefer issues or PR discussions for implementation questions.

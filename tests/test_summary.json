@@ -1,10 +1,10 @@
 ﻿{
-    "timestamp":  "2026-04-14T02:06:01Z",
+    "timestamp":  "2026-04-14T18:17:38Z",
     "version":  "2.0.0",
     "suites":  [
                    {
                        "suite":  "Contract Verification",
-                       "timestamp":  "2026-04-13T18:05:51.672Z",
+                       "timestamp":  "2026-04-14T10:17:27.404Z",
                        "summary":  {
                                        "passed":  30,
                                        "failed":  0,
@@ -22,17 +22,17 @@
                                                        {
                                                            "name":  "Grant registrar role",
                                                            "status":  "PASS",
-                                                           "msg":  "0x87290caE03e155724011Aa2b635878Bd5F0446c2"
+                                                           "msg":  "0xAB172B41363cd396aC47E5993fbff89aBF674dBB"
                                                        },
                                                        {
                                                            "name":  "Revoke registrar role",
                                                            "status":  "PASS",
-                                                           "msg":  "0x87290caE03e155724011Aa2b635878Bd5F0446c2"
+                                                           "msg":  "0xAB172B41363cd396aC47E5993fbff89aBF674dBB"
                                                        },
                                                        {
                                                            "name":  "Register model",
                                                            "status":  "PASS",
-                                                           "msg":  "modelId=24"
+                                                           "msg":  "modelId=29"
                                                        },
                                                        {
                                                            "name":  "Initial status is DRAFT",
@@ -57,7 +57,7 @@
                                                        {
                                                            "name":  "Audit entry appended",
                                                            "status":  "PASS",
-                                                           "msg":  "9 -\u003e 10"
+                                                           "msg":  "14 -\u003e 15"
                                                        },
                                                        {
                                                            "name":  "Audit chain verification",
@@ -67,7 +67,7 @@
                                                        {
                                                            "name":  "Mint NFT",
                                                            "status":  "PASS",
-                                                           "msg":  "tokenId=10"
+                                                           "msg":  "tokenId=15"
                                                        },
                                                        {
                                                            "name":  "NFT owner check",
@@ -99,17 +99,17 @@
                                                            {
                                                                "name":  "Grant registrar role",
                                                                "status":  "PASS",
-                                                               "msg":  "0x53084080CA273574ad504E5FA1Db978852ddBd1E"
+                                                               "msg":  "0x5E2D0c99779f2D88b8478c1c9d1D3E3FF0558a1D"
                                                            },
                                                            {
                                                                "name":  "Revoke registrar role",
                                                                "status":  "PASS",
-                                                               "msg":  "0x53084080CA273574ad504E5FA1Db978852ddBd1E"
+                                                               "msg":  "0x5E2D0c99779f2D88b8478c1c9d1D3E3FF0558a1D"
                                                            },
                                                            {
                                                                "name":  "Register model",
                                                                "status":  "PASS",
-                                                               "msg":  "modelId=19"
+                                                               "msg":  "modelId=24"
                                                            },
                                                            {
                                                                "name":  "Initial status is DRAFT",
@@ -134,7 +134,7 @@
                                                            {
                                                                "name":  "Audit entry appended",
                                                                "status":  "PASS",
-                                                               "msg":  "8 -\u003e 9"
+                                                               "msg":  "13 -\u003e 14"
                                                            },
                                                            {
                                                                "name":  "Audit chain verification",
@@ -144,7 +144,7 @@
                                                            {
                                                                "name":  "Mint NFT",
                                                                "status":  "PASS",
-                                                               "msg":  "tokenId=9"
+                                                               "msg":  "tokenId=14"
                                                            },
                                                            {
                                                                "name":  "NFT owner check",
@@ -171,7 +171,7 @@
                    },
                    {
                        "suite":  "SDK and Backend Integration Tests",
-                       "timestamp":  "2026-04-13T18:05:56.790960Z",
+                       "timestamp":  "2026-04-14T10:17:33.995996Z",
                        "tests":  [
                                      {
                                          "name":  "SDK Import",
@@ -210,6 +210,18 @@
                                          "data":  null
                                      },
                                      {
+                                         "name":  "POST /api/register without auth",
+                                         "status":  "PASS",
+                                         "detail":  "Unauthenticated write rejected with 401",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "POST /api/register with auth",
+                                         "status":  "PASS",
+                                         "detail":  "Authenticated write passed auth and failed at validation",
+                                         "data":  null
+                                     },
+                                     {
                                          "name":  "Secret Manager Init",
                                          "status":  "PASS",
                                          "detail":  "Initialized successfully",
@@ -218,25 +230,25 @@
                                      {
                                          "name":  "Secret Generation",
                                          "status":  "PASS",
-                                         "detail":  "Generated 6-digit secret: 721094",
+                                         "detail":  "Generated 6-digit secret: 285707",
                                          "data":  null
                                      },
                                      {
                                          "name":  "Version Tracking",
                                          "status":  "PASS",
-                                         "detail":  "Version recorded and secret verified: 721094",
+                                         "detail":  "Version recorded and secret verified: 285707",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: server/server.js",
                                          "status":  "PASS",
-                                         "detail":  "Exists (18.74 KB)",
+                                         "detail":  "Exists (24.41 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: sdk/python/provenance_sdk.py",
                                          "status":  "PASS",
-                                         "detail":  "Exists (10.86 KB)",
+                                         "detail":  "Exists (11.67 KB)",
                                          "data":  null
                                      },
                                      {
@@ -254,7 +266,7 @@
                                      {
                                          "name":  "File: address_v2_multi.json",
                                          "status":  "PASS",
-                                         "detail":  "Exists (1.34 KB)",
+                                         "detail":  "Exists (1.12 KB)",
                                          "data":  null
                                      },
                                      {
@@ -302,7 +314,7 @@
                                      {
                                          "name":  "File: scripts/deploy_multi_chain.cjs",
                                          "status":  "PASS",
-                                         "detail":  "Exists (4.56 KB)",
+                                         "detail":  "Exists (4.46 KB)",
                                          "data":  null
                                      },
                                      {
@@ -319,11 +331,11 @@
                                      }
                                  ],
                        "summary":  {
-                                       "passed":  24,
+                                       "passed":  26,
                                        "failed":  0,
                                        "warned":  0,
                                        "skipped":  0,
-                                       "total":  24
+                                       "total":  26
                                    }
                    }
                ]

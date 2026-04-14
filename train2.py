@@ -136,7 +136,6 @@ def main():
     print(f"Model ID:       {result['modelId']}")
     print(f"IPFS CID:       {result['relayer'].get('modelCid', 'N/A')}")
     print(f"Sepolia Tx:     {result['relayer'].get('sepoliaTxHash', 'N/A')}")
-    print(f"Somnia Tx:      {result['relayer'].get('somniaTxHash', 'N/A')}")
     print(f"tBNB Tx:        {result['relayer'].get('tbnbTxHash', 'N/A')}")
     print(f"Training Δ:     loss {initial_loss:.4f}→{final_loss:.4f}, acc {initial_acc:.4f}→{final_acc:.4f}")
     print("="*60)

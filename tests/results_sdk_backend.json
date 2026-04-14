@@ -1,6 +1,6 @@
 {
   "suite": "SDK and Backend Integration Tests",
-  "timestamp": "2026-04-13T18:05:56.790960Z",
+  "timestamp": "2026-04-14T14:20:38.496910Z",
   "tests": [
     {
       "name": "SDK Import",
@@ -39,6 +39,18 @@
       "data": null
     },
     {
+      "name": "POST /api/register without auth",
+      "status": "PASS",
+      "detail": "Unauthenticated write rejected with 401",
+      "data": null
+    },
+    {
+      "name": "POST /api/register with auth",
+      "status": "PASS",
+      "detail": "Authenticated write passed auth and failed at validation",
+      "data": null
+    },
+    {
       "name": "Secret Manager Init",
       "status": "PASS",
       "detail": "Initialized successfully",
@@ -47,79 +59,85 @@
     {
       "name": "Secret Generation",
       "status": "PASS",
-      "detail": "Generated 6-digit secret: 721094",
+      "detail": "Generated high-entropy secret (64 chars)",
       "data": null
     },
     {
       "name": "Version Tracking",
       "status": "PASS",
-      "detail": "Version recorded and secret verified: 721094",
+      "detail": "Version recorded and secret verified",
+      "data": null
+    },
+    {
+      "name": "Secret Storage Encryption",
+      "status": "PASS",
+      "detail": "Secret file stores ciphertext instead of plaintext",
       "data": null
     },
     {
       "name": "File: server/server.js",
       "status": "PASS",
-      "detail": "Exists (18.74 KB)",
+      "detail": "Exists (28.58 KB)",
       "data": null
     },
     {
       "name": "File: sdk/python/provenance_sdk.py",
       "status": "PASS",
-      "detail": "Exists (10.86 KB)",
+      "detail": "Exists (14.61 KB)",
       "data": null
     },
     {
       "name": "File: sdk/python/model_secret_manager.py",
       "status": "PASS",
-      "detail": "Exists (3.72 KB)",
+      "detail": "Exists (6.67 KB)",
       "data": null
     },
     {
       "name": "File: test_zk_standalone.js",
       "status": "PASS",
-      "detail": "Exists (4.90 KB)",
+      "detail": "Exists (5.38 KB)",
       "data": null
     },
     {
       "name": "File: address_v2_multi.json",
       "status": "PASS",
-      "detail": "Exists (1.34 KB)",
+      "detail": "Exists (1.12 KB)",
       "data": null
     },
     {
       "name": "File: contracts/ModelAccessControl.sol",
       "status": "PASS",
-      "detail": "Exists (4.29 KB)",
+      "detail": "Exists (4.67 KB)",
       "data": null
     },
     {
       "name": "File: contracts/ModelRegistry.sol",
       "status": "PASS",
-      "detail": "Exists (11.86 KB)",
+      "detail": "Exists (13.06 KB)",
       "data": null
     },
     {
       "name": "File: contracts/ModelAuditLog.sol",
       "status": "PASS",
-      "detail": "Exists (8.60 KB)",
+      "detail": "Exists (8.69 KB)",
       "data": null
     },
     {
       "name": "File: contracts/ModelNFT.sol",
       "status": "PASS",
-      "detail": "Exists (8.05 KB)",
+      "detail": "Exists (8.81 KB)",
       "data": null
     },
     {
       "name": "File: contracts/ModelStaking.sol",
       "status": "PASS",
-      "detail": "Exists (7.03 KB)",
+      "detail": "Exists (7.23 KB)",
       "data": null
     },
     {
       "name": "File: contracts/ProvenanceTracker.sol",
       "status": "PASS",
-      "detail": "Exists (7.35 KB)",
+      "detail": "Exists (7.47 KB)",
       "data": null
     },
     {
@@ -131,7 +149,13 @@
     {
       "name": "File: scripts/deploy_multi_chain.cjs",
       "status": "PASS",
-      "detail": "Exists (4.56 KB)",
+      "detail": "Exists (4.60 KB)",
+      "data": null
+    },
+    {
+      "name": "SDK model resolution",
+      "status": "PASS",
+      "detail": "Resolved registered model 'TestSDKModel_1776176446' to on-chain ID",
       "data": null
     },
     {
@@ -148,10 +172,10 @@
     }
   ],
   "summary": {
-    "passed": 24,
+    "passed": 28,
     "failed": 0,
     "warned": 0,
     "skipped": 0,
-    "total": 24
+    "total": 28
   }
 }
