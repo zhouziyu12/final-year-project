@@ -99,3 +99,8 @@ The repository currently tracks:
 - `tbnb`
 
 Treat `address_v2_multi.json` as the source of truth for addresses.
+
+Important scope note:
+
+- the current address file records the six main application contracts
+- bridge/verifier contract sources exist in `contracts/`, but they are not part of the default active deployment metadata tracked here

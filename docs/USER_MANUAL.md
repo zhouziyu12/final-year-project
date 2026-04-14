@@ -11,8 +11,13 @@ Core capabilities:
 - provenance event writes
 - audit log queries and verification
 - IPFS-backed file and metadata storage
-- SDK-driven ZK proof generation and submission
+- SDK-driven local ZK proof generation and provenance submission
 - NFT and staking presentation and extension points
+
+Important scope note:
+
+- the current prototype fully supports registry, provenance, audit, backend relay, and local ZK tooling
+- NFT, staking, and bridge-oriented cross-chain behavior should currently be treated as partial or extension-level features, not full user-facing flows
 
 ## Main Interfaces
 
@@ -92,6 +97,12 @@ The SDK will:
 3. generate a ZK proof
 4. upload the model to IPFS
 5. call the backend to submit the provenance record
+
+Implementation note:
+
+- the proof generation step is real
+- proof-related metadata is preserved in the submission payload
+- the current backend mainline still records the event through the provenance tracker flow rather than a full bridge-settlement path
 
 ### 3. Verify a Model
 

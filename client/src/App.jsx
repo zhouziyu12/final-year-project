@@ -4,8 +4,10 @@ import { useDevice } from './hooks';
 import { DesktopLayout, MobileLayout } from './components/layout';
 import { DashboardPage, TrainingPage, ModelsPage, AuditPage, SystemPage, NFTPage } from './pages';
 import {
+  downloadLifecycleVersion,
   fetchAuditVerification,
   fetchHealth,
+  fetchLifecycleBySecret,
   fetchModelDetail,
   fetchModels,
   fetchRecentAuditEvents,
@@ -153,6 +155,16 @@ function App() {
     return response;
   };
 
+  const handleLifecycleLookup = async (secret) => {
+    const response = await fetchLifecycleBySecret(secret);
+    setLastUpdated(new Date().toISOString());
+    return response;
+  };
+
+  const handleLifecycleDownload = async (payload) => {
+    await downloadLifecycleVersion(payload);
+  };
+
   const handleSelectModel = (model) => {
     if (!model) return;
 
@@ -207,6 +219,8 @@ function App() {
         selectedModelContext={selectedModelContext}
         writeAccess={writeAccess}
         onTabChange={handleTabChange}
+        onLifecycleLookup={handleLifecycleLookup}
+        onLifecycleDownload={handleLifecycleDownload}
       />
     ),
     registry: (

@@ -126,3 +126,42 @@ export async function registerModel(payload) {
     throw new Error(unwrapError(error, 'Model registration failed.'));
   }
 }
+
+export async function fetchLifecycleBySecret(secret) {
+  try {
+    const { data } = await client.get('/api/v2/lifecycle', {
+      params: { secret }
+    });
+    return data;
+  } catch (error) {
+    throw new Error(unwrapError(error, 'Unable to load lifecycle by secret.'));
+  }
+}
+
+function getDownloadFilename(headers, fallback = 'model.bin') {
+  const disposition = headers?.['content-disposition'] || headers?.['Content-Disposition'];
+  if (!disposition) return fallback;
+
+  const match = disposition.match(/filename="?([^"]+)"?/i);
+  return match?.[1] || fallback;
+}
+
+export async function downloadLifecycleVersion({ secret, modelHash, fallbackName }) {
+  try {
+    const response = await client.get('/api/v2/lifecycle/download', {
+      params: { secret, modelHash },
+      responseType: 'blob'
+    });
+
+    const blobUrl = window.URL.createObjectURL(response.data);
+    const anchor = document.createElement('a');
+    anchor.href = blobUrl;
+    anchor.download = getDownloadFilename(response.headers, fallbackName || 'model.bin');
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.URL.revokeObjectURL(blobUrl);
+  } catch (error) {
+    throw new Error(unwrapError(error, 'Unable to download the requested model version.'));
+  }
+}

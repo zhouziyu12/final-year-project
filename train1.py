@@ -1,6 +1,13 @@
 """
-train1.py (ultra-minimal business layer)
-职责：参数解析 -> Dummy 训练 -> 保存 .pth -> 一行调用 SDK
+train1.py
+
+Baseline training example aligned with the current ProvenanceSDK interface.
+
+Flow:
+- train a small dummy model locally
+- save the checkpoint
+- keep one stable lifecycle secret per model series
+- submit provenance through the current backend relay path
 """
 
 import os
@@ -35,18 +42,19 @@ class DummyNet(nn.Module):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Train dummy model and submit provenance")
-    parser.add_argument("--commit", default="dummy training")
+    parser = argparse.ArgumentParser(description="Train a dummy model and submit provenance")
+    parser.add_argument("--commit", default="Initial dummy training run")
     parser.add_argument("--sender", default="train1.py")
     parser.add_argument("--version", default="v1.0")
-    parser.add_argument("--model-series", default="DummyNet", help="Model series name")
+    parser.add_argument("--model-series", default="DummyNet", help="Stable local lifecycle series name")
+    parser.add_argument("--model-name", default=None, help="Optional on-chain model name override")
     args = parser.parse_args()
 
-    # 1) Get or create secret for this model series
+    effective_model_name = args.model_name or args.model_series
+
     secret_manager = ModelSecretManager(secrets_dir=str(ROOT / "model_secrets"))
     secret = secret_manager.get_or_create_secret(args.model_series)
 
-    # 2) Dummy training only
     torch.manual_seed(42)
     x = torch.randn(64, 16)
     y = torch.randint(0, 8, (64,))
@@ -56,42 +64,51 @@ def main():
     criterion = nn.CrossEntropyLoss()
 
     model.train()
-    for _ in range(3):
+    for epoch in range(3):
         optimizer.zero_grad()
         logits = model(x)
         loss = criterion(logits, y)
         loss.backward()
         optimizer.step()
+        print(f"Epoch {epoch + 1}/3: loss={loss.item():.4f}")
 
-    # 3) Save weights
     out_dir = ROOT / "artifacts"
     out_dir.mkdir(parents=True, exist_ok=True)
     model_path = out_dir / "model_v1.pth"
     torch.save(model.state_dict(), model_path)
 
-    # 4) Init SDK
     sdk = ProvenanceSDK(project_root=str(ROOT))
+    result = sdk.submit_provenance(
+        str(model_path),
+        args.commit,
+        args.sender,
+        args.version,
+        secret,
+        model_name=effective_model_name,
+    )
 
-    # 5) One-line provenance submit (all ZK/IPFS/network logic inside SDK)
-    result = sdk.submit_provenance(str(model_path), args.commit, args.sender, args.version, secret)
-
-    # 6) Record version in secret manager
     secret_manager.record_version(
         args.model_series,
         args.version,
-        result['modelId'],
-        result['modelHash']
+        result["modelId"],
+        result["modelHash"],
+        model_name=effective_model_name,
+        chain=result.get("chain"),
+        ipfs_cid=result["ipfs"].get("ipfsCid"),
+        tx_hash=result["relayer"].get("tx"),
     )
 
-    print("\n" + "="*60)
-    print("✅ TRAINING COMPLETE")
-    print("="*60)
-    print(f"Model Series:   {args.model_series}")
-    print(f"Secret:         {secret} (saved to model_secrets/secrets.json)")
+    print("\n" + "=" * 60)
+    print("TRAINING COMPLETE")
+    print("=" * 60)
+    print(f"Model series:   {args.model_series}")
+    print(f"Model name:     {effective_model_name}")
+    print(f"Checkpoint:     {model_path}")
     print(f"Model ID:       {result['modelId']}")
-    print(f"Model Hash:     {result['modelHash']}")
-    print("="*60)
-    print("\n💡 Use this secret to query all versions of this model series!")
+    print(f"Model hash:     {result['modelHash']}")
+    print(f"IPFS CID:       {result['ipfs'].get('ipfsCid')}")
+    print(f"Relay tx:       {result['relayer'].get('tx')}")
+    print("=" * 60)
     print(result)
 
 

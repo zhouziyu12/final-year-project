@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   AlertTriangle,
   ArrowRight,
   Binary,
   Box,
+  Download,
   FileCode2,
   Fingerprint,
   HardDriveUpload,
+  KeyRound,
   LockKeyhole,
   PlaySquare,
   ShieldCheck,
@@ -15,10 +17,55 @@ import {
 import { TRAINING_ARTIFACTS, TRAINING_STEPS } from '../lib/projectData';
 import heroScene from '../assets/hero-provenance-scene.svg';
 
-export function TrainingPage({ status, selectedModelContext, writeAccess, onTabChange }) {
+export function TrainingPage({
+  status,
+  selectedModelContext,
+  writeAccess,
+  onTabChange,
+  onLifecycleLookup,
+  onLifecycleDownload
+}) {
   const selectedModel = selectedModelContext.summary;
   const selectedDetail = selectedModelContext.detail;
   const selectedAudit = selectedModelContext.audit;
+  const [secretValue, setSecretValue] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [downloadHash, setDownloadHash] = useState(null);
+  const [lifecycleResult, setLifecycleResult] = useState(null);
+  const [lifecycleError, setLifecycleError] = useState(null);
+
+  async function handleLifecycleSubmit(event) {
+    event.preventDefault();
+    setLookupLoading(true);
+    setLifecycleError(null);
+
+    try {
+      const response = await onLifecycleLookup(secretValue.trim());
+      setLifecycleResult(response);
+    } catch (error) {
+      setLifecycleResult(null);
+      setLifecycleError(error.message);
+    } finally {
+      setLookupLoading(false);
+    }
+  }
+
+  async function handleVersionDownload(version) {
+    setDownloadHash(version.modelHash);
+    setLifecycleError(null);
+
+    try {
+      await onLifecycleDownload({
+        secret: secretValue.trim(),
+        modelHash: version.modelHash,
+        fallbackName: version.artifactFileName || `${lifecycleResult?.series || 'model'}-${version.version || 'version'}.bin`
+      });
+    } catch (error) {
+      setLifecycleError(error.message);
+    } finally {
+      setDownloadHash(null);
+    }
+  }
 
   return (
     <div className="page-grid">
@@ -135,8 +182,8 @@ export function TrainingPage({ status, selectedModelContext, writeAccess, onTabC
             <div className="insight-item">
               <HardDriveUpload size={18} />
               <div>
-                <p className="insight-title">Artifacts are only partly observable</p>
-                <p className="insight-copy">Proof files and checkpoints exist in the project, but the backend currently exposes only model state and audit status, not full file manifests.</p>
+                <p className="insight-title">Artifacts are restored through IPFS by lifecycle secret</p>
+                <p className="insight-copy">The backend resolves the version-linked CID and streams the stored model artifact back from IPFS gateways.</p>
               </div>
             </div>
             <div className="insight-item">
@@ -272,6 +319,100 @@ export function TrainingPage({ status, selectedModelContext, writeAccess, onTabC
             </div>
           )}
         </article>
+      </section>
+
+      <section className="panel-card">
+        <div className="panel-heading">
+          <div>
+            <p className="panel-eyebrow">Lifecycle Download</p>
+            <h3 className="panel-title">Enter a lifecycle secret to download any recorded version of the same model series</h3>
+          </div>
+        </div>
+
+        <form className="registry-form" onSubmit={handleLifecycleSubmit}>
+          <div className="form-grid">
+            <label className="field-group field-group-wide">
+              <span>Lifecycle secret</span>
+              <input
+                name="secret"
+                value={secretValue}
+                onChange={(event) => setSecretValue(event.target.value)}
+                placeholder="Enter the model series secret"
+                required
+              />
+            </label>
+          </div>
+
+          <div className="form-actions">
+            <button type="submit" className="primary-action" disabled={lookupLoading || !secretValue.trim()}>
+              <KeyRound size={16} />
+              <span>{lookupLoading ? 'Loading versions...' : 'Load lifecycle versions'}</span>
+            </button>
+          </div>
+        </form>
+
+        {lifecycleError ? (
+          <div className="feedback-banner is-error">
+            <div className="result-header">
+              <AlertTriangle size={18} />
+              <div>
+                <p className="feedback-title">Lifecycle lookup failed</p>
+                <p className="feedback-copy">{lifecycleError}</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {!lifecycleResult ? (
+          <div className="empty-state">
+            <KeyRound size={32} />
+            <p className="empty-state-title">No lifecycle loaded</p>
+            <p className="empty-state-copy">Enter a secret to load all recorded versions belonging to the same model series.</p>
+          </div>
+        ) : (
+          <>
+            <div className="detail-callout">
+              <div className="detail-callout-head">
+                <div>
+                  <p className="detail-callout-title">{lifecycleResult.series}</p>
+                  <p className="detail-callout-copy">
+                    {lifecycleResult.versions?.length || 0} recorded version{(lifecycleResult.versions?.length || 0) !== 1 ? 's' : ''} resolved from the same lifecycle secret.
+                  </p>
+                </div>
+                <span className="status-pill">{lifecycleResult.storageMode}</span>
+              </div>
+            </div>
+
+            <div className="table-shell">
+              <div className="table-row table-row-head training-artifact-head">
+                <span>Version</span>
+                <span>Model ID</span>
+                <span>Source</span>
+                <span>Timestamp</span>
+                <span>Action</span>
+              </div>
+              {(lifecycleResult.versions || []).map((version) => (
+                <div className="table-row training-artifact-row" key={version.modelHash}>
+                  <span>{version.version || '--'}</span>
+                  <span className="mono-text">#{version.modelId || '--'}</span>
+                  <span>{version.downloadSource || 'unavailable'}</span>
+                  <span>{version.timestamp || '--'}</span>
+                  <span>
+                    <button
+                      type="button"
+                      className="secondary-action"
+                      disabled={!version.downloadReady || downloadHash === version.modelHash}
+                      onClick={() => handleVersionDownload(version)}
+                    >
+                      <Download size={14} />
+                      <span>{downloadHash === version.modelHash ? 'Downloading...' : 'Download'}</span>
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </section>
 
       <section className="panel-card">

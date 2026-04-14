@@ -7,6 +7,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import FormData from 'form-data';
+import { spawnSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -262,6 +263,7 @@ function requirePlainObject(value, fieldName) {
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ADDR_FILE = path.join(PROJECT_ROOT, 'address_v2_multi.json');
 const MODEL_MAP_FILE = path.join(PROJECT_ROOT, 'model_name_map.json');
+const SECRETS_FILE = path.join(PROJECT_ROOT, 'model_secrets', 'secrets.json');
 
 let addrs;
 try {
@@ -282,6 +284,200 @@ function loadModelMap() {
 
 function saveModelMap(map) {
   fs.writeFileSync(MODEL_MAP_FILE, JSON.stringify(map, null, 2));
+}
+
+function loadSecretStore() {
+  try {
+    if (!fs.existsSync(SECRETS_FILE)) {
+      return {};
+    }
+    const raw = JSON.parse(fs.readFileSync(SECRETS_FILE, 'utf8'));
+    return raw?.series || raw || {};
+  } catch {
+    return {};
+  }
+}
+
+function decryptSecretCiphertext(ciphertext) {
+  if (process.platform !== 'win32') {
+    throw new Error('Encrypted secret lookup currently requires Windows DPAPI');
+  }
+
+  const env = {
+    ...process.env,
+    MODEL_SECRET_CIPHERTEXT_B64: Buffer.from(String(ciphertext), 'utf8').toString('base64')
+  };
+
+  const script =
+    "$cipher = [System.Text.Encoding]::UTF8.GetString(" +
+    "[System.Convert]::FromBase64String($env:MODEL_SECRET_CIPHERTEXT_B64));" +
+    "$secure = ConvertTo-SecureString $cipher;" +
+    "$bstr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure);" +
+    "try { [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) } " +
+    "finally { [System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }";
+
+  const result = spawnSync('powershell', ['-NoProfile', '-Command', script], {
+    env,
+    encoding: 'utf8'
+  });
+
+  if (result.status !== 0) {
+    throw new Error(result.stderr?.trim() || 'Failed to decrypt secret ciphertext');
+  }
+
+  return result.stdout.trim();
+}
+
+function resolveSeriesSecret(entry) {
+  if (entry?.secret !== undefined && entry?.secret !== null) {
+    return String(entry.secret);
+  }
+
+  if (entry?.secret_ciphertext) {
+    try {
+      return decryptSecretCiphertext(entry.secret_ciphertext);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function findSeriesBySecret(secret) {
+  const seriesStore = loadSecretStore();
+  const target = String(secret);
+
+  for (const [seriesName, entry] of Object.entries(seriesStore)) {
+    const resolved = resolveSeriesSecret(entry);
+    if (resolved !== null && String(resolved) === target) {
+      return {
+        seriesName,
+        entry,
+        storageMode: entry?.secret_ciphertext ? 'encrypted' : 'plaintext-legacy'
+      };
+    }
+  }
+
+  return null;
+}
+
+function parseMetadataString(value) {
+  if (typeof value !== 'string' || !value.trim().startsWith('{')) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function getRecordMetadata(record) {
+  const metadataRaw = record?.ipfsMetadata ?? record?.[3];
+  return parseMetadataString(metadataRaw);
+}
+
+function buildLifecycleFilename(seriesName, versionEntry, metadata) {
+  if (versionEntry?.artifact_filename) {
+    return versionEntry.artifact_filename;
+  }
+
+  const weightsPath = metadata?.trainingMetadata?.weights_path;
+  if (weightsPath) {
+    return path.basename(weightsPath);
+  }
+
+  const safeSeries = String(seriesName || 'model').replace(/[^\w.-]+/g, '_');
+  const safeVersion = String(versionEntry?.version || 'version').replace(/[^\w.-]+/g, '_');
+  return `${safeSeries}-${safeVersion}.bin`;
+}
+
+async function enrichLifecycleVersion(versionEntry) {
+  const enriched = {
+    version: versionEntry.version,
+    modelId: versionEntry.model_id,
+    modelHash: versionEntry.model_hash,
+    timestamp: versionEntry.timestamp,
+    modelName: versionEntry.model_name || null,
+    chain: versionEntry.chain || null,
+    ipfsCid: versionEntry.ipfs_cid || null,
+    txHash: versionEntry.tx_hash || null,
+    artifactFileName: versionEntry.artifact_filename || null,
+    downloadReady: false,
+    downloadSource: null
+  };
+
+  const modelId = Number(versionEntry.model_id);
+  if (!Number.isInteger(modelId) || modelId <= 0) {
+    if (enriched.ipfsCid) {
+      enriched.downloadReady = true;
+      enriched.downloadSource = 'ipfs';
+    }
+    return enriched;
+  }
+
+  const chainCandidates = versionEntry.chain ? [versionEntry.chain] : ['sepolia', 'tbnb'];
+  for (const chain of chainCandidates) {
+    if (!chains[chain]) continue;
+
+    try {
+      const { mpt } = getContracts(chain);
+      const history = await mpt.getModelHistory(modelId);
+      const matchingRecord = [...history].reverse().find((record) => {
+        const metadata = getRecordMetadata(record);
+        if (!metadata) return false;
+        return (
+          metadata.modelHash === versionEntry.model_hash ||
+          metadata.versionTag === versionEntry.version
+        );
+      });
+
+      if (!matchingRecord) {
+        continue;
+      }
+
+      const metadata = getRecordMetadata(matchingRecord);
+      if (metadata?.ipfsHash && !enriched.ipfsCid) {
+        enriched.ipfsCid = metadata.ipfsHash;
+      }
+      if (!enriched.modelName && metadata?.trainingMetadata?.model_name) {
+        enriched.modelName = metadata.trainingMetadata.model_name;
+      }
+      if (!enriched.chain) {
+        enriched.chain = chain;
+      }
+      if (!enriched.artifactFileName) {
+        enriched.artifactFileName = buildLifecycleFilename(null, versionEntry, metadata);
+      }
+      if (enriched.ipfsCid) {
+        enriched.downloadReady = true;
+        enriched.downloadSource = 'ipfs';
+      }
+      return enriched;
+    } catch {
+      continue;
+    }
+  }
+
+  return enriched;
+}
+
+async function fetchIpfsBinary(cid) {
+  const gateways = [
+    `https://gateway.pinata.cloud/ipfs/${cid}`,
+    `https://ipfs.io/ipfs/${cid}`
+  ];
+
+  for (const url of gateways) {
+    try {
+      const response = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+      return Buffer.from(response.data);
+    } catch {}
+  }
+
+  return null;
 }
 
 const modelNameMap = loadModelMap();
@@ -657,6 +853,58 @@ app.get('/api/models', handle(async (req, res) => {
     }
   }
   ok(res, { models });
+}));
+
+app.get('/api/v2/lifecycle', handle(async (req, res) => {
+  const secret = requireString(req.query.secret, 'secret', { maxLength: 512 });
+  const match = findSeriesBySecret(secret);
+
+  if (!match) {
+    return sendError(res, 'No lifecycle found for this secret', 404);
+  }
+
+  const versions = await Promise.all(
+    (match.entry?.versions || []).map((versionEntry) => enrichLifecycleVersion(versionEntry))
+  );
+
+  ok(res, {
+    series: match.seriesName,
+    storageMode: match.storageMode,
+    createdAt: match.entry?.created_at || null,
+    versions
+  });
+}));
+
+app.get('/api/v2/lifecycle/download', handle(async (req, res) => {
+  const secret = requireString(req.query.secret, 'secret', { maxLength: 512 });
+  const modelHash = requireString(req.query.modelHash, 'modelHash', { maxLength: 128 });
+  const match = findSeriesBySecret(secret);
+
+  if (!match) {
+    return sendError(res, 'No lifecycle found for this secret', 404);
+  }
+
+  const versionEntry = (match.entry?.versions || []).find(
+    (item) => String(item?.model_hash) === String(modelHash)
+  );
+  if (!versionEntry) {
+    return sendError(res, 'Requested version was not found for this secret', 404);
+  }
+
+  const enriched = await enrichLifecycleVersion(versionEntry);
+  if (enriched.ipfsCid) {
+    const binary = await fetchIpfsBinary(enriched.ipfsCid);
+    if (!binary) {
+      return sendError(res, 'Failed to fetch model artifact from IPFS gateways', 502);
+    }
+
+    const filename = enriched.artifactFileName || buildLifecycleFilename(match.seriesName, versionEntry, null);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(binary);
+  }
+
+  return sendError(res, 'This version does not currently resolve to an IPFS artifact', 404);
 }));
 
 // Provenance tracking

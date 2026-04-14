@@ -4,6 +4,12 @@
 
 `client/` is the React + Vite frontend for the AI Model Provenance System.
 
+Current scope note:
+
+- the frontend is primarily a dashboard and demo surface over backend APIs
+- the main operational write path for provenance still runs through the Python SDK + backend relay
+- the `NFT` page is currently presentation-oriented rather than a full end-user mint workflow
+
 Current pages:
 
 - `Overview`

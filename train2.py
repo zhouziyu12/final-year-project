@@ -1,6 +1,14 @@
 """
-train2.py - Incremental training (V2 update based on V1)
-职责：加载 V1 模型 -> 增量训练 -> 保存 V2 -> 一行调用 SDK
+train2.py
+
+Incremental training example aligned with the current ProvenanceSDK interface.
+
+Flow:
+- load the baseline checkpoint
+- fine-tune locally
+- save a new checkpoint
+- reuse the same lifecycle secret for the model series
+- submit provenance through the current backend relay path
 """
 
 import os
@@ -35,49 +43,45 @@ class DummyNet(nn.Module):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Incremental training V2")
-    parser.add_argument("--commit", default="Incremental training V2")
+    parser = argparse.ArgumentParser(description="Incrementally train a dummy model and submit provenance")
+    parser.add_argument("--commit", default="Incremental training run")
     parser.add_argument("--sender", default="train2.py")
     parser.add_argument("--version", default="v2.0")
-    parser.add_argument("--model-series", default="DummyNet", help="Model series name")
-    parser.add_argument("--base-model", default="artifacts/model_v1.pth", help="Path to V1 model")
+    parser.add_argument("--model-series", default="DummyNet", help="Stable local lifecycle series name")
+    parser.add_argument("--model-name", default=None, help="Optional on-chain model name override")
+    parser.add_argument("--base-model", default="artifacts/model_v1.pth", help="Path to the baseline checkpoint")
     parser.add_argument("--epochs", type=int, default=5, help="Additional training epochs")
     args = parser.parse_args()
 
-    # 1) Use same lifecycle secret for this model series
+    effective_model_name = args.model_name or args.model_series
+
     secret_manager = ModelSecretManager(secrets_dir=str(ROOT / "model_secrets"))
     secret = secret_manager.get_or_create_secret(args.model_series)
 
-    # 2) Load V1 model
     base_model_path = ROOT / args.base_model
     if not base_model_path.exists():
-        print(f"❌ Base model not found: {base_model_path}")
-        print("   Run train1.py first to create V1 model")
+        print(f"Base model not found: {base_model_path}")
+        print("Run train1.py first to create the baseline checkpoint.")
         sys.exit(1)
 
-    print(f"📦 Loading base model from: {base_model_path}")
     model = DummyNet()
-    model.load_state_dict(torch.load(base_model_path))
-    print("✅ Base model loaded")
+    model.load_state_dict(torch.load(base_model_path, map_location="cpu"))
+    print(f"Loaded base model: {base_model_path}")
 
-    # 3) Prepare larger training dataset (simulating more data)
     torch.manual_seed(42)
-    x = torch.randn(100, 16)  # 100 samples (vs 64 in V1)
+    x = torch.randn(100, 16)
     y = torch.randint(0, 8, (100,))
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=5e-4)  # Lower LR for fine-tuning
+    optimizer = optim.Adam(model.parameters(), lr=5e-4)
 
-    # 4) Incremental training
-    print(f"\n🔄 Starting incremental training ({args.epochs} epochs)...")
     model.train()
-
     with torch.no_grad():
         initial_logits = model(x)
         initial_loss = criterion(initial_logits, y).item()
         initial_acc = (initial_logits.argmax(dim=1) == y).float().mean().item()
 
-    print(f"   Initial: loss={initial_loss:.4f}, acc={initial_acc:.4f}")
+    print(f"Initial metrics: loss={initial_loss:.4f}, acc={initial_acc:.4f}")
 
     for epoch in range(args.epochs):
         optimizer.zero_grad()
@@ -85,10 +89,8 @@ def main():
         loss = criterion(logits, y)
         loss.backward()
         optimizer.step()
-
-        if (epoch + 1) % 2 == 0:
-            acc = (logits.argmax(dim=1) == y).float().mean().item()
-            print(f"   Epoch {epoch+1}/{args.epochs}: loss={loss.item():.4f}, acc={acc:.4f}")
+        acc = (logits.argmax(dim=1) == y).float().mean().item()
+        print(f"Epoch {epoch + 1}/{args.epochs}: loss={loss.item():.4f}, acc={acc:.4f}")
 
     model.eval()
     with torch.no_grad():
@@ -96,49 +98,51 @@ def main():
         final_loss = criterion(final_logits, y).item()
         final_acc = (final_logits.argmax(dim=1) == y).float().mean().item()
 
-    print(f"   Final: loss={final_loss:.4f}, acc={final_acc:.4f}")
-    print(f"   Improvement: Δloss={initial_loss - final_loss:.4f}, Δacc={final_acc - initial_acc:.4f}")
-
-    # 5) Save V2 model
     out_dir = ROOT / "artifacts"
     out_dir.mkdir(parents=True, exist_ok=True)
     model_path = out_dir / "model_v2.pth"
     torch.save(model.state_dict(), model_path)
-    print(f"\n💾 V2 model saved: {model_path}")
 
-    # 6) Submit provenance via SDK
-    print("\n📡 Submitting provenance to blockchain...")
     sdk = ProvenanceSDK(project_root=str(ROOT))
-
     result = sdk.submit_provenance(
         str(model_path),
         args.commit,
         args.sender,
         args.version,
-        secret
+        secret,
+        model_name=effective_model_name,
     )
 
-    # 7) Record lifecycle version by shared secret/model-series
     secret_manager.record_version(
         args.model_series,
         args.version,
-        result['modelId'],
-        result['modelHash']
+        result["modelId"],
+        result["modelHash"],
+        model_name=effective_model_name,
+        chain=result.get("chain"),
+        ipfs_cid=result["ipfs"].get("ipfsCid"),
+        tx_hash=result["relayer"].get("tx"),
     )
 
-    print("\n" + "="*60)
-    print("✅ INCREMENTAL TRAINING COMPLETE")
-    print("="*60)
-    print(f"Model Series:   {args.model_series}")
-    print(f"Lifecycle Secret: {secret} (same as train1, saved locally)")
-    print(f"Base Model:     {args.base_model}")
-    print(f"New Model:      {model_path}")
+    print("\n" + "=" * 60)
+    print("INCREMENTAL TRAINING COMPLETE")
+    print("=" * 60)
+    print(f"Model series:   {args.model_series}")
+    print(f"Model name:     {effective_model_name}")
+    print(f"Base model:     {base_model_path}")
+    print(f"Checkpoint:     {model_path}")
     print(f"Model ID:       {result['modelId']}")
-    print(f"IPFS CID:       {result['relayer'].get('modelCid', 'N/A')}")
-    print(f"Sepolia Tx:     {result['relayer'].get('sepoliaTxHash', 'N/A')}")
-    print(f"tBNB Tx:        {result['relayer'].get('tbnbTxHash', 'N/A')}")
-    print(f"Training Δ:     loss {initial_loss:.4f}→{final_loss:.4f}, acc {initial_acc:.4f}→{final_acc:.4f}")
-    print("="*60)
+    print(f"Model hash:     {result['modelHash']}")
+    print(f"IPFS CID:       {result['ipfs'].get('ipfsCid')}")
+    print(f"Relay tx:       {result['relayer'].get('tx')}")
+    print(f"Initial loss:   {initial_loss:.4f}")
+    print(f"Final loss:     {final_loss:.4f}")
+    print(f"Initial acc:    {initial_acc:.4f}")
+    print(f"Final acc:      {final_acc:.4f}")
+    print(f"Loss delta:     {initial_loss - final_loss:.4f}")
+    print(f"Acc delta:      {final_acc - initial_acc:.4f}")
+    print("=" * 60)
+    print(result)
 
 
 if __name__ == "__main__":

@@ -1,21 +1,32 @@
-import json
+"""
+train_v2_incremental.py
+
+Incremental training example aligned with the current SDK interface.
+
+Flow:
+- load a base checkpoint when available
+- fine-tune locally
+- save updated weights
+- reuse the same local lifecycle secret for the model series
+- submit provenance through the current ProvenanceSDK entry point
+"""
+
 import os
-import random
-import hashlib
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+os.environ["OMP_NUM_THREADS"] = "1"
+
 import argparse
-import subprocess
 from pathlib import Path
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 
-# Make SDK import robust regardless of cwd/package setup
 import sys
 ROOT = Path(__file__).resolve().parent
-SDK_PATH = ROOT / "sdk" / "python"
-sys.path.append(str(SDK_PATH))
+sys.path.append(str(ROOT / "sdk" / "python"))
 from provenance_sdk import ProvenanceSDK
+from model_secret_manager import ModelSecretManager
 
 
 class SimpleCNN(nn.Module):
@@ -40,169 +51,99 @@ class SimpleCNN(nn.Module):
         return self.classifier(self.features(x))
 
 
-def hash_file(path: Path) -> str:
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return "0x" + h.hexdigest()
-
-
-def generate_zk_proof(model_id: int, secret: str = "123456789") -> dict:
-    """Generate real ZK proof using snarkjs"""
-    try:
-        # Write proof input
-        proof_input = {"secret": secret, "modelId": str(model_id)}
-        with open("last_proof_input.json", "w") as f:
-            json.dump(proof_input, f)
-        
-        print(f"[ZK] Generating proof for model {model_id}...")
-        result = subprocess.run(
-            ["node", "scripts/quick_gen_proof.js"],
-            capture_output=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=120
-        )
-        
-        if result.returncode != 0:
-            print(f"[ZK] Warning: Proof generation failed: {result.stderr}")
-            return {"zk_verified": False, "proof_status": "generation_failed"}
-        
-        # Read generated proof
-        if Path("proof_calldata.txt").exists():
-            with open("proof_calldata.txt", "r") as f:
-                calldata = f.read().strip()
-            
-            print(f"[ZK] ✅ Proof generated successfully")
-            return {
-                "zk_verified": True,
-                "proof_status": "verified",
-                "proof_calldata": calldata[:100] + "...",  # Truncate for storage
-                "circuit": "Poseidon hash commitment"
-            }
-        else:
-            return {"zk_verified": False, "proof_status": "proof_file_missing"}
-            
-    except subprocess.TimeoutExpired:
-        print("[ZK] Warning: Proof generation timeout")
-        return {"zk_verified": False, "proof_status": "timeout"}
-    except Exception as e:
-        print(f"[ZK] Warning: Proof generation error: {e}")
-        return {"zk_verified": False, "proof_status": f"error: {str(e)}"}
-
-
 def main():
-    parser = argparse.ArgumentParser(description="Train V2 model (incremental) with provenance tracking")
-    parser.add_argument("--commit", type=str, default="Incremental training on V1 base", help="Commit message describing changes")
-    parser.add_argument("--sender", type=str, default="train_v2_incremental.py", help="Sender address or identifier")
-    parser.add_argument("--version", type=str, default="v2.0", help="Version tag for this training run")
-    parser.add_argument("--model-id", type=int, default=None, help="Model ID (defaults to env PROVENANCE_MODEL_ID or 5001)")
-    parser.add_argument("--epochs", type=int, default=3, help="Number of training epochs")
-    parser.add_argument("--base-model", type=str, default="artifacts/model_v1_sepolia.pth", help="Base model to load")
+    parser = argparse.ArgumentParser(description="Incrementally fine-tune a CNN model and submit provenance")
+    parser.add_argument("--commit", default="Incremental training on V1 base")
+    parser.add_argument("--sender", default="train_v2_incremental.py")
+    parser.add_argument("--version", default="v2.0")
+    parser.add_argument("--model-series", default="SimpleCNN", help="Stable model series name for local secret tracking")
+    parser.add_argument("--model-name", default=None, help="Optional on-chain model name override")
+    parser.add_argument("--base-model", default="artifacts/model_v1_sepolia.pth", help="Path to the base checkpoint")
+    parser.add_argument("--epochs", type=int, default=3, help="Fine-tuning epochs")
     args = parser.parse_args()
 
-    random.seed(42)
-    torch.manual_seed(42)
+    secret_manager = ModelSecretManager(secrets_dir=str(ROOT / "model_secrets"))
+    secret = secret_manager.get_or_create_secret(args.model_series)
 
-    # Simulate training data (100 samples this time)
+    torch.manual_seed(42)
     x = torch.randn(100, 1, 28, 28)
     y = torch.randint(0, 10, (100,))
 
     model = SimpleCNN()
-    
-    # Load base model if exists
-    base_model_path = Path(args.base_model)
+
+    base_model_path = ROOT / args.base_model
     if base_model_path.exists():
-        print(f"[V2] Loading base model from {base_model_path}")
+        print(f"Loading base model from: {base_model_path}")
         model.load_state_dict(torch.load(base_model_path))
     else:
-        print(f"[V2] Base model not found, training from scratch")
+        print(f"Base model not found at {base_model_path}, continuing from random init")
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=5e-4)  # Lower learning rate for fine-tuning
+    optimizer = optim.Adam(model.parameters(), lr=5e-4)
 
     model.train()
-    epochs = args.epochs
-    initial_loss = None
-    for epoch in range(epochs):
+    with torch.no_grad():
+        initial_logits = model(x)
+        initial_loss = criterion(initial_logits, y).item()
+        initial_acc = (initial_logits.argmax(dim=1) == y).float().mean().item()
+
+    for epoch in range(args.epochs):
         optimizer.zero_grad()
-        out = model(x)
-        loss = criterion(out, y)
-        if epoch == 0:
-            initial_loss = float(loss.item())
+        logits = model(x)
+        loss = criterion(logits, y)
         loss.backward()
         optimizer.step()
+        print(f"Epoch {epoch + 1}/{args.epochs}: loss={loss.item():.4f}")
 
-    final_loss = float(loss.item())
-    
-    # Calculate accuracy
     model.eval()
     with torch.no_grad():
-        out = model(x)
-        pred = out.argmax(dim=1)
-        accuracy = (pred == y).float().mean().item()
+        final_logits = model(x)
+        final_loss = criterion(final_logits, y).item()
+        final_acc = (final_logits.argmax(dim=1) == y).float().mean().item()
 
-    artifacts_dir = ROOT / "artifacts"
-    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    out_dir = ROOT / "artifacts"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    model_path = out_dir / "model_v2_incremental.pth"
+    torch.save(model.state_dict(), model_path)
 
-    weights_path = artifacts_dir / "model_v2_incremental.pth"
-    torch.save(model.state_dict(), weights_path)
-
-    model_hash = hash_file(weights_path)
-    model_id = args.model_id or int(os.getenv("PROVENANCE_MODEL_ID", "5001"))
-
-    # Generate real ZK proof
-    zk_proof_data = generate_zk_proof(model_id)
-
-    sdk = ProvenanceSDK(base_url=os.getenv("PROVENANCE_SERVER", "http://127.0.0.1:3000"), timeout=120)
-
-    metadata = {
-        "framework": "PyTorch",
-        "stage": "incremental_training",
-        "samples_used": 100,
-        "epochs": epochs,
-        "initial_loss": initial_loss,
-        "final_loss": final_loss,
-        "accuracy": accuracy,
-        "loss_improvement": initial_loss - final_loss if initial_loss else 0,
-        "chain": "multi-chain",
-        "version": args.version,
-        "weights_path": str(weights_path),
-        "commit": args.commit,
-        "base_model": args.base_model,
-        **zk_proof_data,  # Include real ZK proof data
-    }
-
+    sdk = ProvenanceSDK(project_root=str(ROOT))
     result = sdk.submit_provenance(
-        model_hash=model_hash,
-        training_metadata=metadata,
-        action="TRAIN_V2_INCREMENTAL",
-        sender=args.sender,
-        model_id=model_id,
-        commit=args.commit,
-        version_tag=args.version,
-        model_file_path=str(weights_path),
+        str(model_path),
+        args.commit,
+        args.sender,
+        args.version,
+        secret,
+        model_name=args.model_name or args.model_series,
     )
 
-    out = {
-        "model_id": model_id,
-        "model_hash": model_hash,
-        "weights_path": str(weights_path),
-        "commit": args.commit,
-        "version": args.version,
-        "sender": args.sender,
-        "accuracy": accuracy,
-        "final_loss": final_loss,
-        "loss_improvement": metadata["loss_improvement"],
-        "zk_proof": zk_proof_data,
-        "sdk_result": result,
-    }
-    with (artifacts_dir / "v2_result.json").open("w", encoding="utf-8") as f:
-        json.dump(out, f, indent=2)
+    secret_manager.record_version(
+        args.model_series,
+        args.version,
+        result["modelId"],
+        result["modelHash"],
+        model_name=args.model_name or args.model_series,
+        chain=result.get("chain"),
+        ipfs_cid=result["ipfs"].get("ipfsCid"),
+        tx_hash=result["relayer"].get("tx"),
+    )
 
-    print("V2 complete")
-    print(json.dumps(out, indent=2))
+    print("\n" + "=" * 60)
+    print("INCREMENTAL TRAINING COMPLETE")
+    print("=" * 60)
+    print(f"Model series:   {args.model_series}")
+    print(f"Model name:     {args.model_name or args.model_series}")
+    print(f"Base model:     {base_model_path}")
+    print(f"New checkpoint: {model_path}")
+    print(f"Model ID:       {result['modelId']}")
+    print(f"Model hash:     {result['modelHash']}")
+    print(f"Initial loss:   {initial_loss:.4f}")
+    print(f"Final loss:     {final_loss:.4f}")
+    print(f"Initial acc:    {initial_acc:.4f}")
+    print(f"Final acc:      {final_acc:.4f}")
+    print(f"Loss delta:     {initial_loss - final_loss:.4f}")
+    print(f"Acc delta:      {final_acc - initial_acc:.4f}")
+    print("=" * 60)
+    print(result)
 
 
 if __name__ == "__main__":

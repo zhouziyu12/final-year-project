@@ -25,6 +25,19 @@ The backend enforces:
 
 If `WRITE_API_KEY` is not configured, write endpoints return `503`.
 
+## Scope Note
+
+The current API surface is centered on:
+
+- backend relay
+- model registration
+- provenance tracking
+- lifecycle lookup by secret
+- audit reads
+- IPFS upload helpers
+
+Bridge-related contracts and some advanced on-chain features exist in the repository, but they are not the primary default API write path today.
+
 ## Read Endpoints
 
 ### `GET /api/health`
@@ -93,6 +106,52 @@ Verifies the provenance chain for a model and returns:
 - `recordCount`
 - `latestRecord`
 
+### `GET /api/v2/lifecycle`
+
+Loads the version history for one model series by lifecycle secret.
+
+Required query parameter:
+
+- `secret=<lifecycle-secret>`
+
+Response highlights:
+
+- `series`
+- `storageMode`
+- `createdAt`
+- `versions[]`
+
+Each version entry may include:
+
+- `version`
+- `modelId`
+- `modelHash`
+- `chain`
+- `ipfsCid`
+- `txHash`
+- `downloadReady`
+- `downloadSource`
+
+Current runtime expectation:
+
+- the downloadable artifact is resolved from IPFS
+- for older records, the backend may recover `ipfsCid` by reading the on-chain provenance metadata and matching `modelHash` or `versionTag`
+
+### `GET /api/v2/lifecycle/download`
+
+Downloads one model version by lifecycle secret and version hash.
+
+Required query parameters:
+
+- `secret=<lifecycle-secret>`
+- `modelHash=<model-hash>`
+
+Behavior:
+
+- the backend resolves the version entry for that model series
+- it then fetches the corresponding file from IPFS gateways
+- if the version does not resolve to an IPFS CID, the route returns `404`
+
 ### `GET /api/ipfs/cat/:cid`
 
 Fetches IPFS content by CID.
@@ -160,6 +219,33 @@ Notes:
 - if `modelName` is provided and there is no valid mapping, the backend attempts auto-registration
 - `action` must be one of the backend-supported actions
 - invalid model IDs, missing models, and invalid object payloads are rejected
+- the SDK may include ZK-related metadata in the payload, but the current mainline backend path still writes through the normal provenance-tracker record flow
+- the current backend route writes `addRecord(...)`, not `addZKProofRecord(...)`
+
+Current SDK-submitted `trainingMetadata` typically includes:
+
+- `framework`
+- `stage`
+- `version`
+- `commit`
+- `message_hash`
+- `weights_path`
+- `zk_verified`
+- `zk_engine`
+- `zk_public_signals`
+- `zk_calldata`
+- `ipfs_upload_mode`
+- `sdk_timestamp`
+
+Important behavior detail:
+
+- `commit` and `modelFilePath` may be sent by the SDK
+- they are accepted in practice as extra request fields
+- they are not currently consumed by the backend route logic
+
+Current default SDK action:
+
+- the SDK currently submits the event with `action="UPDATED"` even for the baseline training flow
 
 ### `POST /api/audit`
 
@@ -217,12 +303,17 @@ curl -X POST http://127.0.0.1:3000/api/sdk/provenance \
 
 ## Contracts Behind the API
 
+Primary runtime-facing contracts:
+
 - `ModelAccessControl`
 - `ModelRegistry`
 - `ModelProvenanceTracker`
 - `ModelAuditLog`
 - `ModelNFT`
 - `ModelStaking`
+
+Repository-level but not default API-path contracts:
+
 - `Verifier`
 - `RealZKBridge`
 

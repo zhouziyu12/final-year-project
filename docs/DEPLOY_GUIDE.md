@@ -49,6 +49,20 @@ Deployment metadata is merged into:
 
 - `address_v2_multi.json`
 
+Current default deployment scope:
+
+- `ModelAccessControl`
+- `ModelRegistry`
+- `ModelProvenanceTracker`
+- `ModelAuditLog`
+- `ModelNFT`
+- `ModelStaking`
+
+Note:
+
+- `Verifier.sol` and `RealZKBridge.sol` exist in the repository
+- they are not part of the default `deploy_multi_chain.cjs` flow at the moment
+
 ## 5. Build ZK Assets
 
 If the circuit changed, rebuild inside `zk/`:
@@ -109,3 +123,4 @@ powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
 - `/api/register` now predicts a model ID and returns a pending registration response immediately.
 - ZK artifacts live under `zk/`, not the repository root.
 - Native Windows circuit compilation is supported and already verified.
+- Local proof generation is implemented today, but bridge-backed end-to-end settlement is still only partially integrated into the main application path.

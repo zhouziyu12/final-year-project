@@ -84,13 +84,29 @@ class ModelSecretManager:
         result = subprocess.run(cmd, capture_output=True, text=True, env=env, check=True)
         return result.stdout.strip()
 
-    def _get_secret_value(self, model_series: str) -> Optional[str]:
+    def _get_secret_value(self, model_series: str, *, strict: bool = False) -> Optional[str]:
         entry = self.secrets.get(model_series)
         if not entry:
             return None
-        if entry.get("secret_ciphertext"):
-            return self._unprotect_secret(entry["secret_ciphertext"])
-        return entry.get("secret")
+
+        legacy_secret = entry.get("secret")
+        ciphertext = entry.get("secret_ciphertext")
+
+        if ciphertext:
+            try:
+                return self._unprotect_secret(ciphertext)
+            except Exception as exc:
+                if legacy_secret:
+                    return legacy_secret
+                if strict:
+                    raise RuntimeError(
+                        f"Unable to decrypt secret for model series '{model_series}'. "
+                        "This entry may have been encrypted under a different Windows "
+                        "user profile or machine."
+                    ) from exc
+                return None
+
+        return legacy_secret
 
     @staticmethod
     def _mask_secret(secret: str) -> str:
@@ -123,17 +139,48 @@ class ModelSecretManager:
             del self.secrets[model_series]["secret"]
             self._save_secrets()
 
-        return self._get_secret_value(model_series)
+        resolved_secret = self._get_secret_value(model_series, strict=True)
+        if resolved_secret is None:
+            raise RuntimeError(f"Secret for model series '{model_series}' is unavailable")
+        return resolved_secret
 
-    def record_version(self, model_series: str, version: str, model_id: int, model_hash: str):
+    def record_version(
+        self,
+        model_series: str,
+        version: str,
+        model_id: int,
+        model_hash: str,
+        *,
+        model_name: Optional[str] = None,
+        chain: Optional[str] = None,
+        ipfs_cid: Optional[str] = None,
+        tx_hash: Optional[str] = None,
+    ):
         """Record version metadata for a model series."""
         if model_series in self.secrets:
-            self.secrets[model_series]["versions"].append({
+            version_entry = {
                 "version": version,
                 "model_id": model_id,
                 "model_hash": model_hash,
                 "timestamp": datetime.now(UTC).isoformat().replace("+00:00", "Z")
-            })
+            }
+
+            if model_name:
+                version_entry["model_name"] = model_name
+            if chain:
+                version_entry["chain"] = chain
+            if ipfs_cid:
+                version_entry["ipfs_cid"] = ipfs_cid
+            if tx_hash:
+                version_entry["tx_hash"] = tx_hash
+
+            versions = self.secrets[model_series].setdefault("versions", [])
+            existing = next((item for item in versions if item.get("model_hash") == model_hash), None)
+            if existing:
+                existing.update(version_entry)
+            else:
+                versions.append(version_entry)
+
             self._save_secrets()
 
     def get_secret(self, model_series: str) -> Optional[str]:
