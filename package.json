@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "user:create": "node scripts/create_user.cjs create",
+    "user:list": "node scripts/create_user.cjs list",
+    "user:delete": "node scripts/create_user.cjs delete"
   },
   "keywords": [],
   "author": "",

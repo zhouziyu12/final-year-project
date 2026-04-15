@@ -1,267 +1,184 @@
-# Project Status Baseline
+# Project Status
 
-This document records the current, code-verified state of the project as of 2026-04-14.
+Updated: 2026-04-15
 
-Its purpose is to distinguish:
+This document records the current implementation status after the ownership, authentication, lifecycle, and terminology drift cleanup.
 
-- what is already implemented
-- what is only partially implemented
-- what is described in docs or reports but not fully realized in the current codebase
-- what appears stale or inconsistent
+## 1. Current System Statement
 
-This file should be treated as the current source of truth for project-scoping discussions until the rest of the documentation is synchronized.
+The repository now presents one consistent primary workflow:
 
-## 1. Implemented Today
+- the Python SDK is the write client
+- the backend issues JWTs and relays writes
+- the registry stores the real authenticated owner address
+- provenance writes are verifier-gated
+- the frontend is a presentation and download surface
 
-### 1.1 Smart Contract Layer
+## 2. Implemented Now
 
-The repository contains and compiles the following contract sources:
+### 2.1 Authentication and Identity
 
-- `ModelAccessControl.sol`
-- `ModelRegistry.sol`
-- `ProvenanceTracker.sol` (`ModelProvenanceTracker`)
-- `ModelAuditLog.sol`
-- `ModelNFT.sol`
-- `ModelStaking.sol`
-- `RealZKBridge.sol`
-- `Verifier.sol`
+Implemented:
 
-The currently recorded deployed addresses in `address_v2_multi.json` cover these active deployment targets:
+- file-backed backend auth store in `server/data/auth_store.json`
+- `POST /api/auth/login`
+- `GET /api/auth/me`
+- account status, lockout, and token-version checks
+- JWT-protected write and lifecycle routes
+- ephemeral fallback JWT signing secret when `JWT_SECRET` is unset, with runtime warnings and status visibility
 
-- `ModelAccessControl`
-- `ModelRegistry`
-- `ModelProvenanceTracker`
-- `ModelAuditLog`
-- `ModelNFT`
-- `ModelStaking`
+Boundary note:
 
-The active deployment file currently targets:
+- the current local username/password account store is a prototype-friendly baseline, not the final production identity stack
 
-- Sepolia
-- BNB Testnet (`tbnb`)
+Current default seeded account:
 
-### 1.2 Backend Service
+- username: `researcher`
+- password: `researcher-demo-pass`
+- wallet: `0x1111111111111111111111111111111111111111`
 
-The backend in `server/server.js` is implemented and acts as the main orchestration layer.
+### 2.2 Ownership and Registry
 
-Implemented backend capabilities include:
+Implemented:
 
-- health and status endpoints
-- model list and model detail read endpoints
-- audit verification endpoints
-- recent audit event querying
-- protected write routes using API key + timestamp + nonce
-- replay protection with persisted nonce state
-- IP-based write rate limiting
-- optional read-only startup mode when `PRIVATE_KEY` is absent
-- Pinata-backed file and metadata upload endpoints
-- model registration relay
-- SDK provenance relay
+- `ModelRegistry.registerModelFor(address owner, ...)`
+- backend relay uses the authenticated user's bound wallet as the on-chain owner
+- owner-scoped model resolution via `GET /api/v2/models/resolve`
+- owner-scoped backend index in `model_name_map.json`
 
-### 1.3 Frontend Application
+Current identity rule:
 
-The React frontend in `client/` is implemented as a demo and inspection interface.
+```text
+chain + owner + modelName
+```
 
-Implemented UI sections:
+### 2.3 SDK Submission Path
 
-- `Overview`
-- `Training`
-- `Registry`
-- `Audit`
-- `System`
-- `NFT`
+Implemented:
 
-What the frontend currently does well:
+- SDK login and bearer-token session handling
+- owner-aware model resolution
+- authenticated `POST /api/register`
+- authenticated `POST /api/sdk/provenance`
+- canonical metadata string as the authoritative write payload
+- `statementHash` computation from `canonicalMetadata`
+- isolated proof outputs under `.proof_runs/<run-id>/`
 
-- reads backend health, status, model, and audit data
-- shows registry inventory and per-model detail
-- displays current backend write posture
-- supports local demo registration if `VITE_WRITE_API_KEY` is configured
-- presents the training pipeline as an explanatory workflow
+### 2.4 Frontend
 
-### 1.4 Python SDK and Local Training Flow
+Implemented:
 
-The Python SDK in `sdk/python/provenance_sdk.py` is implemented and is currently the main route for end-to-end provenance submission.
+- read-only status, registry, and audit pages
+- authenticated lifecycle lookup and download
+- removal of browser registration flow
+- removal of `VITE_WRITE_API_KEY` dependency
 
-Implemented SDK behavior:
+### 2.5 Lifecycle Access
 
-- hash a local model file
-- resolve or auto-register a model through the backend
-- generate a local ZK proof by calling `test_zk_standalone.js`
-- upload files or metadata to IPFS when Pinata credentials exist
-- submit a provenance record to the backend relay
+Implemented:
 
-Implemented training-side scripts:
+- `POST /api/v2/lifecycle/query`
+- `POST /api/v2/lifecycle/download`
 
-- `train1.py`
-- `train2.py`
+Deprecated:
 
-These scripts currently represent the main documented local training entry points.
+- `GET /api/v2/lifecycle`
+- `GET /api/v2/lifecycle/download`
 
-### 1.5 ZK Tooling
+The deprecated `GET` routes now return `410`.
 
-The repository contains a working local proof-generation flow:
+### 2.6 Terminology Cleanup
 
-- circuit source in `zk/circuit.circom`
-- witness/proof artifacts in the repo
-- local standalone generator/verifier in `test_zk_standalone.js`
+Implemented:
 
-The current implementation successfully supports local proof generation and local proof verification.
+- `isActive` replaces list/detail `verified`
+- `chainVerified` is used for audit verification results
+- `statementHash` is the application term
+- `messageHash` is kept only for circuit compatibility
 
-### 1.6 Tests and Support Scripts
+## 3. Current Deployments
 
-The repository includes:
+Deployment metadata was refreshed and written to `address_v2_multi.json`.
 
-- contract smoke/integration scripts
-- zk proof tests
-- SDK/backend integration tests
-- a PowerShell test runner
+### Sepolia
 
-Main active test entry points:
+- `ModelAccessControl`: `0x81f11fB35a79ed025d271C1d4e7a27c2227B37F3`
+- `ModelRegistry`: `0x487C02203D72b378a69F47daC0957c0c3354C9aC`
+- `Groth16Verifier`: `0xE1639d60F78F4Ba37C2D00BCD3612cAfD858af17`
+- `ZKProvenanceTracker`: `0xCaE0d0ff07DfC0cdd21e9Ddb2813dA66931bC5cD`
+- `ModelAuditLog`: `0x78483775fB4fE3fF6e16b1E0349ac2576fa379a9`
 
-- `scripts/test_contracts.cjs`
-- `test_zk_standalone.js`
-- `tests/test_sdk_backend.py`
-- `tests/run_all_tests.ps1`
+Optional extensions still deployed:
+- `ModelProvenanceTracker`: `0x29F7dD3f13cB0AC3AD7Bb30696E5dC54FdA78433`
+- `ModelNFT`: `0x0c0fEEe0905Ce3bEf2398F0901cf409BA33d0102`
+- `ModelStaking`: `0x9d61cb24661e765b52E7E679e2CD0c8dEeC69D73`
 
-## 2. Partially Implemented
+These extension addresses are retained for completeness, but they are not part of the primary paper narrative or authenticated SDK write path.
 
-### 2.1 ZK-Provenance Integration
+### tBNB
 
-ZK proof generation is implemented locally in the SDK flow.
+- `ModelAccessControl`: `0x4FA4C2176750F6FfB8864b8086432C6Cdd1fFFc6`
+- `ModelRegistry`: `0x8d32A2dcBDa306c678cab2370F3dafA3E1D46948`
+- `Groth16Verifier`: `0x7054577279D496DcF00E37FdBe9a192631e195D4`
+- `ZKProvenanceTracker`: `0x947a547ad9da78E12c3F2F4e1197787ADD9Ff61a`
+- `ModelAuditLog`: `0x5e502baC7D8379B481c0e2fD8A0c052d8F151959`
 
-However, the current backend submission path does not fully enforce or settle the proof through the bridge contracts. In practice:
+Optional extensions still deployed:
+- `ModelProvenanceTracker`: `0xFF29f9100d0142e0E3324547Af12a91f173f069E`
+- `ModelNFT`: `0x5a802AE610D3F9640446d5511Bc303C8ea5Ffa24`
+- `ModelStaking`: `0x4b7ede20bE885E11A57a4F4Af6103bA6c298d337`
 
-- the SDK generates the proof
-- proof-related data is included in metadata
-- the backend submits provenance mainly through the normal tracker record path
+These extension addresses are retained for completeness, but they are not part of the primary paper narrative or authenticated SDK write path.
 
-So the project currently has:
+## 4. Validated On This Baseline
 
-- local ZK proof generation: implemented
-- local ZK proof verification: implemented
-- full end-to-end bridge-backed ZK settlement in the default app flow: not fully wired
+Re-run on the current codebase:
 
-### 2.2 Audit Story vs Audit Write Path
+- `npx hardhat compile --show-stack-traces`
+- `python tests/test_sdk_backend.py`
+- `node tests/test_zk_proof.js`
+- `cd client && npm run lint`
+- `cd client && npm run build`
 
-The project exposes audit read functionality and includes a dedicated `ModelAuditLog` contract.
+Observed outcomes:
 
-But the backend currently emphasizes reading audit information more than writing to the dedicated audit contract in the main application flow. This means the audit narrative is stronger than the current write-side integration.
+- backend auth and SDK integration test suite passed after redeployment
+- SDK model resolution succeeded against the new `registerModelFor` deployment
+- lifecycle access no longer exposes secrets in the request URL
+- proof outputs no longer overwrite each other across concurrent runs
 
-### 2.3 NFT and Staking Features
+## 5. Current Truths
 
-The repo includes contract support for NFT and staking features.
+True today:
 
-Current state:
+- model ownership on-chain reflects the authenticated user, not the relay wallet
+- the backend write path is JWT-authenticated
+- frontend write mode is removed
+- the registry list is owner-aware and backend-managed
+- the verifier-gated provenance route is the primary SDK write path
 
-- contracts exist
-- deployment addresses exist for NFT and staking
-- basic script-level interactions exist
-- frontend NFT page is mostly presentational
-- the app does not currently expose a complete user-facing NFT or staking workflow
+Not claimed today:
 
-### 2.4 Cross-Chain System Story
+- that `/api/v2/models` is a complete chain-wide inventory
+- that the browser is the normal training submitter
+- that bridge contracts are the default provenance route
+- that proof blobs are persisted on-chain
 
-The project clearly aims to present a cross-chain provenance architecture.
+## 6. Near-Term Deferred Scope
 
-Current code-verified state:
+Still intentionally secondary or deferred:
 
-- active deployments are recorded on Sepolia and tBNB
-- bridge-related contracts exist in source
-- the default end-to-end runtime path is verifier-gated backend orchestration plus tracked chain state, while the fully trustless bridge workflow remains a separate architectural path
+- upgrading `ModelAuditLog` into the sole authoritative write ledger
+- full wallet-signature login instead of local username/password auth
+- a browser-based training control plane
+- bridge-first multi-chain settlement as the default narrative
 
-## 3. Not Fully Implemented or Not Verified in Current Mainline
+The present repo baseline is therefore aligned with the paper-friendly statement:
 
-The following should not currently be described as fully implemented without qualification:
-
-- a production-complete trustless cross-chain bridge workflow
-- end-to-end on-chain enforcement of all ZK verification steps in the default SDK/backend path
-- a full user-facing NFT issuance and management workflow
-- a full user-facing staking workflow
-- automatic chain-wide model discovery independent of local cache/mapping files
-- dynamic backend verification of ZK readiness at runtime
-
-## 4. Confirmed Drift and Inconsistency
-
-### 4.1 Documentation Drift
-
-The current repository contains multiple descriptions of the system that do not fully match each other.
-
-Observed drift includes:
-
-- `README.md`
-- `docs/`
-- `FYP Interim Report.pdf`
-- deployment scripts
-- CI workflow
-
-Examples:
-
-- some materials describe a broader or more complete cross-chain story than the current runtime path supports
-- some materials reference system behavior that has since changed
-- some materials emphasize chains or flow variants that are not the active code path today
-
-### 4.2 Script Drift
-
-The following files appear outdated or mismatched with the current main interfaces:
-
-- `train_v2_incremental.py`
-- `query_lifecycle.py`
-- `client/scripts_extract_abi.js`
-- `create-dashboard.js`
-
-Specific confirmed issues:
-
-- `train_v2_incremental.py` does not appear to match the current `ProvenanceSDK.submit_provenance(...)` signature
-- `query_lifecycle.py` appears written for an older plaintext secret storage structure, while the current secret manager stores encrypted payloads
-
-### 4.3 CI Drift
-
-The GitHub Actions workflow appears partially out of sync with the current repo layout and active commands.
-
-Examples include:
-
-- path assumptions that do not match the current folder structure
-- dependency assumptions that do not match current lockfile placement
-- stale or mismatched test entry expectations
-
-## 5. Current Real System Flow
-
-The most accurate current system description is:
-
-1. A local training script produces a model artifact.
-2. The Python SDK hashes the model.
-3. The SDK ensures a model is registered through the backend.
-4. The SDK generates a local ZK proof.
-5. The SDK uploads model data or metadata to IPFS when configured.
-6. The SDK submits provenance metadata to the backend.
-7. The backend relays the write to chain-facing contract calls.
-8. The frontend reads status, registry, and audit views back from the backend.
-
-This means the practical center of gravity is:
-
-- local Python tooling for creation
-- backend relay for controlled writes
-- frontend dashboard for visibility
-
-## 6. Recommended Wording for Academic Writing
-
-Safe wording:
-
-- "The current prototype implements model registration, verifier-gated provenance tracking, protected backend relay, local ZK proof generation, IPFS-backed metadata handling, and a frontend audit dashboard."
-- "Default provenance submissions are enforced through the verifier-gated backend and `ZKProvenanceTracker`, while cross-chain bridge-oriented settlement remains a separate architectural capability."
-- "NFT and staking support are implemented at contract level, with limited integration at the application layer."
-
-Wording to avoid without qualification:
-
-- "The system fully achieves trustless end-to-end cross-chain settlement."
-- "The frontend provides complete NFT and staking operations."
-
-## 7. Immediate Cleanup Priorities
-
-The highest-value next steps are:
-
-1. synchronize README and docs with the current prototype
-2. fix or retire stale scripts
-3. align CI with current commands and folder layout
-4. decide whether bridge/ZK claims in the paper should be presented as implemented, partially implemented, or future work
+```text
+SDK main path
++ backend relay
++ verifier-gated provenance
++ ownership-preserving registry writes
++ frontend display and download
+```

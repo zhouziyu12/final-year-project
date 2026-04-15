@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  BadgeCheck,
   Binary,
   Database,
   LayoutDashboard,
@@ -15,8 +14,7 @@ const NAV_ITEMS = [
   { id: 'training', label: 'Train', icon: Binary },
   { id: 'registry', label: 'Registry', icon: Database },
   { id: 'audit', label: 'Audit', icon: ShieldCheck },
-  { id: 'system', label: 'System', icon: ServerCog },
-  { id: 'certificates', label: 'Cert', icon: BadgeCheck }
+  { id: 'system', label: 'System', icon: ServerCog }
 ];
 
 function formatLastUpdated(value) {

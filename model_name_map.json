@@ -1,6 +1,79 @@
 {
-  "tbnb:TestModel.py": 15,
-  "tbnb:test_model.py": 16,
-  "sepolia:VerifierGatedDemo0415": 1,
-  "sepolia:VerifierGatedDemoV2": 2
+  "version": 2,
+  "chains": {
+    "tbnb": {
+      "owners": {
+        "__legacy__": {
+          "testmodel.py": {
+            "id": 15,
+            "name": "TestModel.py",
+            "owner": null,
+            "createdAt": "2026-04-15T11:00:48.872Z"
+          },
+          "test_model.py": {
+            "id": 16,
+            "name": "test_model.py",
+            "owner": null,
+            "createdAt": "2026-04-15T11:00:48.873Z"
+          }
+        }
+      }
+    },
+    "sepolia": {
+      "owners": {
+        "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1": {
+          "testsdkmodel_1776248015": {
+            "id": 10,
+            "name": "TestSDKModel_1776248015",
+            "owner": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1",
+            "createdAt": "2026-04-15T11:00:48.873Z"
+          }
+        },
+        "0x1111111111111111111111111111111111111111": {
+          "testsdkmodel_1776251192": {
+            "id": 1,
+            "name": "TestSDKModel_1776251192",
+            "owner": "0x1111111111111111111111111111111111111111",
+            "createdAt": "2026-04-15T11:06:50.376Z"
+          },
+          "verifiergateddemo0415": {
+            "id": 1,
+            "name": "VerifierGatedDemo0415",
+            "owner": "0x1111111111111111111111111111111111111111",
+            "createdAt": "2026-04-15T11:00:48.873Z"
+          },
+          "testsdkmodel_1776251853": {
+            "id": 2,
+            "name": "TestSDKModel_1776251853",
+            "owner": "0x1111111111111111111111111111111111111111",
+            "createdAt": "2026-04-15T11:17:48.102Z"
+          },
+          "verifiergateddemov2": {
+            "id": 2,
+            "name": "VerifierGatedDemoV2",
+            "owner": "0x1111111111111111111111111111111111111111",
+            "createdAt": "2026-04-15T11:00:48.873Z"
+          },
+          "testsdkmodel_1776254801": {
+            "id": 4,
+            "name": "TestSDKModel_1776254801",
+            "owner": "0x1111111111111111111111111111111111111111",
+            "createdAt": "2026-04-15T12:06:53.105Z"
+          },
+          "testsdkmodel_1776255252": {
+            "id": 5,
+            "name": "TestSDKModel_1776255252",
+            "owner": "0x1111111111111111111111111111111111111111",
+            "createdAt": "2026-04-15T12:14:28.781Z"
+          },
+          "testsdkmodel_1776255357": {
+            "id": 6,
+            "name": "TestSDKModel_1776255357",
+            "owner": "0x1111111111111111111111111111111111111111",
+            "createdAt": "2026-04-15T12:16:05.299Z"
+          }
+        }
+      }
+    }
+  }
 }

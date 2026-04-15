@@ -63,6 +63,7 @@ async function testProofGeneration() {
   const testInput = {
     secret: 123456,
     modelId: 999999999,
+    statementHash: 424242,
     messageHash: 424242
   };
 
@@ -73,7 +74,7 @@ async function testProofGeneration() {
   log(
     'Test Input Created',
     'PASS',
-    `Secret: ${testInput.secret}, ModelId: ${testInput.modelId}, MessageHash: ${testInput.messageHash}`
+    `Secret: ${testInput.secret}, ModelId: ${testInput.modelId}, StatementHash: ${testInput.statementHash}`
   );
 
   try {
@@ -87,7 +88,7 @@ async function testProofGeneration() {
       {
         secret: String(testInput.secret),
         modelId: String(testInput.modelId),
-        messageHash: String(testInput.messageHash)
+        messageHash: String(testInput.statementHash)
       },
       wasm.fullPath,
       zkey.fullPath

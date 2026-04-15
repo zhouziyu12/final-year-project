@@ -1,5 +1,5 @@
 ﻿{
-    "timestamp":  "2026-04-14T18:17:38Z",
+    "timestamp":  "2026-04-15T18:13:21Z",
     "version":  "2.0.0",
     "suites":  [
                    {
@@ -171,7 +171,7 @@
                    },
                    {
                        "suite":  "SDK and Backend Integration Tests",
-                       "timestamp":  "2026-04-14T10:17:33.995996Z",
+                       "timestamp":  "2026-04-15T10:12:40.358085Z",
                        "tests":  [
                                      {
                                          "name":  "SDK Import",
@@ -195,6 +195,12 @@
                                          "name":  "GET /api/v2/status",
                                          "status":  "PASS",
                                          "detail":  "Endpoint returned success=true",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "GET /api/v2/status zkEnforced",
+                                         "status":  "PASS",
+                                         "detail":  "Backend reports verifier-gated provenance as enabled",
                                          "data":  null
                                      },
                                      {
@@ -222,6 +228,12 @@
                                          "data":  null
                                      },
                                      {
+                                         "name":  "POST /api/sdk/provenance with auth",
+                                         "status":  "PASS",
+                                         "detail":  "Authenticated verifier-gated route rejected invalid payload at validation stage",
+                                         "data":  null
+                                     },
+                                     {
                                          "name":  "Secret Manager Init",
                                          "status":  "PASS",
                                          "detail":  "Initialized successfully",
@@ -230,79 +242,85 @@
                                      {
                                          "name":  "Secret Generation",
                                          "status":  "PASS",
-                                         "detail":  "Generated 6-digit secret: 285707",
+                                         "detail":  "Generated high-entropy secret (64 chars)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "Version Tracking",
                                          "status":  "PASS",
-                                         "detail":  "Version recorded and secret verified: 285707",
+                                         "detail":  "Version recorded and secret verified",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "Secret Storage Encryption",
+                                         "status":  "PASS",
+                                         "detail":  "Secret file stores ciphertext instead of plaintext",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: server/server.js",
                                          "status":  "PASS",
-                                         "detail":  "Exists (24.41 KB)",
+                                         "detail":  "Exists (40.42 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: sdk/python/provenance_sdk.py",
                                          "status":  "PASS",
-                                         "detail":  "Exists (11.67 KB)",
+                                         "detail":  "Exists (16.42 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: sdk/python/model_secret_manager.py",
                                          "status":  "PASS",
-                                         "detail":  "Exists (3.72 KB)",
+                                         "detail":  "Exists (8.20 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: test_zk_standalone.js",
                                          "status":  "PASS",
-                                         "detail":  "Exists (4.90 KB)",
+                                         "detail":  "Exists (5.38 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: address_v2_multi.json",
                                          "status":  "PASS",
-                                         "detail":  "Exists (1.12 KB)",
+                                         "detail":  "Exists (1.40 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: contracts/ModelAccessControl.sol",
                                          "status":  "PASS",
-                                         "detail":  "Exists (4.29 KB)",
+                                         "detail":  "Exists (4.67 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: contracts/ModelRegistry.sol",
                                          "status":  "PASS",
-                                         "detail":  "Exists (11.86 KB)",
+                                         "detail":  "Exists (13.06 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: contracts/ModelAuditLog.sol",
                                          "status":  "PASS",
-                                         "detail":  "Exists (8.60 KB)",
+                                         "detail":  "Exists (8.69 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: contracts/ModelNFT.sol",
                                          "status":  "PASS",
-                                         "detail":  "Exists (8.05 KB)",
+                                         "detail":  "Exists (8.81 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: contracts/ModelStaking.sol",
                                          "status":  "PASS",
-                                         "detail":  "Exists (7.03 KB)",
+                                         "detail":  "Exists (7.23 KB)",
                                          "data":  null
                                      },
                                      {
                                          "name":  "File: contracts/ProvenanceTracker.sol",
                                          "status":  "PASS",
-                                         "detail":  "Exists (7.35 KB)",
+                                         "detail":  "Exists (7.47 KB)",
                                          "data":  null
                                      },
                                      {
@@ -314,7 +332,13 @@
                                      {
                                          "name":  "File: scripts/deploy_multi_chain.cjs",
                                          "status":  "PASS",
-                                         "detail":  "Exists (4.46 KB)",
+                                         "detail":  "Exists (4.90 KB)",
+                                         "data":  null
+                                     },
+                                     {
+                                         "name":  "SDK model resolution",
+                                         "status":  "FAIL",
+                                         "detail":  "HTTPConnectionPool(host=\u0027127.0.0.1\u0027, port=3000): Read timed out. (read timeout=30)",
                                          "data":  null
                                      },
                                      {
@@ -331,11 +355,11 @@
                                      }
                                  ],
                        "summary":  {
-                                       "passed":  26,
-                                       "failed":  0,
+                                       "passed":  29,
+                                       "failed":  1,
                                        "warned":  0,
                                        "skipped":  0,
-                                       "total":  26
+                                       "total":  30
                                    }
                    }
                ]

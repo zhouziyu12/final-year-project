@@ -7,7 +7,7 @@ function buildCertificateCandidates(models) {
     title: model.name || `Model ${model.id}`,
     subtitle: model.chain || 'Unknown chain',
     tokenLabel: `CERT-${String(model.numericId || model.id).padStart(4, '0')}`,
-    state: model.verified ? 'Ready' : 'Pending',
+    state: model.isActive ? 'Ready' : 'Pending',
     accent: index % 2 === 0 ? 'marine' : 'ice'
   }));
 }
@@ -22,7 +22,7 @@ export function NFTPage({ models, loading }) {
           <div className="panel-heading">
             <div>
               <p className="panel-eyebrow">Ownership Story</p>
-              <h3 className="panel-title">From verified model to certificate-style deliverable</h3>
+              <h3 className="panel-title">From active provenance record to certificate-style deliverable</h3>
             </div>
           </div>
 
@@ -33,7 +33,7 @@ export function NFTPage({ models, loading }) {
                 <span>Presentation view</span>
               </div>
               <p className="nft-hero-copy">
-                Even without a full minting workflow, the project can already show how a verified registry record becomes a certificate-style output for presentation and extension planning.
+                Even without a full minting workflow, the project can already show how an active, ownership-bound registry record becomes a certificate-style output for presentation and extension planning.
               </p>
             </div>
             <div className="nft-hero-stat">
@@ -53,9 +53,9 @@ export function NFTPage({ models, loading }) {
 
           <div className="pipeline-list">
             {[
-              { title: 'Mint per verified model', copy: 'Issue a certificate after registration and audit both pass.', icon: Award },
+              { title: 'Mint per active model', copy: 'Issue a certificate after registration, activation, and audit all pass.', icon: Award },
               { title: 'Attach provenance metadata', copy: 'Expose proof state, CID, chain, and ownership metadata to the certificate.', icon: ShieldEllipsis },
-              { title: 'Public showcase gallery', copy: 'Turn verified project outputs into a presentable model gallery.', icon: Blocks }
+              { title: 'Public showcase gallery', copy: 'Turn active provenance outputs into a presentable model gallery.', icon: Blocks }
             ].map((item, index) => {
               const Icon = item.icon;
               return (

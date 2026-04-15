@@ -1,15 +1,485 @@
 {
-  "ModelRegistry": [
+  "generatedAt": "2026-04-15T11:15:56.133Z",
+  "addresses": {
+    "sepolia": {
+      "deployer": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1",
+      "contracts": {
+        "ModelAccessControl": "0x81f11fB35a79ed025d271C1d4e7a27c2227B37F3",
+        "ModelRegistry": "0x487C02203D72b378a69F47daC0957c0c3354C9aC",
+        "Groth16Verifier": "0xE1639d60F78F4Ba37C2D00BCD3612cAfD858af17",
+        "ModelProvenanceTracker": "0x29F7dD3f13cB0AC3AD7Bb30696E5dC54FdA78433",
+        "ZKProvenanceTracker": "0xCaE0d0ff07DfC0cdd21e9Ddb2813dA66931bC5cD",
+        "ModelAuditLog": "0x78483775fB4fE3fF6e16b1E0349ac2576fa379a9",
+        "ModelNFT": "0x0c0fEEe0905Ce3bEf2398F0901cf409BA33d0102",
+        "ModelStaking": "0x9d61cb24661e765b52E7E679e2CD0c8dEeC69D73"
+      },
+      "timestamp": "2026-04-15T11:02:52.422Z"
+    },
+    "tbnb": {
+      "deployer": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1",
+      "contracts": {
+        "ModelAccessControl": "0x4FA4C2176750F6FfB8864b8086432C6Cdd1fFFc6",
+        "ModelRegistry": "0x8d32A2dcBDa306c678cab2370F3dafA3E1D46948",
+        "Groth16Verifier": "0x7054577279D496DcF00E37FdBe9a192631e195D4",
+        "ModelProvenanceTracker": "0xFF29f9100d0142e0E3324547Af12a91f173f069E",
+        "ZKProvenanceTracker": "0x947a547ad9da78E12c3F2F4e1197787ADD9Ff61a",
+        "ModelAuditLog": "0x5e502baC7D8379B481c0e2fD8A0c052d8F151959",
+        "ModelNFT": "0x5a802AE610D3F9640446d5511Bc303C8ea5Ffa24",
+        "ModelStaking": "0x4b7ede20bE885E11A57a4F4Af6103bA6c298d337"
+      },
+      "timestamp": "2026-04-15T11:03:53.481Z"
+    }
+  },
+  "ModelAccessControl": [
     {
       "inputs": [
         {
           "internalType": "address",
-          "name": "_bridge",
+          "name": "_governance",
           "type": "address"
         }
       ],
       "stateMutability": "nonpayable",
       "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "by",
+          "type": "address"
+        }
+      ],
+      "name": "Blacklisted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "oldGov",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newGov",
+          "type": "address"
+        }
+      ],
+      "name": "GovernanceChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "grantedBy",
+          "type": "address"
+        }
+      ],
+      "name": "RoleGranted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "revokedBy",
+          "type": "address"
+        }
+      ],
+      "name": "RoleRevoked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "by",
+          "type": "address"
+        }
+      ],
+      "name": "Unblacklisted",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "ADMIN",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "AUDITOR",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "MINTER",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "REGISTRAR",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "addBlacklist",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getGovernance",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "governance",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "grantRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address[]",
+          "name": "accounts",
+          "type": "address[]"
+        }
+      ],
+      "name": "grantRoles",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "hasRole",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "isBlacklisted",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "removeBlacklist",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        }
+      ],
+      "name": "revokeRole",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newAdmin",
+          "type": "address"
+        }
+      ],
+      "name": "transferAdmin",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "newGov",
+          "type": "address"
+        }
+      ],
+      "name": "updateGovernance",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "ModelRegistry": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_accessControl",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "BlacklistedAddress",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InsufficientStake",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum ModelRegistry.ModelStatus",
+          "name": "expected",
+          "type": "uint8"
+        },
+        {
+          "internalType": "enum ModelRegistry.ModelStatus",
+          "name": "actual",
+          "type": "uint8"
+        }
+      ],
+      "name": "InvalidStatus",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "ModelNotFound",
+      "type": "error"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "expected",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "actual",
+          "type": "address"
+        }
+      ],
+      "name": "NotOwner",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "StakedModel",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "TransferAlreadyPending",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "TransferNotPending",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroStake",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "MetadataUpdated",
+      "type": "event"
     },
     {
       "anonymous": false,
@@ -31,8 +501,271 @@
       "type": "event"
     },
     {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum ModelRegistry.ModelStatus",
+          "name": "oldStatus",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum ModelRegistry.ModelStatus",
+          "name": "newStatus",
+          "type": "uint8"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "ModelStatusChanged",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferAccepted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "cancelledBy",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferCancelled",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        }
+      ],
+      "name": "OwnershipTransferRequested",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "versionId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "major",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "minor",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint8",
+          "name": "patch",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "enum ModelRegistry.VersionType",
+          "name": "versionType",
+          "type": "uint8"
+        }
+      ],
+      "name": "VersionAdded",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "acceptTransfer",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "inputs": [],
-      "name": "bridge",
+      "name": "accessControl",
+      "outputs": [
+        {
+          "internalType": "contract ModelAccessControl",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "activateModel",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "_major",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "_minor",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "_patch",
+          "type": "uint8"
+        },
+        {
+          "internalType": "enum ModelRegistry.VersionType",
+          "name": "_type",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
+          "name": "_ipfsMetadata",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_parentHash",
+          "type": "string"
+        }
+      ],
+      "name": "addVersion",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "cancelTransfer",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "deprecateModel",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "getModelOwner",
       "outputs": [
         {
           "internalType": "address",
@@ -51,12 +784,140 @@
           "type": "uint256"
         }
       ],
-      "name": "getOwner",
+      "name": "getModelStatus",
       "outputs": [
         {
-          "internalType": "address",
+          "internalType": "enum ModelRegistry.ModelStatus",
           "name": "",
-          "type": "address"
+          "type": "uint8"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getVersionHistory",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "versionId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "modelId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint8",
+              "name": "versionMajor",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "versionMinor",
+              "type": "uint8"
+            },
+            {
+              "internalType": "uint8",
+              "name": "versionPatch",
+              "type": "uint8"
+            },
+            {
+              "internalType": "enum ModelRegistry.VersionType",
+              "name": "versionType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "ipfsMetadata",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "parentHash",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "operator",
+              "type": "address"
+            }
+          ],
+          "internalType": "struct ModelRegistry.ModelVersion[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "isModelStaked",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "latestVersionId",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelExists",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -104,11 +965,6 @@
         },
         {
           "internalType": "string",
-          "name": "version",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
           "name": "license",
           "type": "string"
         },
@@ -118,9 +974,24 @@
           "type": "address"
         },
         {
+          "internalType": "enum ModelRegistry.ModelStatus",
+          "name": "status",
+          "type": "uint8"
+        },
+        {
           "internalType": "uint256",
           "name": "timestamp",
           "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "stakeAmount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "staked",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -130,8 +1001,91 @@
       "inputs": [
         {
           "internalType": "uint256",
-          "name": "_id",
+          "name": "",
           "type": "uint256"
+        }
+      ],
+      "name": "pendingTransfers",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "accepted",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_name",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_description",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_ipfsCid",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_checksum",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_framework",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_license",
+          "type": "string"
+        }
+      ],
+      "name": "registerModel",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
         },
         {
           "internalType": "string",
@@ -160,32 +1114,288 @@
         },
         {
           "internalType": "string",
-          "name": "_version",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
           "name": "_license",
           "type": "string"
         }
       ],
-      "name": "register",
+      "name": "registerModelFor",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_newOwner",
+          "type": "address"
+        }
+      ],
+      "name": "requestTransfer",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        }
+      ],
+      "name": "revokeModel",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "transferHistory",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "accepted",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_description",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_ipfsCid",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "_checksum",
+          "type": "string"
+        }
+      ],
+      "name": "updateMetadata",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "versionCount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "versions",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "versionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "versionMajor",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "versionMinor",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "versionPatch",
+          "type": "uint8"
+        },
+        {
+          "internalType": "enum ModelRegistry.VersionType",
+          "name": "versionType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
+          "name": "ipfsMetadata",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "parentHash",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     }
   ],
-  "ProvenanceTracker": [
+  "ModelProvenanceTracker": [
     {
       "inputs": [
         {
           "internalType": "address",
-          "name": "_registryAddress",
+          "name": "_accessControl",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_registry",
           "type": "address"
         }
       ],
       "stateMutability": "nonpayable",
       "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "ModelIsBlacklisted",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ModelNotRegistered",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotAuthorized",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "by",
+          "type": "address"
+        }
+      ],
+      "name": "ModelBlacklisted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "by",
+          "type": "address"
+        }
+      ],
+      "name": "ModelUnblacklisted",
+      "type": "event"
     },
     {
       "anonymous": false,
@@ -203,14 +1413,62 @@
           "type": "uint256"
         },
         {
-          "indexed": false,
-          "internalType": "string",
+          "indexed": true,
+          "internalType": "enum ModelProvenanceTracker.EventType",
           "name": "eventType",
-          "type": "string"
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
         }
       ],
       "name": "RecordAdded",
       "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "accessControl",
+      "outputs": [
+        {
+          "internalType": "contract ModelAccessControl",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum ModelProvenanceTracker.EventType",
+          "name": "_eventType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
+          "name": "_ipfsMetadata",
+          "type": "string"
+        }
+      ],
+      "name": "addRecord",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
     },
     {
       "inputs": [
@@ -221,18 +1479,56 @@
         },
         {
           "internalType": "string",
-          "name": "_eventType",
-          "type": "string"
-        },
-        {
-          "internalType": "string",
-          "name": "_ipfsMetadata",
+          "name": "_zkProofCid",
           "type": "string"
         }
       ],
-      "name": "addRecord",
+      "name": "addZKProofRecord",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_reason",
+          "type": "string"
+        }
+      ],
+      "name": "blacklistModel",
       "outputs": [],
       "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "blacklistReasons",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -246,9 +1542,113 @@
       "name": "getModelHistory",
       "outputs": [
         {
-          "internalType": "uint256[]",
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "recordId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "modelId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "enum ModelProvenanceTracker.EventType",
+              "name": "eventType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "ipfsMetadata",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "operator",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "previousHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "recordHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct ModelProvenanceTracker.ProvenanceRecord[]",
           "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "_modelIds",
           "type": "uint256[]"
+        }
+      ],
+      "name": "getModelsStatus",
+      "outputs": [
+        {
+          "internalType": "uint8[]",
+          "name": "statuses",
+          "type": "uint8[]"
+        },
+        {
+          "internalType": "bool[]",
+          "name": "blacklisted",
+          "type": "bool[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelBlacklist",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelChainHead",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
         }
       ],
       "stateMutability": "view",
@@ -268,19 +1668,6 @@
         }
       ],
       "name": "modelHistory",
-      "outputs": [
-        {
-          "internalType": "uint256",
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [],
-      "name": "nextRecordId",
       "outputs": [
         {
           "internalType": "uint256",
@@ -312,9 +1699,9 @@
           "type": "uint256"
         },
         {
-          "internalType": "string",
+          "internalType": "enum ModelProvenanceTracker.EventType",
           "name": "eventType",
-          "type": "string"
+          "type": "uint8"
         },
         {
           "internalType": "string",
@@ -333,7 +1720,12 @@
         },
         {
           "internalType": "bytes32",
-          "name": "previousRecordHash",
+          "name": "previousHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "recordHash",
           "type": "bytes32"
         }
       ],
@@ -342,12 +1734,2927 @@
     },
     {
       "inputs": [],
-      "name": "registryAddress",
+      "name": "registry",
+      "outputs": [
+        {
+          "internalType": "contract IModelRegistry",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "unblacklistModel",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "verifyChain",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "ProvenanceTracker": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_accessControl",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_registry",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "ModelIsBlacklisted",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ModelNotRegistered",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotAuthorized",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "by",
+          "type": "address"
+        }
+      ],
+      "name": "ModelBlacklisted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "by",
+          "type": "address"
+        }
+      ],
+      "name": "ModelUnblacklisted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "recordId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "enum ModelProvenanceTracker.EventType",
+          "name": "eventType",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "RecordAdded",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "accessControl",
+      "outputs": [
+        {
+          "internalType": "contract ModelAccessControl",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum ModelProvenanceTracker.EventType",
+          "name": "_eventType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
+          "name": "_ipfsMetadata",
+          "type": "string"
+        }
+      ],
+      "name": "addRecord",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_zkProofCid",
+          "type": "string"
+        }
+      ],
+      "name": "addZKProofRecord",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_reason",
+          "type": "string"
+        }
+      ],
+      "name": "blacklistModel",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "blacklistReasons",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getModelHistory",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "recordId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "modelId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "enum ModelProvenanceTracker.EventType",
+              "name": "eventType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "ipfsMetadata",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "operator",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "previousHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "recordHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct ModelProvenanceTracker.ProvenanceRecord[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "_modelIds",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "getModelsStatus",
+      "outputs": [
+        {
+          "internalType": "uint8[]",
+          "name": "statuses",
+          "type": "uint8[]"
+        },
+        {
+          "internalType": "bool[]",
+          "name": "blacklisted",
+          "type": "bool[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelBlacklist",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelChainHead",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelHistory",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "records",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "recordId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum ModelProvenanceTracker.EventType",
+          "name": "eventType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
+          "name": "ipfsMetadata",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "previousHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "recordHash",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "registry",
+      "outputs": [
+        {
+          "internalType": "contract IModelRegistry",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "unblacklistModel",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "verifyChain",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "ZKProvenanceTracker": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_accessControl",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_registry",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_verifier",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidModelSignal",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidProof",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidStatementHash",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ModelIsBlacklisted",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ModelNotRegistered",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotAuthorized",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NullifierAlreadyUsed",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "by",
+          "type": "address"
+        }
+      ],
+      "name": "ModelBlacklisted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "by",
+          "type": "address"
+        }
+      ],
+      "name": "ModelUnblacklisted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "nullifier",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "statementHash",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "name": "ProofVerified",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "recordId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "enum ZKProvenanceTracker.EventType",
+          "name": "eventType",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        }
+      ],
+      "name": "RecordAdded",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "accessControl",
+      "outputs": [
+        {
+          "internalType": "contract ModelAccessControl",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum ZKProvenanceTracker.EventType",
+          "name": "_eventType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
+          "name": "_canonicalMetadata",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256[2]",
+          "name": "_pA",
+          "type": "uint256[2]"
+        },
+        {
+          "internalType": "uint256[2][2]",
+          "name": "_pB",
+          "type": "uint256[2][2]"
+        },
+        {
+          "internalType": "uint256[2]",
+          "name": "_pC",
+          "type": "uint256[2]"
+        },
+        {
+          "internalType": "uint256[3]",
+          "name": "_pubSignals",
+          "type": "uint256[3]"
+        }
+      ],
+      "name": "addVerifiedRecord",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_reason",
+          "type": "string"
+        }
+      ],
+      "name": "blacklistModel",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "blacklistReasons",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "string",
+          "name": "_canonicalMetadata",
+          "type": "string"
+        }
+      ],
+      "name": "computeStatementHash",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "pure",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getModelHistory",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "recordId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "modelId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "enum ZKProvenanceTracker.EventType",
+              "name": "eventType",
+              "type": "uint8"
+            },
+            {
+              "internalType": "string",
+              "name": "ipfsMetadata",
+              "type": "string"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "operator",
+              "type": "address"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "previousHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "recordHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct ZKProvenanceTracker.ProvenanceRecord[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "_modelIds",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "getModelsStatus",
+      "outputs": [
+        {
+          "internalType": "uint8[]",
+          "name": "statuses",
+          "type": "uint8[]"
+        },
+        {
+          "internalType": "bool[]",
+          "name": "blacklisted",
+          "type": "bool[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelBlacklist",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelChainHead",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelHistory",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "nullifierUsed",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "records",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "recordId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum ZKProvenanceTracker.EventType",
+          "name": "eventType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "string",
+          "name": "ipfsMetadata",
+          "type": "string"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "previousHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "recordHash",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "registry",
+      "outputs": [
+        {
+          "internalType": "contract IZKModelRegistry",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "unblacklistModel",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "verifier",
+      "outputs": [
+        {
+          "internalType": "contract Groth16Verifier",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "verifyChain",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "ModelAuditLog": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_accessControl",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "OnlyAuditor",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "entryId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "enum ModelAuditLog.ActionType",
+          "name": "action",
+          "type": "uint8"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "actor",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "targetId",
+          "type": "uint256"
+        }
+      ],
+      "name": "AuditEntryAdded",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "accessControl",
+      "outputs": [
+        {
+          "internalType": "contract ModelAccessControl",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "chainHead",
+      "outputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "entries",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        },
+        {
+          "internalType": "enum ModelAuditLog.ActionType",
+          "name": "action",
+          "type": "uint8"
+        },
+        {
+          "internalType": "address",
+          "name": "actor",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "targetId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "previousHash",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "string",
+          "name": "metadata",
+          "type": "string"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "contentHash",
+          "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_start",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_end",
+          "type": "uint256"
+        }
+      ],
+      "name": "getEntriesByRange",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "enum ModelAuditLog.ActionType",
+              "name": "action",
+              "type": "uint8"
+            },
+            {
+              "internalType": "address",
+              "name": "actor",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "targetId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "previousHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "string",
+              "name": "metadata",
+              "type": "string"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "contentHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct ModelAuditLog.AuditEntry[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getModelAuditTrail",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "id",
+              "type": "uint256"
+            },
+            {
+              "internalType": "enum ModelAuditLog.ActionType",
+              "name": "action",
+              "type": "uint8"
+            },
+            {
+              "internalType": "address",
+              "name": "actor",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "targetId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "previousHash",
+              "type": "bytes32"
+            },
+            {
+              "internalType": "string",
+              "name": "metadata",
+              "type": "string"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "contentHash",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct ModelAuditLog.AuditEntry[]",
+          "name": "",
+          "type": "tuple[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum ModelAuditLog.ActionType",
+          "name": "_action",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_targetId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_metadata",
+          "type": "string"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_contentHash",
+          "type": "bytes32"
+        }
+      ],
+      "name": "logAction",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "_metadata",
+          "type": "string"
+        }
+      ],
+      "name": "logModelRegistered",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_from",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_to",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "_accepted",
+          "type": "bool"
+        }
+      ],
+      "name": "logOwnershipTransfer",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_account",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "_role",
+          "type": "bytes32"
+        },
+        {
+          "internalType": "bool",
+          "name": "_granted",
+          "type": "bool"
+        }
+      ],
+      "name": "logRoleChange",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_actor",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "_slashed",
+          "type": "bool"
+        }
+      ],
+      "name": "logStakeChange",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "_oldStatus",
+          "type": "uint8"
+        },
+        {
+          "internalType": "uint8",
+          "name": "_newStatus",
+          "type": "uint8"
+        },
+        {
+          "internalType": "address",
+          "name": "_operator",
+          "type": "address"
+        }
+      ],
+      "name": "logStatusChange",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_versionId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "_operator",
+          "type": "address"
+        },
+        {
+          "internalType": "string",
+          "name": "_metadata",
+          "type": "string"
+        }
+      ],
+      "name": "logVersionAdded",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelAuditIndex",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalEntries",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_entryId",
+          "type": "uint256"
+        }
+      ],
+      "name": "verifyChain",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "ModelNFT": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_accessControl",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_registry",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "BlacklistedAddress",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ModelAlreadyHasNFT",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ModelNotRegistered",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotAdmin",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "TransferCooldownActive",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroAddress",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "approved",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "Approval",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "operator",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "approved",
+          "type": "bool"
+        }
+      ],
+      "name": "ApprovalForAll",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "ModelNFTBurned",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        }
+      ],
+      "name": "ModelNFTMinted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        }
+      ],
+      "name": "ModelNFTTransferred",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "Transfer",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "accessControl",
+      "outputs": [
+        {
+          "internalType": "contract ModelAccessControl",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "approve",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "balanceOf",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "burn",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getApproved",
       "outputs": [
         {
           "internalType": "address",
           "name": "",
           "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
+        }
+      ],
+      "name": "getOwnerTokens",
+      "outputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "",
+          "type": "uint256[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getTokenByModel",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_owner",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_operator",
+          "type": "address"
+        }
+      ],
+      "name": "isApprovedForAll",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "lastTransferTime",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_metadataCid",
+          "type": "string"
+        }
+      ],
+      "name": "mint",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelHasNft",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "modelToToken",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "name",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "operatorApprovals",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "ownerOf",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "registry",
+      "outputs": [
+        {
+          "internalType": "contract IModelRegistryForNFT",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_from",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "safeTransferFrom",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_operator",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "_approved",
+          "type": "bool"
+        }
+      ],
+      "name": "setApprovalForAll",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_seconds",
+          "type": "uint256"
+        }
+      ],
+      "name": "setTransferCooldown",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "symbol",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "tokenApprovals",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "tokenMetadata",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "tokenOwner",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "tokenToModel",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "tokenURI",
+      "outputs": [
+        {
+          "internalType": "string",
+          "name": "",
+          "type": "string"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalSupply",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "transferCooldown",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_from",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_to",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "_tokenId",
+          "type": "uint256"
+        }
+      ],
+      "name": "transferFrom",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "ModelStaking": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_accessControl",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "_treasury",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "inputs": [],
+      "name": "AlreadySlashed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "AlreadyWithdrawn",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "BlacklistedAddress",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidModelId",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NotAdmin",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "StakeLocked",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "StakerMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZeroAmount",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "oldPeriod",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newPeriod",
+          "type": "uint256"
+        }
+      ],
+      "name": "LockPeriodUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "oldMin",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newMin",
+          "type": "uint256"
+        }
+      ],
+      "name": "MinStakeUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "oldRatio",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "newRatio",
+          "type": "uint256"
+        }
+      ],
+      "name": "SlashRatioUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "staker",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "StakeDeposited",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "staker",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "slashedAmount",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "toTreasury",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "reason",
+          "type": "string"
+        }
+      ],
+      "name": "StakeSlashed",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "staker",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        }
+      ],
+      "name": "StakeWithdrawn",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "oldTreasury",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newTreasury",
+          "type": "address"
+        }
+      ],
+      "name": "TreasuryUpdated",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "accessControl",
+      "outputs": [
+        {
+          "internalType": "contract ModelAccessControl",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256[]",
+          "name": "_modelIds",
+          "type": "uint256[]"
+        },
+        {
+          "internalType": "string",
+          "name": "_reason",
+          "type": "string"
+        }
+      ],
+      "name": "batchSlash",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getLockRemaining",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getStakeAmount",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "getStakeInfo",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint256",
+              "name": "modelId",
+              "type": "uint256"
+            },
+            {
+              "internalType": "address",
+              "name": "staker",
+              "type": "address"
+            },
+            {
+              "internalType": "uint256",
+              "name": "amount",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "timestamp",
+              "type": "uint256"
+            },
+            {
+              "internalType": "uint256",
+              "name": "unlockTime",
+              "type": "uint256"
+            },
+            {
+              "internalType": "bool",
+              "name": "withdrawn",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "slashed",
+              "type": "bool"
+            }
+          ],
+          "internalType": "struct ModelStaking.StakeInfo",
+          "name": "",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "lockPeriod",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "minStake",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "_reason",
+          "type": "string"
+        }
+      ],
+      "name": "slash",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "slashedAmount",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "slashRatio",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "stake",
+      "outputs": [],
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "stakes",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "address",
+          "name": "staker",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "amount",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "unlockTime",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bool",
+          "name": "withdrawn",
+          "type": "bool"
+        },
+        {
+          "internalType": "bool",
+          "name": "slashed",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalSlashed",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalStaked",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "treasury",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_period",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateLockPeriod",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_min",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateMinStake",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_ratio",
+          "type": "uint256"
+        }
+      ],
+      "name": "updateSlashRatio",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_treasury",
+          "type": "address"
+        }
+      ],
+      "name": "updateTreasury",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "_modelId",
+          "type": "uint256"
+        }
+      ],
+      "name": "withdraw",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "Groth16Verifier": [
+    {
+      "inputs": [
+        {
+          "internalType": "uint256[2]",
+          "name": "_pA",
+          "type": "uint256[2]"
+        },
+        {
+          "internalType": "uint256[2][2]",
+          "name": "_pB",
+          "type": "uint256[2][2]"
+        },
+        {
+          "internalType": "uint256[2]",
+          "name": "_pC",
+          "type": "uint256[2]"
+        },
+        {
+          "internalType": "uint256[3]",
+          "name": "_pubSignals",
+          "type": "uint256[3]"
+        }
+      ],
+      "name": "verifyProof",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
         }
       ],
       "stateMutability": "view",
@@ -390,206 +4697,269 @@
       "type": "function"
     }
   ],
-  "addresses": {
-    "sepolia_registry": "0x878801331F0209A50008C2c65e212D5401e75Ea4",
-    "sepolia_tracker": "0x656e66d52bc4ce97e899BD680c4719111b893833",
-    "sepolia_verifier": "0x9D672d65c2dfe8A546f1539ba5d3c6cA2988687b",
-    "sepolia_bridge": "0x6Ab73fD3a19aeB903458240bE93aC16c4c09f28A",
-    "tbnb_registry": "0x73FDC0180b7B11ca82fb236EcAa778A4566f52E9",
-    "tbnb_tracker": "0x0bC82C1d959d456c99cA468C7FDC267928A287FD",
-    "tbnb_verifier": "0xfed6EB80A19fc4474A8b5424e6222fb614401fD0",
-    "tbnb_bridge": "0xB7b091f3757d5eBCf4b8A221Eba1421DD8bE180e"
-  },
-  "v2": {
-    "network": "hardhat",
-    "timestamp": "2026-03-18T11:54:36.709Z",
-    "deployer": "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266",
-    "contracts": {
-      "accessControl": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-      "registry": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
-      "tracker": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
-      "auditLog": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
-      "nft": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
-      "staking": "0x5FC8d32690cc91D4c39d9d3abcBD16989F875707"
+  "RealZKBridge": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_verifier",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
     },
-    "abis": {
-      "ModelAccessControl": [
-        "constructor(address)",
-        "event Blacklisted(address indexed,address indexed)",
-        "event GovernanceChanged(address indexed,address indexed)",
-        "event RoleGranted(bytes32 indexed,address indexed,address indexed)",
-        "event RoleRevoked(bytes32 indexed,address indexed,address indexed)",
-        "event Unblacklisted(address indexed,address indexed)",
-        "function ADMIN() view returns (bytes32)",
-        "function AUDITOR() view returns (bytes32)",
-        "function MINTER() view returns (bytes32)",
-        "function REGISTRAR() view returns (bytes32)",
-        "function addBlacklist(address)",
-        "function getGovernance() view returns (address)",
-        "function governance() view returns (address)",
-        "function grantRole(bytes32,address)",
-        "function grantRoles(bytes32,address[])",
-        "function hasRole(bytes32,address) view returns (bool)",
-        "function isBlacklisted(address) view returns (bool)",
-        "function removeBlacklist(address)",
-        "function revokeRole(bytes32,address)",
-        "function transferAdmin(address)",
-        "function updateGovernance(address)"
+    {
+      "inputs": [],
+      "name": "BridgeNonceAlreadyUsed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "InvalidDestinationChain",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "MessageHashMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ModelIdMismatch",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "NullifierAlreadyUsed",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "ZKProofInvalid",
+      "type": "error"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "messageId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint16",
+          "name": "dstChainId",
+          "type": "uint16"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "bridgeNonce",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "messageHash",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "nullifier",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "bytes",
+          "name": "payload",
+          "type": "bytes"
+        }
       ],
-      "ModelRegistry": [
-        "constructor(address)",
-        "error BlacklistedAddress()",
-        "error InsufficientStake()",
-        "error InvalidStatus(uint8,uint8)",
-        "error NotOwner(address,address)",
-        "error StakedModel()",
-        "error TransferAlreadyPending()",
-        "error TransferNotPending()",
-        "error ZeroStake()",
-        "event ModelRegistered(uint256 indexed,address indexed)",
-        "event ModelStatusChanged(uint256 indexed,uint8,uint8,address indexed)",
-        "event OwnershipTransferAccepted(uint256 indexed,address indexed,address indexed)",
-        "event OwnershipTransferCancelled(uint256 indexed,address indexed)",
-        "event OwnershipTransferRequested(uint256 indexed,address indexed,address indexed)",
-        "event VersionAdded(uint256 indexed,uint256 indexed,uint8,uint8,uint8,uint8)",
-        "function acceptTransfer(uint256)",
-        "function accessControl() view returns (address)",
-        "function activateModel(uint256)",
-        "function addVersion(uint256,uint8,uint8,uint8,uint8,string,string) returns (uint256)",
-        "function cancelTransfer(uint256)",
-        "function deprecateModel(uint256)",
-        "function getModelOwner(uint256) view returns (address)",
-        "function getModelStatus(uint256) view returns (uint8)",
-        "function getVersionHistory(uint256) view returns ((uint256,uint256,uint8,uint8,uint8,uint8,string,string,uint256,address)[])",
-        "function isModelStaked(uint256) view returns (bool)",
-        "function latestVersionId(uint256) view returns (uint256)",
-        "function models(uint256) view returns (uint256,string,string,string,string,string,string,address,uint8,uint256,uint256,bool)",
-        "function pendingTransfers(uint256) view returns (uint256,address,address,uint256,bool)",
-        "function registerModel(string,string,string,string,string,string) returns (uint256)",
-        "function requestTransfer(uint256,address)",
-        "function revokeModel(uint256)",
-        "function transferHistory(uint256,uint256) view returns (uint256,address,address,uint256,bool)",
-        "function updateMetadata(uint256,string,string,string)",
-        "function versionCount(uint256) view returns (uint256)",
-        "function versions(uint256,uint256) view returns (uint256,uint256,uint8,uint8,uint8,uint8,string,string,uint256,address)"
+      "name": "CrossChainMessage",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "prover",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "timestamp",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "nullifier",
+          "type": "uint256"
+        }
       ],
-      "ModelProvenanceTracker": [
-        "constructor(address,address)",
-        "error ModelIsBlacklisted()",
-        "error NotAuthorized()",
-        "event ModelBlacklisted(uint256 indexed,string,address)",
-        "event ModelUnblacklisted(uint256 indexed,address)",
-        "event RecordAdded(uint256 indexed,uint256 indexed,uint8 indexed,address)",
-        "function accessControl() view returns (address)",
-        "function addRecord(uint256,uint8,string) returns (uint256)",
-        "function addZKProofRecord(uint256,string) returns (uint256)",
-        "function blacklistModel(uint256,string)",
-        "function blacklistReasons(uint256) view returns (string)",
-        "function getModelHistory(uint256) view returns ((uint256,uint256,uint8,string,uint256,address,bytes32,bytes32)[])",
-        "function getModelsStatus(uint256[]) view returns (uint8[],bool[])",
-        "function modelBlacklist(uint256) view returns (bool)",
-        "function modelChainHead(uint256) view returns (bytes32)",
-        "function modelHistory(uint256,uint256) view returns (uint256)",
-        "function records(uint256) view returns (uint256,uint256,uint8,string,uint256,address,bytes32,bytes32)",
-        "function registry() view returns (address)",
-        "function unblacklistModel(uint256)",
-        "function verifyChain(uint256) view returns (bool)"
+      "name": "ProofVerified",
+      "type": "event"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "modelId",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint16",
+          "name": "dstChainId",
+          "type": "uint16"
+        },
+        {
+          "internalType": "uint256",
+          "name": "bridgeNonce",
+          "type": "uint256"
+        },
+        {
+          "internalType": "bytes",
+          "name": "payload",
+          "type": "bytes"
+        },
+        {
+          "internalType": "uint256[2]",
+          "name": "_pA",
+          "type": "uint256[2]"
+        },
+        {
+          "internalType": "uint256[2][2]",
+          "name": "_pB",
+          "type": "uint256[2][2]"
+        },
+        {
+          "internalType": "uint256[2]",
+          "name": "_pC",
+          "type": "uint256[2]"
+        },
+        {
+          "internalType": "uint256[3]",
+          "name": "_pubSignals",
+          "type": "uint256[3]"
+        }
       ],
-      "ModelAuditLog": [
-        "constructor(address)",
-        "error EmptyMetadata()",
-        "error OnlyAuditor()",
-        "event AuditEntryAdded(uint256 indexed,uint8 indexed,address indexed,uint256)",
-        "function accessControl() view returns (address)",
-        "function chainHead() view returns (bytes32)",
-        "function entries(uint256) view returns (uint256,uint8,address,uint256,uint256,bytes32,string,bytes32)",
-        "function getEntriesByRange(uint256,uint256) view returns ((uint256,uint8,address,uint256,uint256,bytes32,string,bytes32)[])",
-        "function getModelAuditTrail(uint256) view returns ((uint256,uint8,address,uint256,uint256,bytes32,string,bytes32)[])",
-        "function logAction(uint8,uint256,string,bytes32) returns (uint256)",
-        "function logModelRegistered(uint256,address,string) returns (uint256)",
-        "function logOwnershipTransfer(uint256,address,address,bool) returns (uint256)",
-        "function logRoleChange(address,bytes32,bool) returns (uint256)",
-        "function logStakeChange(uint256,address,uint256,bool) returns (uint256)",
-        "function logStatusChange(uint256,uint8,uint8,address) returns (uint256)",
-        "function logVersionAdded(uint256,uint256,address,string) returns (uint256)",
-        "function modelAuditIndex(uint256,uint256) view returns (uint256)",
-        "function totalEntries() view returns (uint256)",
-        "function verifyChain(uint256) view returns (bool)"
+      "name": "bridgeData",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "getVerifier",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
       ],
-      "ModelNFT": [
-        "constructor(address)",
-        "error ModelAlreadyHasNFT()",
-        "error ModelNotRegistered()",
-        "error NotTokenOwner()",
-        "error TransferCooldownActive()",
-        "error ZeroAddress()",
-        "event Approval(address indexed,address indexed,uint256 indexed)",
-        "event ApprovalForAll(address indexed,address indexed,bool)",
-        "event ModelNFTBurned(uint256 indexed,uint256 indexed)",
-        "event ModelNFTMinted(uint256 indexed,uint256 indexed,address)",
-        "event ModelNFTTransferred(uint256 indexed,uint256 indexed,address indexed,address,uint256)",
-        "event Transfer(address indexed,address indexed,uint256 indexed)",
-        "function accessControl() view returns (address)",
-        "function approve(address,uint256)",
-        "function balanceOf(address) view returns (uint256)",
-        "function burn(uint256)",
-        "function getOwnerTokens(address) view returns (uint256[])",
-        "function getTokenByModel(uint256) view returns (uint256)",
-        "function lastTransferTime(uint256) view returns (uint256)",
-        "function mint(uint256,string) returns (uint256)",
-        "function modelHasNft(uint256) view returns (bool)",
-        "function modelToToken(uint256) view returns (uint256)",
-        "function name() view returns (string)",
-        "function operatorApprovals(address,address) view returns (bool)",
-        "function ownerOf(uint256) view returns (address)",
-        "function safeTransferFrom(address,address,uint256)",
-        "function setApprovalForAll(address,bool)",
-        "function setTransferCooldown(uint256)",
-        "function symbol() view returns (string)",
-        "function tokenApprovals(uint256) view returns (address)",
-        "function tokenMetadata(uint256) view returns (string)",
-        "function tokenOwner(uint256) view returns (address)",
-        "function tokenToModel(uint256) view returns (uint256)",
-        "function tokenURI(uint256) view returns (string)",
-        "function totalSupply() view returns (uint256)",
-        "function transferCooldown() view returns (uint256)"
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "nonce",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
       ],
-      "ModelStaking": [
-        "constructor(address,address)",
-        "error AlreadySlashed()",
-        "error AlreadyWithdrawn()",
-        "error InsufficientStake()",
-        "error InvalidModelId()",
-        "error StakeLocked()",
-        "error StakerMismatch()",
-        "error ZeroAmount()",
-        "event LockPeriodUpdated(uint256,uint256)",
-        "event MinStakeUpdated(uint256,uint256)",
-        "event SlashRatioUpdated(uint256,uint256)",
-        "event StakeDeposited(uint256 indexed,address indexed,uint256)",
-        "event StakeSlashed(uint256 indexed,address indexed,uint256,uint256,string)",
-        "event StakeWithdrawn(uint256 indexed,address indexed,uint256)",
-        "event TreasuryUpdated(address indexed,address indexed)",
-        "function accessControl() view returns (address)",
-        "function batchSlash(uint256[],string)",
-        "function getLockRemaining(uint256) view returns (uint256)",
-        "function getStakeAmount(uint256) view returns (uint256)",
-        "function getStakeInfo(uint256) view returns ((uint256,address,uint256,uint256,uint256,bool,bool))",
-        "function lockPeriod() view returns (uint256)",
-        "function minStake() view returns (uint256)",
-        "function slash(uint256,string) returns (uint256)",
-        "function slashRatio() view returns (uint256)",
-        "function stake(uint256) payable",
-        "function stakes(uint256) view returns (uint256,address,uint256,uint256,uint256,bool,bool)",
-        "function totalSlashed() view returns (uint256)",
-        "function totalStaked() view returns (uint256)",
-        "function treasury() view returns (address)",
-        "function updateLockPeriod(uint256)",
-        "function updateMinStake(uint256)",
-        "function updateSlashRatio(uint256)",
-        "function updateTreasury(address)",
-        "function withdraw(uint256)"
-      ]
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        },
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "usedBridgeNonces",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "name": "usedNullifiers",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "verifier",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
     }
-  }
+  ]
 }

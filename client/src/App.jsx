@@ -2,18 +2,21 @@ import React, { startTransition, useCallback, useEffect, useState } from 'react'
 import './App.css';
 import { useDevice } from './hooks';
 import { DesktopLayout, MobileLayout } from './components/layout';
-import { DashboardPage, TrainingPage, ModelsPage, AuditPage, SystemPage, NFTPage } from './pages';
+import { DashboardPage, TrainingPage, ModelsPage, AuditPage, SystemPage } from './pages';
 import {
   downloadLifecycleVersion,
   fetchAuditVerification,
+  fetchCurrentUser,
   fetchHealth,
   fetchLifecycleBySecret,
   fetchModelDetail,
   fetchModels,
   fetchRecentAuditEvents,
   fetchStatus,
-  getWriteAccessState,
-  registerModel
+  getFrontendRoleState,
+  getStoredAuthSession,
+  loginUser,
+  logoutUser
 } from './lib/api';
 import { PAGE_META } from './lib/projectData';
 
@@ -44,8 +47,11 @@ function App() {
   const [error, setError] = useState(null);
   const [selectionError, setSelectionError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [authSession, setAuthSession] = useState(() => getStoredAuthSession());
+  const [authRefreshing, setAuthRefreshing] = useState(Boolean(getStoredAuthSession()?.token));
+  const [authError, setAuthError] = useState(null);
   const { isMobile } = useDevice();
-  const writeAccess = getWriteAccessState();
+  const frontendRole = getFrontendRoleState();
 
   const selectedModel = models.find((model) => (
     model && String(model.numericId || model.id) === String(selectedModelRef?.id) && model.chain === selectedModelRef?.chain
@@ -97,6 +103,38 @@ function App() {
   }, [loadPlatformData]);
 
   useEffect(() => {
+    let active = true;
+
+    async function hydrateSession() {
+      if (!getStoredAuthSession()?.token) {
+        if (active) setAuthRefreshing(false);
+        return;
+      }
+
+      try {
+        const session = await fetchCurrentUser();
+        if (!active) return;
+        setAuthSession(session);
+        setAuthError(null);
+      } catch (sessionError) {
+        if (!active) return;
+        setAuthSession(null);
+        setAuthError(getActionError(sessionError, 'Stored session could not be restored.'));
+      } finally {
+        if (active) {
+          setAuthRefreshing(false);
+        }
+      }
+    }
+
+    hydrateSession();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!selectedModelRef?.id || !selectedModelRef?.chain) {
       setSelectedModelDetail(null);
       setSelectedModelAudit(null);
@@ -145,16 +183,6 @@ function App() {
     return response;
   };
 
-  const handleRegister = async (payload) => {
-    const response = await registerModel(payload);
-    await loadPlatformData({
-      id: Number(response.numericId || response.id),
-      chain: response.chain || payload.chain || 'sepolia'
-    });
-    startTransition(() => setTab('registry'));
-    return response;
-  };
-
   const handleLifecycleLookup = async (secret) => {
     const response = await fetchLifecycleBySecret(secret);
     setLastUpdated(new Date().toISOString());
@@ -163,6 +191,18 @@ function App() {
 
   const handleLifecycleDownload = async (payload) => {
     await downloadLifecycleVersion(payload);
+  };
+
+  const handleLogin = async (credentials) => {
+    const session = await loginUser(credentials);
+    setAuthSession(session);
+    setAuthError(null);
+    return session;
+  };
+
+  const handleLogout = () => {
+    logoutUser();
+    setAuthSession(null);
   };
 
   const handleSelectModel = (model) => {
@@ -208,7 +248,8 @@ function App() {
         auditEvents={auditEvents}
         loading={loading}
         selectedModelContext={selectedModelContext}
-        writeAccess={writeAccess}
+        frontendRole={frontendRole}
+        authSession={authSession}
         onTabChange={handleTabChange}
         onSelectModel={handleSelectModel}
       />
@@ -217,10 +258,14 @@ function App() {
       <TrainingPage
         status={status}
         selectedModelContext={selectedModelContext}
-        writeAccess={writeAccess}
+        frontendRole={frontendRole}
+        authSession={authSession}
+        authRefreshing={authRefreshing}
         onTabChange={handleTabChange}
         onLifecycleLookup={handleLifecycleLookup}
         onLifecycleDownload={handleLifecycleDownload}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
       />
     ),
     registry: (
@@ -228,11 +273,11 @@ function App() {
         status={status}
         models={models}
         loading={loading}
-        writeAccess={writeAccess}
+        frontendRole={frontendRole}
+        authSession={authSession}
         selectedModelContext={selectedModelContext}
         onSelectModel={handleSelectModel}
         onTabChange={handleTabChange}
-        onRegister={handleRegister}
       />
     ),
     audit: (
@@ -250,14 +295,8 @@ function App() {
         status={status}
         models={models}
         auditEvents={auditEvents}
-        writeAccess={writeAccess}
-      />
-    ),
-    certificates: (
-      <NFTPage
-        status={status}
-        models={models}
-        loading={loading}
+        frontendRole={frontendRole}
+        authSession={authSession}
       />
     )
   };
@@ -283,6 +322,15 @@ function App() {
           <div>
             <p className="app-banner-title">Selected model context incomplete</p>
             <p className="app-banner-copy">{selectionError}</p>
+          </div>
+        </section>
+      ) : null}
+
+      {authError && !error ? (
+        <section className="app-banner" aria-live="polite">
+          <div>
+            <p className="app-banner-title">Session notice</p>
+            <p className="app-banner-copy">{authError}</p>
           </div>
         </section>
       ) : null}

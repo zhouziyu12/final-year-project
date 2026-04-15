@@ -31,6 +31,8 @@ RESULTS = {
 if load_dotenv:
     load_dotenv(Path(__file__).parent.parent / '.env', override=False)
 
+AUTH_CACHE = None
+
 
 def log(name, status, detail, data=None):
     result = {'name': name, 'status': status, 'detail': detail, 'data': data}
@@ -77,11 +79,29 @@ def test_backend_api():
                 data = response.json()
                 if data.get('success'):
                     log(name, 'PASS', 'Endpoint returned success=true')
+                    if name == 'GET /api/health':
+                        if data.get('jwtSecretMode') in {'configured', 'ephemeral'}:
+                            log('GET /api/health jwtSecretMode', 'PASS', f"Health endpoint reports jwtSecretMode={data.get('jwtSecretMode')}")
+                        else:
+                            log('GET /api/health jwtSecretMode', 'FAIL', f"Unexpected jwtSecretMode: {data.get('jwtSecretMode')}")
                     if name == 'GET /api/v2/status':
                         if data.get('zkEnforced') is True:
                             log('GET /api/v2/status zkEnforced', 'PASS', 'Backend reports verifier-gated provenance as enabled')
                         else:
                             log('GET /api/v2/status zkEnforced', 'FAIL', 'Backend did not report zkEnforced=true')
+                        if data.get('authStoreMode') == 'stateful-file-store':
+                            log('GET /api/v2/status authStoreMode', 'PASS', 'Backend reports the hardened file-backed auth store mode')
+                        else:
+                            log('GET /api/v2/status authStoreMode', 'FAIL', f"Unexpected authStoreMode: {data.get('authStoreMode')}")
+                        if data.get('jwtSecretMode') in {'configured', 'ephemeral'}:
+                            log('GET /api/v2/status jwtSecretMode', 'PASS', f"Status endpoint reports jwtSecretMode={data.get('jwtSecretMode')}")
+                        else:
+                            log('GET /api/v2/status jwtSecretMode', 'FAIL', f"Unexpected jwtSecretMode: {data.get('jwtSecretMode')}")
+                    if name == 'GET /api/v2/models':
+                        if data.get('inventoryMode') == 'backend-index' and data.get('isCompleteInventory') is False:
+                            log('GET /api/v2/models inventoryMode', 'PASS', 'Model list explicitly reports backend-index inventory semantics')
+                        else:
+                            log('GET /api/v2/models inventoryMode', 'FAIL', f"Unexpected inventory metadata: {data.get('inventoryMode')}, {data.get('isCompleteInventory')}")
                 else:
                     log(name, 'FAIL', 'Endpoint returned success=false')
             else:
@@ -92,20 +112,62 @@ def test_backend_api():
             log(name, 'FAIL', str(error))
 
 
-def build_write_headers():
-    api_key = os.getenv('WRITE_API_KEY')
-    if not api_key:
-        raise RuntimeError('WRITE_API_KEY is not configured for authenticated backend tests')
+def get_test_credentials():
     return {
-        'x-api-key': api_key,
-        'x-auth-timestamp': str(int(time.time() * 1000)),
-        'x-auth-nonce': secrets.token_hex(16),
+        'username': os.getenv('SDK_USERNAME') or os.getenv('PROVENANCE_USERNAME') or 'researcher',
+        'password': os.getenv('SDK_PASSWORD') or os.getenv('PROVENANCE_PASSWORD') or 'researcher-demo-pass',
     }
+
+
+def get_auth_headers():
+    global AUTH_CACHE
+    if AUTH_CACHE:
+        return {'Authorization': f"Bearer {AUTH_CACHE['token']}"}
+
+    credentials = get_test_credentials()
+    response = requests.post(
+        'http://127.0.0.1:3000/api/auth/login',
+        json=credentials,
+        timeout=10,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    if not payload.get('success') or not payload.get('token'):
+        raise RuntimeError(f'Login did not return a token: {payload}')
+
+    AUTH_CACHE = payload
+    return {'Authorization': f"Bearer {payload['token']}"}
 
 
 def test_backend_write_auth():
     print('\n=== Test Group 2B: Backend Write Authentication ===')
     base_url = 'http://127.0.0.1:3000'
+
+    try:
+        login = requests.post(
+            f'{base_url}/api/auth/login',
+            json=get_test_credentials(),
+            timeout=5,
+        )
+        if login.status_code == 200 and login.json().get('success'):
+            log('POST /api/auth/login', 'PASS', 'Login returned success=true and issued a JWT')
+        else:
+            log('POST /api/auth/login', 'FAIL', f'Expected 200, got {login.status_code}')
+    except Exception as error:
+        log('POST /api/auth/login', 'FAIL', str(error))
+
+    try:
+        me = requests.get(
+            f'{base_url}/api/auth/me',
+            headers=get_auth_headers(),
+            timeout=5,
+        )
+        if me.status_code == 200 and me.json().get('user', {}).get('walletAddress'):
+            log('GET /api/auth/me', 'PASS', 'Authenticated session resolves to a bound wallet address')
+        else:
+            log('GET /api/auth/me', 'FAIL', f'Expected authenticated user payload, got {me.status_code}')
+    except Exception as error:
+        log('GET /api/auth/me', 'FAIL', str(error))
 
     try:
         unauthorized = requests.post(f'{base_url}/api/register', json={}, timeout=5)
@@ -120,7 +182,7 @@ def test_backend_write_auth():
         authorized = requests.post(
             f'{base_url}/api/register',
             json={},
-            headers=build_write_headers(),
+            headers=get_auth_headers(),
             timeout=5,
         )
         if authorized.status_code == 400:
@@ -134,7 +196,7 @@ def test_backend_write_auth():
         provenance = requests.post(
             f'{base_url}/api/sdk/provenance',
             json={},
-            headers=build_write_headers(),
+            headers=get_auth_headers(),
             timeout=5,
         )
         if provenance.status_code == 400:
@@ -222,12 +284,23 @@ def test_sdk_model_resolution():
     try:
         from sdk.python.provenance_sdk import ProvenanceSDK
 
-        sdk = ProvenanceSDK(base_url='http://127.0.0.1:3000', timeout=30)
+        credentials = get_test_credentials()
+        sdk = ProvenanceSDK(
+            base_url='http://127.0.0.1:3000',
+            username=credentials['username'],
+            password=credentials['password'],
+            timeout=30,
+        )
         model_name = f'TestSDKModel_{int(time.time())}'
 
         try:
+            session = sdk.login()
             created = sdk._ensure_model_registered(model_name, 'sepolia', '0xabc123')
-            resolved = sdk._find_model_by_name(model_name, 'sepolia')
+            resolved = sdk._find_model_by_name(
+                model_name,
+                'sepolia',
+                session['user']['walletAddress'],
+            )
         except requests.exceptions.ConnectionError:
             log('SDK model resolution', 'FAIL', 'Backend not running (connection refused)')
             return

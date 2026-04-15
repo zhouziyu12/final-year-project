@@ -1,11 +1,22 @@
-import hashlib
+"""
+Python SDK for the verifier-gated provenance pipeline.
+
+Primary write path:
+1. authenticate with username/password to obtain a JWT
+2. resolve or register a model under the authenticated owner's wallet address
+3. upload the artifact through the backend relay
+4. generate a Groth16 proof locally
+5. submit canonical metadata + proof to the backend relay
+"""
+
+from __future__ import annotations
+
 import base64
 import hashlib
 import json
 import os
 import secrets
 import subprocess
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -20,23 +31,18 @@ except ImportError:  # pragma: no cover - optional dependency fallback
 
 
 class ProvenanceSDK:
-    """
-    All-in-one SDK:
-    - Generate ZK proof (Node + snarkjs standalone script)
-    - Upload model weights to IPFS (Pinata direct, optional fallback to backend)
-    - Assemble provenance payload
-    - Submit to backend tri-chain relayer
-    """
-
     def __init__(
         self,
         base_url: str = "http://127.0.0.1:3000",
         project_root: Optional[str] = None,
         pinata_api_key: Optional[str] = None,
         pinata_secret_api_key: Optional[str] = None,
-        write_api_key: Optional[str] = None,
+        write_api_key: Optional[str] = None,  # deprecated, retained for compatibility
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        access_token: Optional[str] = None,
         timeout: int = 300,
-    ):
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.project_root = (
             Path(project_root)
@@ -49,26 +55,28 @@ class ProvenanceSDK:
         if load_dotenv and env_path.exists():
             load_dotenv(env_path, override=False)
 
-        self.write_api_key = write_api_key or os.getenv("WRITE_API_KEY")
+        self.username = username or os.getenv("SDK_USERNAME") or os.getenv("PROVENANCE_USERNAME")
+        self.password = password or os.getenv("SDK_PASSWORD") or os.getenv("PROVENANCE_PASSWORD")
+        self.auth_token = access_token or os.getenv("SDK_ACCESS_TOKEN") or os.getenv("PROVENANCE_ACCESS_TOKEN")
+        self.current_user: Optional[Dict[str, Any]] = None
 
-        # Pinata credentials can come from ctor or env
+        self.write_api_key = write_api_key
         self.pinata_api_key = pinata_api_key or os.getenv("PINATA_API_KEY")
-        self.pinata_secret_api_key = pinata_secret_api_key or os.getenv("PINATA_SECRET_API_KEY") or os.getenv("PINATA_SECRET")
+        self.pinata_secret_api_key = (
+            pinata_secret_api_key
+            or os.getenv("PINATA_SECRET_API_KEY")
+            or os.getenv("PINATA_SECRET")
+        )
 
     # ------------------------------- Utilities -------------------------------
 
     @staticmethod
     def _sha256_file(path: str) -> str:
-        h = hashlib.sha256()
-        with open(path, "rb") as f:
-            for chunk in iter(lambda: f.read(1024 * 1024), b""):
-                h.update(chunk)
-        return "0x" + h.hexdigest()
-
-    @staticmethod
-    def _model_id_from_hash(model_hash: str) -> int:
-        hex_part = str(model_hash).replace("0x", "")[:15] or "1"
-        return int(hex_part, 16) % 1_000_000_000
+        digest = hashlib.sha256()
+        with open(path, "rb") as file_obj:
+            for chunk in iter(lambda: file_obj.read(1024 * 1024), b""):
+                digest.update(chunk)
+        return "0x" + digest.hexdigest()
 
     @staticmethod
     def _keccak_to_field(payload: str) -> int:
@@ -109,69 +117,151 @@ class ProvenanceSDK:
             "publicSignals": [str(value) for value in public_signals],
         }
 
+    @staticmethod
+    def _response_error(response: requests.Response, fallback: str) -> str:
+        try:
+            payload = response.json()
+        except Exception:
+            payload = None
+        if isinstance(payload, dict):
+            return payload.get("error") or payload.get("message") or fallback
+        return fallback
+
+    # ----------------------------- Authentication ----------------------------
+
+    def _fetch_current_user(self) -> Dict[str, Any]:
+        if not self.auth_token:
+            raise RuntimeError("No access token is available")
+
+        response = requests.get(
+            f"{self.base_url}/api/auth/me",
+            headers={"Authorization": f"Bearer {self.auth_token}"},
+            timeout=self.timeout,
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(self._response_error(response, "Failed to validate access token"))
+
+        payload = response.json()
+        user = payload.get("user")
+        if not payload.get("success") or not isinstance(user, dict):
+            raise RuntimeError(f"Unexpected /api/auth/me payload: {payload}")
+
+        self.current_user = user
+        return user
+
+    def login(self, force: bool = False) -> Dict[str, Any]:
+        if self.auth_token and not force:
+            try:
+                user = self._fetch_current_user()
+                return {"token": self.auth_token, "user": user}
+            except Exception:
+                self.auth_token = None
+                self.current_user = None
+
+        if not self.username or not self.password:
+            raise RuntimeError("SDK username/password must be configured before login")
+
+        response = requests.post(
+            f"{self.base_url}/api/auth/login",
+            json={"username": self.username, "password": self.password},
+            timeout=self.timeout,
+        )
+        if response.status_code >= 400:
+            raise RuntimeError(self._response_error(response, "Authentication failed"))
+
+        payload = response.json()
+        if not payload.get("success") or not payload.get("token") or not isinstance(payload.get("user"), dict):
+            raise RuntimeError(f"Unexpected /api/auth/login payload: {payload}")
+
+        self.auth_token = payload["token"]
+        self.current_user = payload["user"]
+        return payload
+
+    def _ensure_authenticated(self) -> Dict[str, Any]:
+        if self.current_user and self.auth_token:
+            return self.current_user
+        if self.auth_token:
+            return self._fetch_current_user()
+        login_payload = self.login()
+        return login_payload["user"]
+
+    def _build_auth_headers(self) -> Dict[str, str]:
+        self._ensure_authenticated()
+        if not self.auth_token:
+            raise RuntimeError("Authentication token is unavailable after login")
+        return {"Authorization": f"Bearer {self.auth_token}"}
+
     # ------------------------------ ZK Wrapper -------------------------------
 
-    def _generate_zk_proof(self, secret: str, model_id: int, message_hash: int) -> Dict[str, Any]:
+    def _generate_zk_proof(self, secret: str, model_id: int, statement_hash: int) -> Dict[str, Any]:
         """
-        Windows-safe file-bridge mode:
-        1) write scripts/last_proof_input.json
-        2) run node test_zk_standalone.js (stdout/stderr direct to console, no capture)
-        3) read proof.json, public.json, proof_calldata_debug.txt from disk
+        Bridge local proof generation through test_zk_standalone.js using
+        per-run output directories to avoid concurrent file collisions.
+
+        The circuit input still uses the generic `messageHash` field name for
+        compatibility with the existing witness format, but the SDK treats it
+        as the verifier statement hash derived from canonical metadata.
         """
         print(f"[SDK] Generating ZK proof for modelId={model_id}...")
-        
-        input_path = self.project_root / "scripts" / "last_proof_input.json"
-        proof_path = self.project_root / "proof.json"
-        public_path = self.project_root / "public.json"
-        calldata_debug_path = self.project_root / "proof_calldata_debug.txt"
 
-        input_path.parent.mkdir(parents=True, exist_ok=True)
+        run_dir = self.project_root / ".proof_runs" / (
+            datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + f"-{secrets.token_hex(6)}"
+        )
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        input_path = run_dir / "last_proof_input.json"
+        proof_path = run_dir / "proof.json"
+        public_path = run_dir / "public.json"
+        calldata_debug_path = run_dir / "proof_calldata_debug.txt"
+
         input_path.write_text(
             json.dumps(
-                {"secret": str(secret), "modelId": str(model_id), "messageHash": str(message_hash)},
+                {
+                    "secret": str(secret),
+                    "modelId": str(model_id),
+                    "statementHash": str(statement_hash),
+                    "messageHash": str(statement_hash),
+                },
                 ensure_ascii=False,
             ),
             encoding="utf-8",
         )
-        print(f"[SDK] Input written: {input_path}")
+        print(f"[SDK] Proof input written: {input_path}")
 
-        cmd = "node test_zk_standalone.js"
-        print(f"[SDK] Running: {cmd}")
-        print("[SDK] (Node output will appear below, this may take 30-60s...)")
-        
-        # Windows: use CREATE_NO_WINDOW to prevent handle inheritance deadlock
-        import sys
+        env = os.environ.copy()
+        env["PROOF_INPUT_PATH"] = str(input_path)
+        env["PROOF_OUTPUT_PATH"] = str(proof_path)
+        env["PUBLIC_OUTPUT_PATH"] = str(public_path)
+        env["PROOF_CALLDATA_OUTPUT_PATH"] = str(calldata_debug_path)
+
+        command = ["node", "test_zk_standalone.js"]
+        print("[SDK] Running proof generator with isolated output paths...")
+
         creation_flags = 0
-        if sys.platform == "win32":
+        if os.name == "nt":
             creation_flags = subprocess.CREATE_NO_WINDOW
-        
+
         result = subprocess.run(
-            cmd,
+            command,
             cwd=str(self.project_root),
-            shell=True,
             timeout=120,
+            env=env,
             creationflags=creation_flags,
         )
 
-        if result.returncode != 0:
-            print(f"[SDK] WARNING: Node script exited with code {result.returncode}, checking output files...")
-            # Don't fail immediately - check if output files exist
-            if not (proof_path.exists() and public_path.exists() and calldata_debug_path.exists()):
-                raise RuntimeError(
-                    f"ZK proof generation failed. returncode={result.returncode}, output files missing"
-                )
-            print("[SDK] Output files found despite non-zero exit code, continuing...")
-        else:
-            print("[SDK] Node script completed successfully.")
-        
+        if result.returncode != 0 and not (
+            proof_path.exists() and public_path.exists() and calldata_debug_path.exists()
+        ):
+            raise RuntimeError(
+                f"ZK proof generation failed with exit code {result.returncode} and no complete output set"
+            )
+
         proof = self._safe_json_load(proof_path, default={})
         public_signals = self._safe_json_load(public_path, default=[])
-
         if not calldata_debug_path.exists():
             raise RuntimeError(f"Calldata debug file not found: {calldata_debug_path}")
 
         raw = calldata_debug_path.read_text(encoding="utf-8", errors="ignore").strip()
-
         marker_start = "========== Solidity Calldata =========="
         marker_end = "======================================="
         calldata = raw
@@ -181,12 +271,11 @@ class ProvenanceSDK:
                 calldata = calldata.split(marker_end, 1)[0]
             calldata = calldata.strip()
 
-        print(f"[SDK] ZK proof generated. Calldata length: {len(calldata)} chars")
-
         return {
             "zk": {
                 "ok": True,
                 "engine": "snarkjs.groth16",
+                "runDir": str(run_dir),
                 "inputFile": str(input_path),
                 "proofFile": str(proof_path),
                 "publicFile": str(public_path),
@@ -200,90 +289,68 @@ class ProvenanceSDK:
     # ------------------------------ IPFS Wrapper -----------------------------
 
     def _upload_model_to_ipfs(self, model_path: str) -> Dict[str, Any]:
-        """
-        Direct Pinata upload from SDK (preferred).
-        If credentials missing, returns non-fatal status and backend can still upload via modelFilePath.
-        """
         print(f"[SDK] Uploading model to IPFS: {model_path}")
-        
-        p = Path(model_path)
-        if not p.exists():
+
+        artifact_path = Path(model_path)
+        if not artifact_path.exists():
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
-        if not (self.pinata_api_key and self.pinata_secret_api_key):
-            print("[SDK] Pinata credentials not configured, falling back to backend upload route.")
-            with open(p, "rb") as fp:
-                response = requests.post(
-                    f"{self.base_url}/api/ipfs/upload/file",
-                    json={
-                        "data": base64.b64encode(fp.read()).decode("ascii"),
-                        "fileName": p.name,
-                    },
-                    headers=self._build_write_headers(),
-                    timeout=self.timeout,
-                )
-            if response.status_code >= 400:
-                raise RuntimeError(f"Backend IPFS upload failed: {response.text}")
-            payload = response.json()
-            if not payload.get("success"):
-                raise RuntimeError(f"Backend IPFS upload returned failure: {payload}")
-            return {
-                "ok": True,
-                "ipfsCid": payload.get("cid"),
-                "provider": "backend-relay",
+        if self.pinata_api_key and self.pinata_secret_api_key:
+            url = "https://api.pinata.cloud/pinning/pinFileToIPFS"
+            headers = {
+                "pinata_api_key": self.pinata_api_key,
+                "pinata_secret_api_key": self.pinata_secret_api_key,
             }
+            metadata = {"name": artifact_path.name}
 
-        url = "https://api.pinata.cloud/pinning/pinFileToIPFS"
-        headers = {
-            "pinata_api_key": self.pinata_api_key,
-            "pinata_secret_api_key": self.pinata_secret_api_key,
-        }
-        metadata = {"name": p.name}
+            with open(artifact_path, "rb") as file_obj:
+                files = {
+                    "file": (artifact_path.name, file_obj, "application/octet-stream"),
+                    "pinataMetadata": (None, json.dumps(metadata), "application/json"),
+                }
+                response = requests.post(url, headers=headers, files=files, timeout=self.timeout)
+                response.raise_for_status()
+                payload = response.json()
 
-        print("[SDK] Uploading to Pinata (this may take 10-30s)...")
-        with open(p, "rb") as fp:
-            files = {
-                "file": (p.name, fp, "application/octet-stream"),
-                "pinataMetadata": (None, json.dumps(metadata), "application/json"),
-            }
-            resp = requests.post(url, headers=headers, files=files, timeout=self.timeout)
-            resp.raise_for_status()
-            data = resp.json()
+            cid = payload.get("IpfsHash")
+            return {"ok": True, "ipfsCid": cid, "provider": "pinata-direct"}
 
-        cid = data.get("IpfsHash")
-        print(f"[SDK] IPFS upload complete. CID: {cid}")
-        
-        return {
-            "ok": True,
-            "ipfsCid": cid,
-            "provider": "pinata-direct",
-        }
+        with open(artifact_path, "rb") as file_obj:
+            response = requests.post(
+                f"{self.base_url}/api/ipfs/upload/file",
+                json={
+                    "data": base64.b64encode(file_obj.read()).decode("ascii"),
+                    "fileName": artifact_path.name,
+                },
+                headers=self._build_auth_headers(),
+                timeout=self.timeout,
+            )
+
+        if response.status_code >= 400:
+            raise RuntimeError(self._response_error(response, "Backend IPFS upload failed"))
+
+        payload = response.json()
+        if not payload.get("success") or not payload.get("cid"):
+            raise RuntimeError(f"Unexpected backend IPFS payload: {payload}")
+
+        return {"ok": True, "ipfsCid": payload["cid"], "provider": "backend-relay"}
 
     # --------------------------- Backend Communication -----------------------
 
-    def _build_write_headers(self) -> Dict[str, str]:
-        if not self.write_api_key:
-            raise RuntimeError("WRITE_API_KEY is required for backend write operations")
-
-        return {
-            "x-api-key": self.write_api_key,
-            "x-auth-timestamp": str(int(time.time() * 1000)),
-            "x-auth-nonce": secrets.token_hex(16),
-        }
-
     def _send_to_relayer(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        print(f"[SDK] Submitting to tri-chain relayer: {self.base_url}/api/sdk/provenance")
-        resp = requests.post(
+        print(f"[SDK] Submitting to verifier-gated relayer: {self.base_url}/api/sdk/provenance")
+        response = requests.post(
             f"{self.base_url}/api/sdk/provenance",
             json=payload,
-            headers=self._build_write_headers(),
+            headers=self._build_auth_headers(),
             timeout=self.timeout,
         )
-        resp.raise_for_status()
-        data = resp.json()
+        if response.status_code >= 400:
+            raise RuntimeError(self._response_error(response, "Relayer submission failed"))
+
+        data = response.json()
         if not data.get("success"):
             raise RuntimeError(f"Relayer returned failure: {data}")
-        print("[SDK] Relayer submission successful.")
         return data
 
     def _list_models(self, chain: str) -> Dict[str, Any]:
@@ -298,36 +365,54 @@ class ProvenanceSDK:
             raise RuntimeError(f"Model list request failed: {payload}")
         return payload
 
-    def _find_model_by_name(self, model_name: str, chain: str) -> Optional[Dict[str, Any]]:
-        payload = self._list_models(chain)
-        normalized = model_name.strip().lower()
-        for model in payload.get("models", []):
-            if str(model.get("name", "")).strip().lower() == normalized:
-                return model
-        return None
+    def _resolve_model_by_owner(self, model_name: str, chain: str, owner: str) -> Optional[Dict[str, Any]]:
+        response = requests.get(
+            f"{self.base_url}/api/v2/models/resolve",
+            params={"chain": chain, "owner": owner, "name": model_name},
+            timeout=self.timeout,
+        )
+        if response.status_code == 404:
+            return None
+        if response.status_code >= 400:
+            raise RuntimeError(self._response_error(response, "Model resolution failed"))
+
+        payload = response.json()
+        if not payload.get("success"):
+            raise RuntimeError(f"Model resolution returned failure: {payload}")
+        return payload.get("model")
+
+    def _find_model_by_name(
+        self, model_name: str, chain: str, owner: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        user = self._ensure_authenticated() if owner is None else None
+        scoped_owner = owner or user["walletAddress"]
+        return self._resolve_model_by_owner(model_name, chain, scoped_owner)
 
     def _register_model(self, model_name: str, chain: str, model_hash: str) -> Dict[str, Any]:
         response = requests.post(
             f"{self.base_url}/api/register",
             json={
                 "name": model_name,
-                "description": f"Auto-registered by ProvenanceSDK for {model_name}",
+                "description": f"Registered by ProvenanceSDK for {model_name}",
                 "checksum": model_hash,
                 "framework": "PyTorch",
                 "license": "MIT",
                 "chain": chain,
             },
-            headers=self._build_write_headers(),
+            headers=self._build_auth_headers(),
             timeout=self.timeout,
         )
-        response.raise_for_status()
+        if response.status_code >= 400:
+            raise RuntimeError(self._response_error(response, "Model registration failed"))
+
         payload = response.json()
         if not payload.get("success"):
             raise RuntimeError(f"Model registration failed: {payload}")
         return payload
 
     def _ensure_model_registered(self, model_name: str, chain: str, model_hash: str) -> Dict[str, Any]:
-        existing = self._find_model_by_name(model_name, chain)
+        user = self._ensure_authenticated()
+        existing = self._resolve_model_by_owner(model_name, chain, user["walletAddress"])
         if existing:
             return existing
         return self._register_model(model_name, chain, model_hash)
@@ -344,35 +429,31 @@ class ProvenanceSDK:
         model_name: Optional[str] = None,
         chain: str = "sepolia",
     ) -> Dict[str, Any]:
-        """
-        One-call full pipeline:
-          1) hash model
-          2) build modelId
-          3) generate ZK proof
-          4) upload model to IPFS (SDK direct when possible)
-          5) assemble full payload (ZK calldata + IPFS CID + metadata)
-          6) submit to tri-chain relayer backend
-        """
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("SDK PIPELINE START")
-        print("="*60)
-        
+        print("=" * 60)
+
+        user = self._ensure_authenticated()
         model_path = str(Path(model_path).resolve())
-        print(f"[SDK] Step 1/6: Hashing model file...")
+        effective_model_name = model_name or Path(model_path).stem
+
+        print("[SDK] Step 1/6: Hashing model file...")
         model_hash = self._sha256_file(model_path)
         print(f"[SDK] Model hash: {model_hash}")
-        print(f"\n[SDK] Step 2/6: Resolving on-chain model registration...")
-        effective_model_name = model_name or Path(model_path).stem
+
+        print("[SDK] Step 2/6: Resolving owner-scoped on-chain model registration...")
         registry_model = self._ensure_model_registered(effective_model_name, chain, model_hash)
         model_id = int(registry_model["numericId"] if "numericId" in registry_model else registry_model["id"])
-        print(f"[SDK] Resolved on-chain model: {effective_model_name} -> {model_id} ({chain})")
+        print(
+            f"[SDK] Resolved model scope: chain={chain}, owner={user['walletAddress']}, name={effective_model_name}, id={model_id}"
+        )
 
-        print(f"\n[SDK] Step 3/6: Uploading model to IPFS...")
+        print("[SDK] Step 3/6: Uploading model artifact to IPFS...")
         ipfs_bundle = self._upload_model_to_ipfs(model_path)
         if not ipfs_bundle.get("ok") or not ipfs_bundle.get("ipfsCid"):
             raise RuntimeError("Model upload to IPFS did not return a CID")
 
-        print(f"\n[SDK] Step 4/6: Generating ZK proof...")
+        print("[SDK] Step 4/6: Building canonical metadata and generating ZK proof...")
         submitted_at = self._utc_now_iso()
         canonical_metadata_payload = {
             "action": "UPDATED",
@@ -394,13 +475,13 @@ class ProvenanceSDK:
         }
         canonical_metadata = self._canonical_json(canonical_metadata_payload)
         statement_hash = self._keccak_to_field(canonical_metadata)
-        zk_bundle = self._generate_zk_proof(secret=secret, model_id=model_id, message_hash=statement_hash)
+        zk_bundle = self._generate_zk_proof(secret=secret, model_id=model_id, statement_hash=statement_hash)
         zk_proof = self._proof_to_contract_args(
             zk_bundle["zk"]["proof"],
             zk_bundle["zk"]["publicSignals"],
         )
 
-        print(f"\n[SDK] Step 5/6: Assembling metadata...")
+        print("[SDK] Step 5/6: Assembling verifier-gated payload...")
         payload = {
             "modelId": model_id,
             "modelName": effective_model_name,
@@ -409,15 +490,16 @@ class ProvenanceSDK:
             "zkProof": zk_proof,
         }
 
-        print(f"\n[SDK] Step 6/6: Submitting to tri-chain relayer...")
+        print("[SDK] Step 6/6: Submitting authenticated provenance write...")
         relayer_result = self._send_to_relayer(payload)
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print("SDK PIPELINE COMPLETE")
-        print("="*60 + "\n")
+        print("=" * 60 + "\n")
 
         return {
             "success": True,
+            "authenticatedUser": user,
             "modelPath": model_path,
             "modelHash": model_hash,
             "modelId": model_id,
@@ -426,6 +508,7 @@ class ProvenanceSDK:
             "canonicalMetadata": canonical_metadata_payload,
             "statementHash": str(statement_hash),
             "zk": {
+                "runDir": zk_bundle["zk"]["runDir"],
                 "calldata": zk_bundle["zk"]["calldata"],
                 "proof": zk_proof,
                 "publicSignals": zk_bundle["zk"]["publicSignals"],

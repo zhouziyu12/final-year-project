@@ -1,6 +1,6 @@
 {
   "suite": "ZK Proof System Tests",
-  "timestamp": "2026-04-14T15:57:28.987Z",
+  "timestamp": "2026-04-15T12:05:12.283Z",
   "tests": [
     {
       "name": "Circuit Source",
@@ -29,7 +29,7 @@
     {
       "name": "Test Input Created",
       "status": "PASS",
-      "detail": "Secret: 123456, ModelId: 999999999, MessageHash: 424242",
+      "detail": "Secret: 123456, ModelId: 999999999, StatementHash: 424242",
       "data": null
     },
     {

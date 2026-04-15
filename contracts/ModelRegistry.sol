@@ -123,7 +123,7 @@ contract ModelRegistry {
 
     // External functions
 
-    /// @notice Register a new model. Requires the REGISTRAR role and a clean blacklist status.
+    /// @notice Register a new model and assign ownership to the caller.
     function registerModel(
         string calldata _name,
         string calldata _description,
@@ -132,10 +132,53 @@ contract ModelRegistry {
         string calldata _framework,
         string calldata _license
     ) external notBlacklisted returns (uint256) {
+        return _registerModel(
+            msg.sender,
+            _name,
+            _description,
+            _ipfsCid,
+            _checksum,
+            _framework,
+            _license
+        );
+    }
+
+    /// @notice Register a new model on behalf of an authenticated owner.
+    function registerModelFor(
+        address _owner,
+        string calldata _name,
+        string calldata _description,
+        string calldata _ipfsCid,
+        string calldata _checksum,
+        string calldata _framework,
+        string calldata _license
+    ) external notBlacklisted returns (uint256) {
+        return _registerModel(
+            _owner,
+            _name,
+            _description,
+            _ipfsCid,
+            _checksum,
+            _framework,
+            _license
+        );
+    }
+
+    function _registerModel(
+        address _owner,
+        string calldata _name,
+        string calldata _description,
+        string calldata _ipfsCid,
+        string calldata _checksum,
+        string calldata _framework,
+        string calldata _license
+    ) internal returns (uint256) {
         require(
             accessControl.hasRole(accessControl.REGISTRAR(), msg.sender),
             "ModelRegistry: requires REGISTRAR role"
         );
+        require(_owner != address(0), "ModelRegistry: owner is zero");
+        require(!accessControl.isBlacklisted(_owner), "ModelRegistry: owner is blacklisted");
 
         uint256 id = ++_modelCounter;
 
@@ -148,7 +191,7 @@ contract ModelRegistry {
         model.checksum = _checksum;
         model.framework = _framework;
         model.license = _license;
-        model.owner = msg.sender;
+        model.owner = _owner;
         model.status = ModelStatus.DRAFT;
         model.timestamp = block.timestamp;
         model.stakeAmount = 0;
@@ -158,7 +201,7 @@ contract ModelRegistry {
         uint256 initialVersionId = ++_versionCounter;
         _addVersion(id, initialVersionId, 1, 0, 0, VersionType.PATCH, "", "");
 
-        emit ModelRegistered(id, msg.sender);
+        emit ModelRegistered(id, _owner);
         return id;
     }
 

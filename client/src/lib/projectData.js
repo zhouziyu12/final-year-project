@@ -22,8 +22,8 @@ export const PAGE_META = {
   },
   registry: {
     eyebrow: 'Model Registry',
-    title: 'Inspect registered models and, when configured locally, submit new entries',
-    description: 'The registry is driven by the backend model list and detail endpoints. Frontend writes stay disabled unless a local demo write key is explicitly configured.'
+    title: 'Inspect indexed models and follow the authenticated SDK write path',
+    description: 'The registry is driven by backend-managed list and detail endpoints. The browser no longer submits model writes directly.'
   },
   audit: {
     eyebrow: 'Audit Console',
@@ -32,13 +32,8 @@ export const PAGE_META = {
   },
   system: {
     eyebrow: 'System Status',
-    title: 'Surface backend, chain, verifier-gated provenance, and write-mode readiness',
-    description: 'This page exposes the runtime dependencies that make the project believable during a demo: service health, chain connectivity, verifier-gated provenance status, and write access mode.'
-  },
-  certificates: {
-    eyebrow: 'Certificate View',
-    title: 'Present verified models as certificate-style outputs',
-    description: 'This remains a secondary showcase page built on top of live model records instead of replacing the core provenance workflow.'
+    title: 'Surface backend, chain, verifier-gated provenance, and relay readiness',
+    description: 'This page exposes the runtime dependencies that make the project believable during a demo: service health, chain connectivity, verifier-gated provenance status, and relay availability.'
   }
 };
 
@@ -70,7 +65,7 @@ export const DEMO_LANES = [
   {
     step: '04',
     label: 'System Status',
-    copy: 'Show backend health, chain block height, relayer balance, and write mode before closing the demo.',
+    copy: 'Show backend health, chain block height, relayer balance, and relay mode before closing the demo.',
     cta: 'Open system status',
     tab: 'system',
     icon: Waypoints
@@ -90,7 +85,7 @@ export const TRAINING_STEPS = [
   },
   {
     title: 'Proof generation',
-    copy: 'The standalone prover produces `proof.json`, `public.json`, and Solidity-ready verifier arguments that can be reviewed later.',
+    copy: 'The standalone prover produces an isolated proof run directory with `proof.json`, `public.json`, and Solidity-ready verifier arguments.',
     icon: Binary
   },
   {
@@ -119,16 +114,16 @@ export const TRAINING_ARTIFACTS = [
     note: 'Incremental training entry point.'
   },
   {
-    name: 'proof.json',
+    name: '.proof_runs/<run>/proof.json',
     producer: 'Standalone prover',
     surfacedBy: 'Local artifact only',
-    note: 'Generated proof output, not directly indexed by the backend.'
+    note: 'Generated proof output stored under a per-run directory, not directly indexed by the backend.'
   },
   {
-    name: 'public.json',
+    name: '.proof_runs/<run>/public.json',
     producer: 'Standalone prover',
     surfacedBy: 'Local artifact only',
-    note: 'Public signals emitted during proof generation.'
+    note: 'Public signals emitted during proof generation and stored under the same isolated run directory.'
   },
   {
     name: 'address_v2_multi.json',
@@ -140,7 +135,7 @@ export const TRAINING_ARTIFACTS = [
     name: 'model_name_map.json',
     producer: 'Backend relayer',
     surfacedBy: 'Registry endpoints',
-    note: 'Persists the mapping between model names and on-chain IDs.'
+    note: 'Persists the owner-scoped backend index used to resolve chain + owner + modelName to an on-chain ID.'
   }
 ];
 

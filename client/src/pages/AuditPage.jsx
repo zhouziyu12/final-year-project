@@ -162,12 +162,12 @@ export function AuditPage({ models, onAudit, loading, selectedModelContext, audi
               </div>
             </div>
           ) : (
-            <div className={`result-card${result.payload.verified ? ' result-card-success' : ' result-card-warning'}`}>
+            <div className={`result-card${result.payload.chainVerified ? ' result-card-success' : ' result-card-warning'}`}>
               <div className="result-header">
-                {result.payload.verified ? <ShieldCheck size={20} /> : <ShieldAlert size={20} />}
+                {result.payload.chainVerified ? <ShieldCheck size={20} /> : <ShieldAlert size={20} />}
                 <div>
                   <p className="result-title">
-                    {result.payload.verified ? 'Chain verified successfully' : 'Chain integrity did not pass'}
+                    {result.payload.chainVerified ? 'Chain verified successfully' : 'Chain integrity did not pass'}
                   </p>
                   <p className="result-copy">
                     Model #{result.payload.modelId} on {result.payload.chain} returned {result.payload.recordCount} recorded provenance events.
@@ -177,8 +177,8 @@ export function AuditPage({ models, onAudit, loading, selectedModelContext, audi
 
               <div className="result-metrics">
                 <div>
-                  <span>Verified</span>
-                  <strong>{result.payload.verified ? 'Yes' : 'No'}</strong>
+                  <span>Chain verified</span>
+                  <strong>{result.payload.chainVerified ? 'Yes' : 'No'}</strong>
                 </div>
                 <div>
                   <span>Record count</span>

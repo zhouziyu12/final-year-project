@@ -13,7 +13,7 @@ function getChainRows(status) {
   return Object.entries(status?.chains || {});
 }
 
-export function SystemPage({ health, status, models, auditEvents, writeAccess }) {
+export function SystemPage({ health, status, models, auditEvents, frontendRole, authSession }) {
   const chainRows = getChainRows(status);
 
   return (
@@ -35,9 +35,9 @@ export function SystemPage({ health, status, models, auditEvents, writeAccess })
           <p className="metric-footnote">The UI reads the default provenance mode directly from `/api/v2/status`.</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Frontend write mode</p>
-          <p className="metric-value">{writeAccess.enabled ? 'Enabled' : 'Read-only'}</p>
-          <p className="metric-footnote">{writeAccess.summary}</p>
+          <p className="metric-label">Frontend role</p>
+          <p className="metric-value">{authSession?.user ? 'Signed in' : 'Presentation'}</p>
+          <p className="metric-footnote">{frontendRole.summary}</p>
         </article>
       </section>
 
@@ -102,7 +102,7 @@ export function SystemPage({ health, status, models, auditEvents, writeAccess })
               <Server size={18} />
               <div>
                 <p className="insight-title">Express backend</p>
-                <p className="insight-copy">Serves health, status, model inventory, model detail, audit verification, and optional write routes.</p>
+                <p className="insight-copy">Serves health, status, backend-indexed model inventory, model detail, audit verification, and authenticated relay routes.</p>
               </div>
             </div>
             <div className="insight-item">
@@ -122,8 +122,8 @@ export function SystemPage({ health, status, models, auditEvents, writeAccess })
             <div className="insight-item">
               <LockKeyhole size={18} />
               <div>
-                <p className="insight-title">Protected write API</p>
-                <p className="insight-copy">The server enforces API key, timestamp, nonce, replay protection, and rate limiting before accepting writes.</p>
+                <p className="insight-title">Protected account-based relay</p>
+                <p className="insight-copy">The server enforces bearer-token authentication, account status checks, lockout policy, and owner-bound write checks before accepting lifecycle access or provenance writes.</p>
               </div>
             </div>
           </div>
@@ -187,7 +187,7 @@ export function SystemPage({ health, status, models, auditEvents, writeAccess })
               <ShieldCheck size={18} />
               <div>
                 <p className="insight-title">Keeps the trust boundary explicit</p>
-                <p className="insight-copy">Examiners can see whether the frontend is in read-only mode or intentionally allowed to perform local demo writes.</p>
+                <p className="insight-copy">Examiners can see that the frontend is presentation-first, while authenticated SDK writes stay behind the backend relay.</p>
               </div>
             </article>
           </div>

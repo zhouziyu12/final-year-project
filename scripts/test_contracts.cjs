@@ -95,8 +95,10 @@ async function testNetwork(network) {
 
   let modelId = null;
   try {
+    const delegatedOwner = wallet.address;
     const receipt = await waitForConfirm(
-      await registry.registerModel(
+      await registry.registerModelFor(
+        delegatedOwner,
         `ResNet50-${Date.now()}`,
         "Image classification model",
         "QmExample",
@@ -111,6 +113,8 @@ async function testNetwork(network) {
     output.push(record("Register model", modelId ? "PASS" : "FAIL", `modelId=${modelId}`));
 
     if (modelId) {
+      const onChainOwner = await registry.getModelOwner(modelId);
+      output.push(record("Delegated owner assignment", onChainOwner === delegatedOwner ? "PASS" : "FAIL", onChainOwner));
       const draftStatus = Number(await registry.getModelStatus(modelId));
       output.push(record("Initial status is DRAFT", draftStatus === 0 ? "PASS" : "FAIL", `status=${draftStatus}`));
 

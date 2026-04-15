@@ -5,6 +5,7 @@ import cors from 'cors';
 import 'dotenv/config';
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import FormData from 'form-data';
 import { spawnSync } from 'child_process';
@@ -102,42 +103,13 @@ app.use((req, res, next) => {
   next();
 });
 
-const WRITE_API_KEY = process.env.WRITE_API_KEY || '';
-const WRITE_AUTH_WINDOW_MS = Number(process.env.WRITE_AUTH_WINDOW_MS || 5 * 60 * 1000);
+const CONFIGURED_JWT_SECRET = typeof process.env.JWT_SECRET === 'string' ? process.env.JWT_SECRET.trim() : '';
+const JWT_SECRET_MIN_LENGTH = 32;
+const JWT_SECRET_MODE = CONFIGURED_JWT_SECRET ? 'configured' : 'ephemeral';
+const JWT_SECRET = CONFIGURED_JWT_SECRET || crypto.randomBytes(32).toString('hex');
+const AUTH_TOKEN_TTL_SECONDS = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 8 * 60 * 60);
 const WRITE_RATE_LIMIT_WINDOW_MS = Number(process.env.WRITE_RATE_LIMIT_WINDOW_MS || 60 * 1000);
 const WRITE_RATE_LIMIT_MAX = Number(process.env.WRITE_RATE_LIMIT_MAX || 30);
-const AUTH_STATE_FILE = path.join(__dirname, 'write_auth_state.json');
-
-function loadNonceStore() {
-  try {
-    if (!fs.existsSync(AUTH_STATE_FILE)) {
-      return new Map();
-    }
-
-    const parsed = JSON.parse(fs.readFileSync(AUTH_STATE_FILE, 'utf8'));
-    const entries = Array.isArray(parsed?.nonces) ? parsed.nonces : [];
-    const current = nowMs();
-    return new Map(
-      entries
-        .filter((entry) => entry?.key && Number(entry?.expiresAt) > current)
-        .map((entry) => [entry.key, { expiresAt: Number(entry.expiresAt) }])
-    );
-  } catch {
-    return new Map();
-  }
-}
-
-function persistNonceStore() {
-  const payload = {
-    nonces: Array.from(nonceStore.entries()).map(([key, value]) => ({
-      key,
-      expiresAt: value.expiresAt
-    }))
-  };
-  fs.writeFileSync(AUTH_STATE_FILE, JSON.stringify(payload, null, 2));
-}
-
-const nonceStore = loadNonceStore();
 const rateLimitStore = new Map();
 
 function nowMs() {
@@ -182,53 +154,6 @@ function validateWriteRateLimit(req, res) {
 
   existing.count += 1;
   return true;
-}
-
-function validateWriteAuth(req, res, next) {
-  if (!WRITE_API_KEY) {
-    console.error('WRITE_API_KEY not configured. Refusing write request.');
-    return sendError(res, 'Write authentication is not configured', 503);
-  }
-
-  if (!validateWriteRateLimit(req, res)) {
-    return;
-  }
-
-  const apiKey = req.get('x-api-key');
-  const timestampHeader = req.get('x-auth-timestamp');
-  const nonce = req.get('x-auth-nonce');
-
-  if (!apiKey || apiKey !== WRITE_API_KEY) {
-    return sendError(res, 'Invalid write API key', 401);
-  }
-
-  if (!timestampHeader || !nonce) {
-    return sendError(res, 'Missing write authentication headers', 401);
-  }
-
-  const timestamp = Number(timestampHeader);
-  if (!Number.isFinite(timestamp)) {
-    return sendError(res, 'Invalid write authentication timestamp', 401);
-  }
-
-  const age = Math.abs(nowMs() - timestamp);
-  if (age > WRITE_AUTH_WINDOW_MS) {
-    return sendError(res, 'Expired write authentication timestamp', 401);
-  }
-
-  cleanupMap(nonceStore, 'expiresAt', persistNonceStore);
-  const nonceKey = `${apiKey}:${nonce}`;
-  if (nonceStore.has(nonceKey)) {
-    return sendError(res, 'Replay detected for write request', 409);
-  }
-
-  nonceStore.set(nonceKey, { expiresAt: nowMs() + WRITE_AUTH_WINDOW_MS });
-  persistNonceStore();
-  req.writeAuth = {
-    clientIp: getClientIp(req),
-    authenticatedAt: new Date().toISOString()
-  };
-  next();
 }
 
 function requireString(value, fieldName, { optional = false, maxLength = 2000 } = {}) {
@@ -403,8 +328,27 @@ function normalizeZKProof(zkProof) {
 
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const ADDR_FILE = path.join(PROJECT_ROOT, 'address_v2_multi.json');
-const MODEL_MAP_FILE = path.join(PROJECT_ROOT, 'model_name_map.json');
+const MODEL_INDEX_FILE = path.join(PROJECT_ROOT, 'model_name_map.json');
 const SECRETS_FILE = path.join(PROJECT_ROOT, 'model_secrets', 'secrets.json');
+const LEGACY_USERS_FILE = path.join(__dirname, 'users.json');
+const AUTH_STORE_FILE = path.resolve(
+  process.env.AUTH_USER_STORE_FILE || path.join(__dirname, 'data', 'auth_store.json')
+);
+const LEGACY_OWNER_KEY = '__legacy__';
+const DEFAULT_USERS = [
+  {
+    username: 'researcher',
+    password: 'researcher-demo-pass',
+    walletAddress: '0x1111111111111111111111111111111111111111',
+    role: 'researcher'
+  }
+];
+const ALLOWED_USER_ROLES = new Set(['researcher', 'admin']);
+const ALLOWED_USER_STATUSES = new Set(['active', 'disabled']);
+const AUTH_TOKEN_ISSUER = String(process.env.AUTH_TOKEN_ISSUER || 'ai-provenance-backend').trim() || 'ai-provenance-backend';
+const AUTH_TOKEN_AUDIENCE = String(process.env.AUTH_TOKEN_AUDIENCE || 'ai-provenance-sdk').trim() || 'ai-provenance-sdk';
+const AUTH_LOCKOUT_THRESHOLD = Math.max(1, Number(process.env.AUTH_LOCKOUT_THRESHOLD || 5));
+const AUTH_LOCKOUT_DURATION_SECONDS = Math.max(60, Number(process.env.AUTH_LOCKOUT_DURATION_SECONDS || 15 * 60));
 
 let addrs;
 try {
@@ -414,18 +358,695 @@ try {
   process.exit(1);
 }
 
-function loadModelMap() {
-  try {
-    if (fs.existsSync(MODEL_MAP_FILE)) {
-      return JSON.parse(fs.readFileSync(MODEL_MAP_FILE, 'utf8'));
-    }
-  } catch {}
-  return {};
+function createEmptyModelIndex() {
+  return {
+    version: 2,
+    chains: {}
+  };
 }
 
-function saveModelMap(map) {
-  fs.writeFileSync(MODEL_MAP_FILE, JSON.stringify(map, null, 2));
+function normalizeModelNameKey(modelName) {
+  return String(modelName || '').trim().toLowerCase();
 }
+
+function tryNormalizeWalletAddress(value) {
+  if (!value || value === LEGACY_OWNER_KEY) {
+    return null;
+  }
+
+  try {
+    return ethers.getAddress(String(value));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeWalletAddress(value, fieldName = 'walletAddress') {
+  try {
+    return ethers.getAddress(String(value));
+  } catch {
+    const error = new Error(`${fieldName} must be a valid EVM address`);
+    error.statusCode = 400;
+    throw error;
+  }
+}
+
+function ensureChainIndex(index, chain) {
+  if (!index.chains[chain]) {
+    index.chains[chain] = { owners: {} };
+  }
+  return index.chains[chain];
+}
+
+function ensureOwnerBucket(index, chain, owner) {
+  const chainEntry = ensureChainIndex(index, chain);
+  const ownerKey = tryNormalizeWalletAddress(owner) || LEGACY_OWNER_KEY;
+  if (!chainEntry.owners[ownerKey]) {
+    chainEntry.owners[ownerKey] = {};
+  }
+  return { ownerKey, bucket: chainEntry.owners[ownerKey] };
+}
+
+function upsertModelIndexEntry(index, { chain, owner, modelName, modelId, createdAt = null }) {
+  const normalizedName = normalizeModelNameKey(modelName);
+  if (!normalizedName) {
+    return null;
+  }
+
+  const normalizedOwner = tryNormalizeWalletAddress(owner);
+  const { bucket } = ensureOwnerBucket(index, chain, normalizedOwner);
+  bucket[normalizedName] = {
+    id: Number(modelId),
+    name: String(modelName).trim(),
+    owner: normalizedOwner,
+    createdAt: createdAt || bucket[normalizedName]?.createdAt || new Date().toISOString()
+  };
+  return bucket[normalizedName];
+}
+
+function findIndexedModel(chain, owner, modelName) {
+  const chainEntry = modelIndex.chains?.[chain];
+  if (!chainEntry) {
+    return null;
+  }
+
+  const ownerKey = tryNormalizeWalletAddress(owner) || LEGACY_OWNER_KEY;
+  const normalizedName = normalizeModelNameKey(modelName);
+  const entry = chainEntry.owners?.[ownerKey]?.[normalizedName];
+  if (!entry) {
+    return null;
+  }
+
+  return {
+    ...entry,
+    chain,
+    ownerKey,
+    modelNameKey: normalizedName
+  };
+}
+
+function removeIndexedModel(chain, owner, modelName) {
+  const chainEntry = modelIndex.chains?.[chain];
+  if (!chainEntry) {
+    return;
+  }
+
+  const ownerKey = tryNormalizeWalletAddress(owner) || LEGACY_OWNER_KEY;
+  const normalizedName = normalizeModelNameKey(modelName);
+  if (!chainEntry.owners?.[ownerKey]?.[normalizedName]) {
+    return;
+  }
+
+  delete chainEntry.owners[ownerKey][normalizedName];
+  if (Object.keys(chainEntry.owners[ownerKey]).length === 0) {
+    delete chainEntry.owners[ownerKey];
+  }
+  if (Object.keys(chainEntry.owners).length === 0) {
+    delete modelIndex.chains[chain];
+  }
+  saveModelIndex(modelIndex);
+}
+
+function migrateIndexedModelOwner(chain, entry, resolvedOwner) {
+  const normalizedOwner = tryNormalizeWalletAddress(resolvedOwner);
+  if (!entry || !normalizedOwner || entry.ownerKey === normalizedOwner) {
+    return;
+  }
+
+  removeIndexedModel(chain, entry.ownerKey === LEGACY_OWNER_KEY ? null : entry.ownerKey, entry.name || entry.modelNameKey);
+  upsertModelIndexEntry(modelIndex, {
+    chain,
+    owner: normalizedOwner,
+    modelName: entry.name || entry.modelNameKey,
+    modelId: entry.id,
+    createdAt: entry.createdAt || null
+  });
+  saveModelIndex(modelIndex);
+}
+
+function loadModelIndex() {
+  try {
+    if (!fs.existsSync(MODEL_INDEX_FILE)) {
+      return createEmptyModelIndex();
+    }
+
+    const parsed = JSON.parse(fs.readFileSync(MODEL_INDEX_FILE, 'utf8'));
+    if (parsed?.version === 2 && parsed?.chains) {
+      return parsed;
+    }
+
+    const converted = createEmptyModelIndex();
+    for (const [key, modelId] of Object.entries(parsed || {})) {
+      const separatorIndex = key.indexOf(':');
+      if (separatorIndex === -1) continue;
+
+      const chain = key.slice(0, separatorIndex);
+      const modelName = key.slice(separatorIndex + 1);
+      const numericId = Number(modelId);
+      if (!chain || !modelName || !Number.isInteger(numericId) || numericId <= 0) continue;
+
+      upsertModelIndexEntry(converted, {
+        chain,
+        owner: null,
+        modelName,
+        modelId: numericId
+      });
+    }
+
+    return converted;
+  } catch {}
+  return createEmptyModelIndex();
+}
+
+function saveModelIndex(index) {
+  fs.writeFileSync(MODEL_INDEX_FILE, JSON.stringify(index, null, 2));
+}
+
+function hashPassword(password, salt = crypto.randomBytes(16)) {
+  const derived = crypto.scryptSync(password, salt, 64);
+  return `scrypt$${salt.toString('hex')}$${derived.toString('hex')}`;
+}
+
+function verifyPassword(password, storedHash) {
+  const [algorithm, saltHex, digestHex] = String(storedHash || '').split('$');
+  if (algorithm !== 'scrypt' || !saltHex || !digestHex) {
+    return false;
+  }
+
+  const expected = Buffer.from(digestHex, 'hex');
+  const actual = crypto.scryptSync(password, Buffer.from(saltHex, 'hex'), expected.length);
+  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
+}
+
+function isoNow() {
+  return new Date().toISOString();
+}
+
+function normalizeUserStatus(status, fieldName = 'status') {
+  const normalized = requireString(status || 'active', fieldName, { maxLength: 64 }).toLowerCase();
+  if (!ALLOWED_USER_STATUSES.has(normalized)) {
+    const error = new Error(`${fieldName} must be one of: ${Array.from(ALLOWED_USER_STATUSES).join(', ')}`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return normalized;
+}
+
+function normalizeTokenVersion(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function normalizeTimestamp(value, { allowNull = true } = {}) {
+  if (value === undefined || value === null || value === '') {
+    return allowNull ? null : isoNow();
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.valueOf())) {
+    return allowNull ? null : isoNow();
+  }
+  return parsed.toISOString();
+}
+
+function normalizeFailedLoginCount(value) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function createStoredUserRecord({
+  username,
+  passwordHash,
+  walletAddress,
+  role = 'researcher',
+  status = 'active',
+  tokenVersion = 1,
+  createdAt = null,
+  updatedAt = null,
+  passwordChangedAt = null,
+  lastLoginAt = null,
+  failedLoginCount = 0,
+  lockedUntil = null
+}) {
+  const now = isoNow();
+  return {
+    username: requireString(username, 'username', { maxLength: 64 }).toLowerCase(),
+    passwordHash: requireString(passwordHash, 'passwordHash', { maxLength: 512 }),
+    walletAddress: normalizeWalletAddress(walletAddress),
+    role: normalizeUserRole(role || 'researcher'),
+    status: normalizeUserStatus(status || 'active'),
+    tokenVersion: normalizeTokenVersion(tokenVersion),
+    createdAt: normalizeTimestamp(createdAt, { allowNull: false }) || now,
+    updatedAt: normalizeTimestamp(updatedAt, { allowNull: false }) || now,
+    passwordChangedAt: normalizeTimestamp(passwordChangedAt, { allowNull: false }) || now,
+    lastLoginAt: normalizeTimestamp(lastLoginAt),
+    failedLoginCount: normalizeFailedLoginCount(failedLoginCount),
+    lockedUntil: normalizeTimestamp(lockedUntil)
+  };
+}
+
+function createDefaultStoredUsers() {
+  return DEFAULT_USERS.map((user) => createStoredUserRecord({
+    username: user.username,
+    passwordHash: hashPassword(user.password),
+    walletAddress: user.walletAddress,
+    role: user.role
+  }));
+}
+
+function ensureUserStoreFile() {
+  fs.mkdirSync(path.dirname(AUTH_STORE_FILE), { recursive: true });
+  if (fs.existsSync(AUTH_STORE_FILE)) {
+    return;
+  }
+
+  let source = null;
+  if (fs.existsSync(LEGACY_USERS_FILE)) {
+    try {
+      source = JSON.parse(fs.readFileSync(LEGACY_USERS_FILE, 'utf8'));
+    } catch {
+      source = null;
+    }
+  }
+
+  const seeded = {
+    version: 2,
+    users: Array.isArray(source?.users) && source.users.length > 0
+      ? source.users.map((user) => createStoredUserRecord({
+        username: user.username,
+        passwordHash: user.passwordHash || hashPassword(user.password || 'change-me'),
+        walletAddress: user.walletAddress,
+        role: user.role || 'researcher',
+        status: user.status || 'active',
+        tokenVersion: user.tokenVersion,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        passwordChangedAt: user.passwordChangedAt,
+        lastLoginAt: user.lastLoginAt,
+        failedLoginCount: user.failedLoginCount,
+        lockedUntil: user.lockedUntil
+      }))
+      : createDefaultStoredUsers()
+  };
+  fs.writeFileSync(AUTH_STORE_FILE, `${JSON.stringify(seeded, null, 2)}\n`);
+}
+
+function loadUserStore() {
+  ensureUserStoreFile();
+  const parsed = JSON.parse(fs.readFileSync(AUTH_STORE_FILE, 'utf8'));
+  return {
+    version: parsed?.version || 2,
+    users: (parsed?.users || []).map((user) => ({
+      ...createStoredUserRecord({
+        username: user.username,
+        passwordHash: user.passwordHash,
+        walletAddress: user.walletAddress,
+        role: user.role || 'researcher',
+        status: user.status || 'active',
+        tokenVersion: user.tokenVersion,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+        passwordChangedAt: user.passwordChangedAt,
+        lastLoginAt: user.lastLoginAt,
+        failedLoginCount: user.failedLoginCount,
+        lockedUntil: user.lockedUntil
+      })
+    }))
+  };
+}
+
+function saveUserStore(store = userStore) {
+  fs.mkdirSync(path.dirname(AUTH_STORE_FILE), { recursive: true });
+  fs.writeFileSync(AUTH_STORE_FILE, `${JSON.stringify({
+    version: store.version || 2,
+    users: store.users
+  }, null, 2)}\n`);
+}
+
+function normalizeUserRole(role, fieldName = 'role') {
+  const normalized = requireString(role || 'researcher', fieldName, { maxLength: 64 }).toLowerCase();
+  if (!ALLOWED_USER_ROLES.has(normalized)) {
+    const error = new Error(`${fieldName} must be one of: ${Array.from(ALLOWED_USER_ROLES).join(', ')}`);
+    error.statusCode = 400;
+    throw error;
+  }
+  return normalized;
+}
+
+function refreshUserStoreFromDisk() {
+  const latest = loadUserStore();
+  userStore.version = latest.version;
+  userStore.users = latest.users;
+  return userStore;
+}
+
+function findStoredUserByUsername(normalizedUsername) {
+  return userStore.users.find((user) => user.username === normalizedUsername) || null;
+}
+
+function findStoredUserByWalletAddress(walletAddress) {
+  return userStore.users.find((user) => user.walletAddress === walletAddress) || null;
+}
+
+function findUserByUsername(username) {
+  refreshUserStoreFromDisk();
+  const normalizedUsername = String(username || '').trim().toLowerCase();
+  return findStoredUserByUsername(normalizedUsername);
+}
+
+function listPublicUsers() {
+  refreshUserStoreFromDisk();
+  return userStore.users
+    .slice()
+    .sort((left, right) => left.username.localeCompare(right.username))
+    .map((user) => buildPublicUser(user));
+}
+
+function createLocalUser({ username, password, walletAddress, role, status }) {
+  refreshUserStoreFromDisk();
+
+  const normalizedUsername = requireString(username, 'username', { maxLength: 64 }).toLowerCase();
+  if (findStoredUserByUsername(normalizedUsername)) {
+    const error = new Error(`User '${normalizedUsername}' already exists`);
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const normalizedPassword = requireString(password, 'password', { maxLength: 256 });
+  const normalizedWalletAddress = normalizeWalletAddress(walletAddress);
+  const normalizedRole = normalizeUserRole(role || 'researcher');
+  const normalizedStatus = normalizeUserStatus(status || 'active');
+  if (findStoredUserByWalletAddress(normalizedWalletAddress)) {
+    const error = new Error(`Wallet '${normalizedWalletAddress}' is already bound to another user`);
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const nextUser = createStoredUserRecord({
+    username: normalizedUsername,
+    passwordHash: hashPassword(normalizedPassword),
+    walletAddress: normalizedWalletAddress,
+    role: normalizedRole,
+    status: normalizedStatus
+  });
+
+  userStore.users.push(nextUser);
+  saveUserStore(userStore);
+  return buildPublicUser(nextUser);
+}
+
+function deleteLocalUser(username, { requestedBy = null } = {}) {
+  refreshUserStoreFromDisk();
+
+  const normalizedUsername = requireString(username, 'username', { maxLength: 64 }).toLowerCase();
+  const existing = findStoredUserByUsername(normalizedUsername);
+  if (!existing) {
+    const error = new Error(`User '${normalizedUsername}' was not found`);
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (requestedBy && normalizedUsername === String(requestedBy).trim().toLowerCase()) {
+    const error = new Error('Admin users cannot delete their own active account via the API');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (existing.role === 'admin' && existing.status === 'active') {
+    const adminCount = userStore.users.filter((user) => user.role === 'admin' && user.status === 'active').length;
+    if (adminCount <= 1) {
+      const error = new Error('At least one admin user must remain');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
+  userStore.users = userStore.users.filter((user) => user.username !== normalizedUsername);
+  saveUserStore(userStore);
+  return buildPublicUser(existing);
+}
+
+function isUserLocked(user) {
+  return Boolean(user?.lockedUntil) && new Date(user.lockedUntil).valueOf() > nowMs();
+}
+
+function markFailedLogin(username) {
+  refreshUserStoreFromDisk();
+  const normalizedUsername = String(username || '').trim().toLowerCase();
+  const user = findStoredUserByUsername(normalizedUsername);
+  if (!user) {
+    return null;
+  }
+
+  user.failedLoginCount = normalizeFailedLoginCount(user.failedLoginCount) + 1;
+  if (user.failedLoginCount >= AUTH_LOCKOUT_THRESHOLD) {
+    user.lockedUntil = new Date(nowMs() + AUTH_LOCKOUT_DURATION_SECONDS * 1000).toISOString();
+    user.failedLoginCount = 0;
+  }
+  user.updatedAt = isoNow();
+  saveUserStore(userStore);
+  return user;
+}
+
+function markSuccessfulLogin(username) {
+  refreshUserStoreFromDisk();
+  const normalizedUsername = String(username || '').trim().toLowerCase();
+  const user = findStoredUserByUsername(normalizedUsername);
+  if (!user) {
+    return null;
+  }
+
+  user.failedLoginCount = 0;
+  user.lockedUntil = null;
+  user.lastLoginAt = isoNow();
+  user.updatedAt = isoNow();
+  saveUserStore(userStore);
+  return user;
+}
+
+function updateLocalUser(username, updates, { requestedBy = null } = {}) {
+  refreshUserStoreFromDisk();
+
+  const normalizedUsername = requireString(username, 'username', { maxLength: 64 }).toLowerCase();
+  const existing = findStoredUserByUsername(normalizedUsername);
+  if (!existing) {
+    const error = new Error(`User '${normalizedUsername}' was not found`);
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const nextRole = updates.role !== undefined ? normalizeUserRole(updates.role) : existing.role;
+  const nextStatus = updates.status !== undefined ? normalizeUserStatus(updates.status) : existing.status;
+  const requestedWallet = updates.walletAddress !== undefined ? updates.walletAddress : updates.wallet;
+  const nextWalletAddress = requestedWallet !== undefined ? normalizeWalletAddress(requestedWallet) : existing.walletAddress;
+  const nextPassword = updates.password !== undefined
+    ? requireString(updates.password, 'password', { maxLength: 256 })
+    : null;
+
+  const walletConflict = userStore.users.find(
+    (user) => user.username !== normalizedUsername && user.walletAddress === nextWalletAddress
+  );
+  if (walletConflict) {
+    const error = new Error(`Wallet '${nextWalletAddress}' is already bound to another user`);
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const requestedByUsername = requestedBy ? String(requestedBy).trim().toLowerCase() : null;
+  if (requestedByUsername && requestedByUsername === normalizedUsername && nextStatus !== 'active') {
+    const error = new Error('Admin users cannot disable their own active account via the API');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const activeAdminsExcludingCurrent = userStore.users.filter(
+    (user) => user.username !== normalizedUsername && user.role === 'admin' && user.status === 'active'
+  ).length;
+  if (existing.role === 'admin' && existing.status === 'active' && (nextRole !== 'admin' || nextStatus !== 'active') && activeAdminsExcludingCurrent < 1) {
+    const error = new Error('At least one active admin user must remain');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const securityRelevantChange = (
+    existing.role !== nextRole
+    || existing.status !== nextStatus
+    || existing.walletAddress !== nextWalletAddress
+    || nextPassword !== null
+  );
+
+  existing.role = nextRole;
+  existing.status = nextStatus;
+  existing.walletAddress = nextWalletAddress;
+  existing.updatedAt = isoNow();
+
+  if (nextPassword !== null) {
+    existing.passwordHash = hashPassword(nextPassword);
+    existing.passwordChangedAt = isoNow();
+    existing.failedLoginCount = 0;
+    existing.lockedUntil = null;
+  }
+
+  if (securityRelevantChange) {
+    existing.tokenVersion = normalizeTokenVersion(existing.tokenVersion) + 1;
+  }
+
+  saveUserStore(userStore);
+  return buildPublicUser(existing);
+}
+
+function base64urlEncode(value) {
+  const buffer = Buffer.isBuffer(value) ? value : Buffer.from(value);
+  return buffer
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+function base64urlDecode(value) {
+  const normalized = String(value)
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+  const padding = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4));
+  return Buffer.from(`${normalized}${padding}`, 'base64');
+}
+
+function signAuthToken(payload) {
+  const headerSegment = base64urlEncode(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const payloadSegment = base64urlEncode(JSON.stringify(payload));
+  const signingInput = `${headerSegment}.${payloadSegment}`;
+  const signature = crypto.createHmac('sha256', JWT_SECRET).update(signingInput).digest();
+  return `${signingInput}.${base64urlEncode(signature)}`;
+}
+
+function verifyAuthToken(token) {
+  const segments = String(token || '').split('.');
+  if (segments.length !== 3) {
+    const error = new Error('Malformed token');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const [headerSegment, payloadSegment, signatureSegment] = segments;
+  const expectedSignature = crypto.createHmac('sha256', JWT_SECRET).update(`${headerSegment}.${payloadSegment}`).digest();
+  const providedSignature = base64urlDecode(signatureSegment);
+  if (
+    expectedSignature.length !== providedSignature.length ||
+    !crypto.timingSafeEqual(expectedSignature, providedSignature)
+  ) {
+    const error = new Error('Invalid token signature');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  const payload = JSON.parse(base64urlDecode(payloadSegment).toString('utf8'));
+  const currentEpoch = Math.floor(nowMs() / 1000);
+  if (payload?.iss !== AUTH_TOKEN_ISSUER) {
+    const error = new Error('Invalid token issuer');
+    error.statusCode = 401;
+    throw error;
+  }
+  if (payload?.aud !== AUTH_TOKEN_AUDIENCE) {
+    const error = new Error('Invalid token audience');
+    error.statusCode = 401;
+    throw error;
+  }
+  if (payload?.nbf && Number(payload.nbf) > currentEpoch) {
+    const error = new Error('Authentication token is not active yet');
+    error.statusCode = 401;
+    throw error;
+  }
+  if (!payload?.exp || Number(payload.exp) <= currentEpoch) {
+    const error = new Error('Authentication token expired');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  return payload;
+}
+
+function buildPublicUser(user) {
+  return {
+    username: user.username,
+    walletAddress: normalizeWalletAddress(user.walletAddress),
+    role: user.role,
+    status: normalizeUserStatus(user.status || 'active'),
+    createdAt: normalizeTimestamp(user.createdAt),
+    updatedAt: normalizeTimestamp(user.updatedAt),
+    lastLoginAt: normalizeTimestamp(user.lastLoginAt)
+  };
+}
+
+function issueSessionForUser(user) {
+  const nowEpoch = Math.floor(nowMs() / 1000);
+  const payload = {
+    sub: user.username,
+    username: user.username,
+    walletAddress: normalizeWalletAddress(user.walletAddress),
+    role: user.role,
+    status: normalizeUserStatus(user.status || 'active'),
+    ver: normalizeTokenVersion(user.tokenVersion),
+    iss: AUTH_TOKEN_ISSUER,
+    aud: AUTH_TOKEN_AUDIENCE,
+    jti: crypto.randomUUID(),
+    iat: nowEpoch,
+    nbf: nowEpoch,
+    exp: nowEpoch + AUTH_TOKEN_TTL_SECONDS
+  };
+
+  return {
+    token: signAuthToken(payload),
+    expiresAt: new Date(payload.exp * 1000).toISOString(),
+    user: buildPublicUser(payload)
+  };
+}
+
+function requireAuth(req, res, next) {
+  if (!validateWriteRateLimit(req, res)) {
+    return;
+  }
+
+  const authorization = req.get('authorization') || '';
+  if (!authorization.startsWith('Bearer ')) {
+    return sendError(res, 'Missing bearer token', 401);
+  }
+
+  try {
+    const payload = verifyAuthToken(authorization.slice(7));
+    const currentUser = findUserByUsername(payload.sub || payload.username);
+    if (!currentUser) {
+      return sendError(res, 'Authentication token no longer maps to a user', 401);
+    }
+    if (currentUser.status !== 'active') {
+      return sendError(res, 'User account is disabled', 403);
+    }
+    if (normalizeTokenVersion(currentUser.tokenVersion) !== normalizeTokenVersion(payload.ver)) {
+      return sendError(res, 'Authentication token has been revoked', 401);
+    }
+    req.auth = buildPublicUser(currentUser);
+    next();
+  } catch (error) {
+    return sendError(res, error.message || 'Invalid authentication token', error.statusCode || 401);
+  }
+}
+
+function requireRole(expectedRole) {
+  return (req, res, next) => {
+    if (!req.auth) {
+      return sendError(res, 'Authentication is required', 401);
+    }
+
+    if (req.auth.role !== expectedRole) {
+      return sendError(res, `This route requires role: ${expectedRole}`, 403);
+    }
+
+    next();
+  };
+}
+
+const modelIndex = loadModelIndex();
+const userStore = loadUserStore();
 
 function loadSecretStore() {
   try {
@@ -650,7 +1271,7 @@ async function fetchIpfsBinary(cid) {
   return null;
 }
 
-const modelNameMap = loadModelMap();
+saveModelIndex(modelIndex);
 
 const SEPOLIA_RPC =
   process.env.SEPOLIA_RPC ||
@@ -665,6 +1286,11 @@ const bootWarnings = [];
 if (!pk) {
   bootWarnings.push('PRIVATE_KEY missing: backend will start in read-only mode and write routes will be unavailable.');
 }
+if (!CONFIGURED_JWT_SECRET) {
+  bootWarnings.push('JWT_SECRET missing: backend generated an ephemeral signing secret for this process. Set JWT_SECRET for demo, shared, or persistent environments.');
+} else if (CONFIGURED_JWT_SECRET.length < JWT_SECRET_MIN_LENGTH) {
+  bootWarnings.push(`JWT_SECRET is shorter than the recommended ${JWT_SECRET_MIN_LENGTH} characters. Use a long random secret for demo and production-like environments.`);
+}
 
 const sepProvider = new ethers.JsonRpcProvider(SEPOLIA_RPC);
 const bnbProvider = new ethers.JsonRpcProvider(TBNB_RPC);
@@ -678,6 +1304,9 @@ const chains = {
 
 const MR_ABI = [
   'function registerModel(string memory _name, string memory _description,' +
+    ' string memory _ipfsCid, string memory _checksum, string memory _framework,' +
+    ' string memory _license) external returns (uint256)',
+  'function registerModelFor(address _owner, string memory _name, string memory _description,' +
     ' string memory _ipfsCid, string memory _checksum, string memory _framework,' +
     ' string memory _license) external returns (uint256)',
   'function activateModel(uint256 _id) external',
@@ -822,10 +1451,32 @@ function getStatusName(status) {
 }
 
 function getKnownModels(chain) {
-  const prefix = `${chain}:`;
-  return Object.entries(modelNameMap)
-    .filter(([key]) => key.startsWith(prefix))
-    .map(([key, id]) => ({ chain, name: key.slice(prefix.length), id: Number(id) }));
+  const chainEntry = modelIndex.chains?.[chain];
+  if (!chainEntry?.owners) {
+    return [];
+  }
+
+  const deduplicated = new Map();
+  for (const [ownerKey, bucket] of Object.entries(chainEntry.owners)) {
+    for (const [modelNameKey, record] of Object.entries(bucket || {})) {
+      const numericId = Number(record?.id);
+      if (!Number.isInteger(numericId) || numericId <= 0) continue;
+
+      const dedupeKey = `${chain}:${numericId}`;
+      if (deduplicated.has(dedupeKey)) continue;
+
+      deduplicated.set(dedupeKey, {
+        chain,
+        id: numericId,
+        name: record?.name || modelNameKey,
+        ownerKey,
+        indexedOwner: tryNormalizeWalletAddress(record?.owner) || (ownerKey === LEGACY_OWNER_KEY ? null : ownerKey),
+        createdAt: record?.createdAt || null
+      });
+    }
+  }
+
+  return Array.from(deduplicated.values());
 }
 
 async function getModelOwnerOrNull(contract, modelId) {
@@ -833,17 +1484,42 @@ async function getModelOwnerOrNull(contract, modelId) {
   return owner === ethers.ZeroAddress ? null : owner;
 }
 
+function pickContracts(contractSet = {}, keys = []) {
+  return keys.reduce((accumulator, key) => {
+    if (contractSet[key]) {
+      accumulator[key] = contractSet[key];
+    }
+    return accumulator;
+  }, {});
+}
+
 async function buildStatusPayload() {
+  refreshUserStoreFromDisk();
   const chainsPayload = {};
   let totalModels = 0;
   const contractsPayload = {};
+  const optionalExtensionsPayload = {};
   let zkEnforced = true;
 
   for (const chain of ['sepolia', 'tbnb']) {
     const knownModels = getKnownModels(chain);
     totalModels += knownModels.length;
     chainsPayload[chain] = await getChainStatus(chain);
-    contractsPayload[chain] = addrs?.[chain]?.contracts || {};
+    const chainContracts = addrs?.[chain]?.contracts || {};
+    contractsPayload[chain] = pickContracts(chainContracts, [
+      'ModelAccessControl',
+      'ModelRegistry',
+      'Groth16Verifier',
+      'ZKProvenanceTracker',
+      'ModelAuditLog'
+    ]);
+    optionalExtensionsPayload[chain] = pickContracts(chainContracts, [
+      'ModelProvenanceTracker',
+      'ModelNFT',
+      'ModelStaking',
+      'RealZKBridge',
+      'Verifier'
+    ]);
     if (!contractsPayload[chain]?.ZKProvenanceTracker || !contractsPayload[chain]?.Groth16Verifier) {
       zkEnforced = false;
     }
@@ -852,11 +1528,22 @@ async function buildStatusPayload() {
   return {
     chains: chainsPayload,
     contracts: contractsPayload,
+    optionalExtensions: optionalExtensionsPayload,
     totalModels,
     totalAudits: totalModels,
     zkReady: zkEnforced,
     zkEnforced,
-    writeMode: pk ? 'enabled' : 'read-only',
+    inventoryMode: 'backend-index',
+    inventoryScope: 'owner-scoped-known-models',
+    authStoreMode: 'stateful-file-store',
+    authStoreVersion: userStore.version,
+    jwtSecretMode: JWT_SECRET_MODE,
+    authLockoutPolicy: {
+      threshold: AUTH_LOCKOUT_THRESHOLD,
+      durationSeconds: AUTH_LOCKOUT_DURATION_SECONDS
+    },
+    authMode: 'jwt',
+    relayMode: pk ? 'relay-enabled' : 'read-only',
     warnings: bootWarnings
   };
 }
@@ -864,32 +1551,37 @@ async function buildStatusPayload() {
 async function getModelSummary(chain, entry) {
   const { mr } = getContracts(chain);
   try {
-    const owner = await mr.getModelOwner(entry.id);
-    if (owner === ethers.ZeroAddress) {
+    const owner = await getModelOwnerOrNull(mr, entry.id);
+    if (!owner) {
       return {
         id: String(entry.id),
         numericId: entry.id,
         name: entry.name,
-        description: 'Registration submitted through backend relayer',
+        description: 'Indexed by the backend-managed registry cache.',
         chain,
         owner: null,
         status: 'PENDING_REGISTRATION',
-        verified: false,
+        isActive: false,
         staked: false,
         pending: true
       };
     }
+
+    if (owner) {
+      migrateIndexedModelOwner(chain, entry, owner);
+    }
+
     const status = await mr.getModelStatus(entry.id);
     const staked = await mr.isModelStaked(entry.id);
     return {
       id: String(entry.id),
       numericId: entry.id,
       name: entry.name,
-      description: 'Registered through backend relayer',
+      description: 'Indexed by the backend-managed registry cache.',
       chain,
       owner,
       status: getStatusName(status),
-      verified: Number(status) === 1,
+      isActive: Number(status) === 1,
       staked
     };
   } catch {
@@ -903,6 +1595,7 @@ app.get('/api/health', (req, res) => {
   ok(res, {
     status: bootWarnings.length === 0 ? 'ok' : 'degraded',
     timestamp: Date.now(),
+    jwtSecretMode: JWT_SECRET_MODE,
     warnings: bootWarnings
   });
 });
@@ -913,6 +1606,80 @@ app.get('/api/v2/status', handle(async (req, res) => {
 
 app.get('/api/status', handle(async (req, res) => {
   ok(res, await buildStatusPayload());
+}));
+
+app.post('/api/auth/login', handle(async (req, res) => {
+  const username = requireString(req.body?.username, 'username', { maxLength: 64 }).toLowerCase();
+  const password = requireString(req.body?.password, 'password', { maxLength: 256 });
+
+  const user = findUserByUsername(username);
+  if (!user) {
+    return sendError(res, 'Invalid username or password', 401);
+  }
+
+  if (user.status !== 'active') {
+    return sendError(res, 'User account is disabled', 403);
+  }
+
+  if (isUserLocked(user)) {
+    return sendError(res, `User account is temporarily locked until ${user.lockedUntil}`, 423);
+  }
+
+  if (!verifyPassword(password, user.passwordHash)) {
+    markFailedLogin(username);
+    return sendError(res, 'Invalid username or password', 401);
+  }
+
+  const authenticatedUser = markSuccessfulLogin(username) || user;
+  const session = issueSessionForUser(authenticatedUser);
+  ok(res, session);
+}));
+
+app.get('/api/auth/me', requireAuth, handle(async (req, res) => {
+  ok(res, {
+    user: buildPublicUser(req.auth)
+  });
+}));
+
+app.get('/api/admin/users', requireAuth, requireRole('admin'), handle(async (req, res) => {
+  ok(res, {
+    users: listPublicUsers()
+  });
+}));
+
+app.post('/api/admin/users', requireAuth, requireRole('admin'), handle(async (req, res) => {
+  const user = createLocalUser({
+    username: req.body?.username,
+    password: req.body?.password,
+    walletAddress: req.body?.walletAddress || req.body?.wallet,
+    role: req.body?.role || 'researcher',
+    status: req.body?.status || 'active'
+  });
+
+  res.status(201).json({
+    success: true,
+    user
+  });
+}));
+
+app.patch('/api/admin/users/:username', requireAuth, requireRole('admin'), handle(async (req, res) => {
+  const updatedUser = updateLocalUser(req.params.username, req.body || {}, {
+    requestedBy: req.auth.username
+  });
+
+  ok(res, {
+    user: updatedUser
+  });
+}));
+
+app.delete('/api/admin/users/:username', requireAuth, requireRole('admin'), handle(async (req, res) => {
+  const deletedUser = deleteLocalUser(req.params.username, {
+    requestedBy: req.auth.username
+  });
+
+  ok(res, {
+    user: deletedUser
+  });
 }));
 
 // Audit events
@@ -964,11 +1731,11 @@ app.get('/api/v2/audit/verify/:id', handle(async (req, res) => {
 
   const { mpt } = getContracts(chain);
   const history = await mpt.getModelHistory(id);
-  const verified = await mpt.verifyChain(id);
+  const chainVerified = await mpt.verifyChain(id);
   ok(res, {
     modelId: id,
     chain,
-    verified,
+    chainVerified,
     recordCount: history.length,
     latestRecord: history.length > 0 ? history[history.length - 1] : null
   });
@@ -984,16 +1751,54 @@ app.post('/api/audit', handle(async (req, res) => {
 
   const { mpt } = getContracts(targetChain);
   const history = await mpt.getModelHistory(id);
-  const verified = await mpt.verifyChain(id);
+  const chainVerified = await mpt.verifyChain(id);
   ok(res, {
     modelId: id,
     chain: targetChain,
-    verified,
+    chainVerified,
     recordCount: history.length
   });
 }));
 
 // Models
+
+app.get('/api/v2/models/resolve', handle(async (req, res) => {
+  const chain = requireString(req.query.chain || 'sepolia', 'chain', { maxLength: 64 });
+  if (!chains[chain]) return sendError(res, `Invalid chain: ${chain}`, 400);
+
+  const owner = normalizeWalletAddress(requireString(req.query.owner, 'owner', { maxLength: 128 }), 'owner');
+  const modelName = requireString(req.query.name || req.query.modelName, 'name', { maxLength: 256 });
+  let entry = findIndexedModel(chain, owner, modelName);
+
+  if (!entry) {
+    const legacyEntry = findIndexedModel(chain, null, modelName);
+    if (legacyEntry) {
+      const { mr } = getContracts(chain);
+      const actualOwner = await getModelOwnerOrNull(mr, legacyEntry.id);
+      if (actualOwner && actualOwner === owner) {
+        migrateIndexedModelOwner(chain, legacyEntry, actualOwner);
+        entry = findIndexedModel(chain, owner, modelName);
+      }
+    }
+  }
+
+  if (!entry) {
+    return sendError(res, `No indexed model named '${modelName}' was found for owner ${owner} on ${chain}`, 404);
+  }
+
+  const summary = await getModelSummary(chain, entry);
+  if (!summary) {
+    return sendError(res, 'Indexed model no longer resolves on-chain', 404);
+  }
+  if (summary.owner && summary.owner !== owner) {
+    return sendError(res, `Model '${modelName}' is not owned by ${owner} on ${chain}`, 404);
+  }
+
+  ok(res, {
+    resolutionMode: 'owner-scoped-backend-index',
+    model: summary
+  });
+}));
 
 app.get('/api/v2/models/:id', handle(async (req, res) => {
   const chain = req.query.chain || 'sepolia';
@@ -1002,8 +1807,8 @@ app.get('/api/v2/models/:id', handle(async (req, res) => {
   if (Number.isNaN(id) || id <= 0) return sendError(res, 'Invalid model ID', 400);
 
   const { mr } = getContracts(chain);
-  const owner = await mr.getModelOwner(id);
-  if (owner === ethers.ZeroAddress) {
+  const owner = await getModelOwnerOrNull(mr, id);
+  if (!owner) {
     return sendError(res, 'Model not found', 404);
   }
 
@@ -1011,8 +1816,10 @@ app.get('/api/v2/models/:id', handle(async (req, res) => {
   const staked = await mr.isModelStaked(id);
   ok(res, {
     id,
+    chain,
     owner,
     status: getStatusName(status),
+    isActive: Number(status) === 1,
     staked
   });
 }));
@@ -1034,7 +1841,12 @@ app.get('/api/v2/models', handle(async (req, res) => {
     }
   }
 
-  ok(res, { models });
+  ok(res, {
+    inventoryMode: 'backend-index',
+    inventoryScope: 'owner-scoped-known-models',
+    isCompleteInventory: false,
+    models
+  });
 }));
 
 app.get('/api/models', handle(async (req, res) => {
@@ -1049,11 +1861,16 @@ app.get('/api/models', handle(async (req, res) => {
       if (summary) models.push(summary);
     }
   }
-  ok(res, { models });
+  ok(res, {
+    inventoryMode: 'backend-index',
+    inventoryScope: 'owner-scoped-known-models',
+    isCompleteInventory: false,
+    models
+  });
 }));
 
-app.get('/api/v2/lifecycle', handle(async (req, res) => {
-  const secret = requireString(req.query.secret, 'secret', { maxLength: 512 });
+app.post('/api/v2/lifecycle/query', requireAuth, handle(async (req, res) => {
+  const secret = requireString(req.body?.secret, 'secret', { maxLength: 512 });
   const match = findSeriesBySecret(secret);
 
   if (!match) {
@@ -1072,9 +1889,9 @@ app.get('/api/v2/lifecycle', handle(async (req, res) => {
   });
 }));
 
-app.get('/api/v2/lifecycle/download', handle(async (req, res) => {
-  const secret = requireString(req.query.secret, 'secret', { maxLength: 512 });
-  const modelHash = requireString(req.query.modelHash, 'modelHash', { maxLength: 128 });
+app.post('/api/v2/lifecycle/download', requireAuth, handle(async (req, res) => {
+  const secret = requireString(req.body?.secret, 'secret', { maxLength: 512 });
+  const modelHash = requireString(req.body?.modelHash, 'modelHash', { maxLength: 128 });
   const match = findSeriesBySecret(secret);
 
   if (!match) {
@@ -1104,11 +1921,17 @@ app.get('/api/v2/lifecycle/download', handle(async (req, res) => {
   return sendError(res, 'This version does not currently resolve to an IPFS artifact', 404);
 }));
 
+app.get('/api/v2/lifecycle', (req, res) => {
+  sendError(res, 'Use POST /api/v2/lifecycle/query', 410);
+});
+
+app.get('/api/v2/lifecycle/download', (req, res) => {
+  sendError(res, 'Use POST /api/v2/lifecycle/download', 410);
+});
+
 // Provenance tracking
 
-app.post('/api/sdk/provenance', handle(async (req, res) => {
-  validateWriteAuth(req, res, () => {});
-  if (res.headersSent) return;
+app.post('/api/sdk/provenance', requireAuth, handle(async (req, res) => {
   const modelId = requirePositiveInt(req.body.modelId, 'modelId');
   const modelName = requireString(req.body.modelName, 'modelName', { maxLength: 256 });
   const targetChain = requireString(req.body.chain || 'sepolia', 'chain', { maxLength: 64 });
@@ -1128,6 +1951,9 @@ app.post('/api/sdk/provenance', handle(async (req, res) => {
   const owner = await getModelOwnerOrNull(mr, modelId);
   if (!owner) {
     return sendError(res, `Model ${modelId} is not registered on ${targetChain}`, 404);
+  }
+  if (owner !== req.auth.walletAddress) {
+    return sendError(res, `Authenticated submitter does not own model ${modelId}`, 403);
   }
 
   const eventType = ACTION_MAP[parsedMetadata.action];
@@ -1162,46 +1988,70 @@ app.post('/api/sdk/provenance', handle(async (req, res) => {
     tx: tx.hash,
     modelId,
     eventType,
+    owner,
     statementHash: statementHash.toString(),
     nullifier: nullifier.toString(),
     proofVerified: true
   });
 }));
 
-app.post('/api/register', handle(async (req, res) => {
-  validateWriteAuth(req, res, () => {});
-  if (res.headersSent) return;
+app.post('/api/register', requireAuth, handle(async (req, res) => {
   const { name, description, ipfsCid, checksum, framework, license, chain } = req.body;
   const modelName = requireString(name, 'name', { maxLength: 256 });
 
   const targetChain = chain || 'sepolia';
   if (!chains[targetChain]) return sendError(res, `Invalid chain: ${targetChain}`, 400);
   const writableChain = requireWriteChain(targetChain);
-  const mapKey = `${targetChain}:${modelName}`;
+  const owner = req.auth.walletAddress;
 
   const { mr } = getContracts(targetChain);
-  if (modelNameMap[mapKey]) {
-    const existingId = Number(modelNameMap[mapKey]);
-    const existingOwner = await getModelOwnerOrNull(mr, existingId);
-    if (existingOwner) {
+  let existingEntry = findIndexedModel(targetChain, owner, modelName);
+  if (!existingEntry) {
+    const legacyEntry = findIndexedModel(targetChain, null, modelName);
+    if (legacyEntry) {
+      const actualOwner = await getModelOwnerOrNull(mr, legacyEntry.id);
+      if (actualOwner && actualOwner === owner) {
+        migrateIndexedModelOwner(targetChain, legacyEntry, actualOwner);
+        existingEntry = findIndexedModel(targetChain, owner, modelName);
+      }
+    }
+  }
+
+  if (existingEntry) {
+    const existingOwner = await getModelOwnerOrNull(mr, existingEntry.id);
+    if (existingOwner === owner) {
       return ok(res, {
-        id: String(existingId),
-        numericId: existingId,
+        id: String(existingEntry.id),
+        numericId: existingEntry.id,
         name: modelName,
         description: description || '',
         chain: targetChain,
         owner: existingOwner,
-        verified: false,
+        isActive: false,
         existing: true
       });
     }
 
-    delete modelNameMap[mapKey];
-    saveModelMap(modelNameMap);
+    if (!existingOwner) {
+      return ok(res, {
+        id: String(existingEntry.id),
+        numericId: existingEntry.id,
+        name: modelName,
+        description: description || '',
+        chain: targetChain,
+        owner: null,
+        isActive: false,
+        existing: true,
+        pending: true
+      });
+    }
+
+    removeIndexedModel(targetChain, owner, modelName);
   }
 
   const writer = mr.connect(writableChain.wallet);
   const registrationArgs = [
+    owner,
     modelName,
     requireString(description, 'description', { optional: true, maxLength: 2048 }) || '',
     requireString(ipfsCid, 'ipfsCid', { optional: true, maxLength: 256 }) || '',
@@ -1210,12 +2060,17 @@ app.post('/api/register', handle(async (req, res) => {
     requireString(license, 'license', { optional: true, maxLength: 128 }) || 'MIT'
   ];
 
-  const predictedModelId = Number(await writer.registerModel.staticCall(...registrationArgs));
-  const tx = await writer.registerModel(...registrationArgs);
+  const predictedModelId = Number(await writer.registerModelFor.staticCall(...registrationArgs));
+  const tx = await writer.registerModelFor(...registrationArgs);
   await tx.wait();
 
-  modelNameMap[mapKey] = predictedModelId;
-  saveModelMap(modelNameMap);
+  upsertModelIndexEntry(modelIndex, {
+    chain: targetChain,
+    owner,
+    modelName,
+    modelId: predictedModelId
+  });
+  saveModelIndex(modelIndex);
 
   ok(res, {
     id: String(predictedModelId),
@@ -1223,7 +2078,8 @@ app.post('/api/register', handle(async (req, res) => {
     name: modelName,
     description: description || '',
     chain: targetChain,
-    verified: false,
+    owner,
+    isActive: false,
     pending: true,
     txHash: tx.hash
   });
@@ -1231,9 +2087,7 @@ app.post('/api/register', handle(async (req, res) => {
 
 // IPFS
 
-app.post('/api/ipfs/upload/file', handle(async (req, res) => {
-  validateWriteAuth(req, res, () => {});
-  if (res.headersSent) return;
+app.post('/api/ipfs/upload/file', requireAuth, handle(async (req, res) => {
   const { data, fileName } = req.body;
   if (!data) return sendError(res, 'Missing data field', 400);
   requireString(fileName, 'fileName', { optional: true, maxLength: 256 });
@@ -1262,9 +2116,7 @@ app.post('/api/ipfs/upload/file', handle(async (req, res) => {
   ok(res, { cid, gatewayUrl: `https://gateway.pinata.cloud/ipfs/${cid}` });
 }));
 
-app.post('/api/ipfs/upload/metadata', handle(async (req, res) => {
-  validateWriteAuth(req, res, () => {});
-  if (res.headersSent) return;
+app.post('/api/ipfs/upload/metadata', requireAuth, handle(async (req, res) => {
   const { metadata } = req.body;
   if (!metadata) return sendError(res, 'Missing metadata field', 400);
   requirePlainObject(metadata, 'metadata');

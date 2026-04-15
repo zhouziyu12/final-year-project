@@ -20,22 +20,55 @@ import heroScene from '../assets/hero-provenance-scene.svg';
 export function TrainingPage({
   status,
   selectedModelContext,
-  writeAccess,
+  frontendRole,
+  authSession,
+  authRefreshing,
   onTabChange,
   onLifecycleLookup,
-  onLifecycleDownload
+  onLifecycleDownload,
+  onLogin,
+  onLogout
 }) {
   const selectedModel = selectedModelContext.summary;
   const selectedDetail = selectedModelContext.detail;
   const selectedAudit = selectedModelContext.audit;
+  const [credentials, setCredentials] = useState({ username: '', password: '' });
+  const [authSubmitting, setAuthSubmitting] = useState(false);
   const [secretValue, setSecretValue] = useState('');
   const [lookupLoading, setLookupLoading] = useState(false);
   const [downloadHash, setDownloadHash] = useState(null);
   const [lifecycleResult, setLifecycleResult] = useState(null);
   const [lifecycleError, setLifecycleError] = useState(null);
 
+  function handleCredentialChange(event) {
+    const { name, value } = event.target;
+    setCredentials((current) => ({ ...current, [name]: value }));
+  }
+
+  async function handleLoginSubmit(event) {
+    event.preventDefault();
+    setAuthSubmitting(true);
+    setLifecycleError(null);
+
+    try {
+      await onLogin({
+        username: credentials.username.trim(),
+        password: credentials.password
+      });
+      setCredentials({ username: credentials.username.trim(), password: '' });
+    } catch (error) {
+      setLifecycleError(error.message);
+    } finally {
+      setAuthSubmitting(false);
+    }
+  }
+
   async function handleLifecycleSubmit(event) {
     event.preventDefault();
+    if (!authSession?.token) {
+      setLifecycleError('Sign in with an account before querying lifecycle secrets.');
+      return;
+    }
     setLookupLoading(true);
     setLifecycleError(null);
 
@@ -51,6 +84,10 @@ export function TrainingPage({
   }
 
   async function handleVersionDownload(version) {
+    if (!authSession?.token) {
+      setLifecycleError('Sign in with an account before downloading lifecycle artifacts.');
+      return;
+    }
     setDownloadHash(version.modelHash);
     setLifecycleError(null);
 
@@ -129,9 +166,9 @@ export function TrainingPage({
           <p className="metric-footnote">Read directly from the backend status response rather than assumed locally.</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Write mode</p>
-          <p className="metric-value">{writeAccess.enabled ? 'Demo enabled' : 'SDK only'}</p>
-          <p className="metric-footnote">{writeAccess.summary}</p>
+          <p className="metric-label">Viewer session</p>
+          <p className="metric-value">{authSession?.user ? 'Signed in' : authRefreshing ? 'Checking' : 'Required'}</p>
+          <p className="metric-footnote">{frontendRole.summary}</p>
         </article>
       </section>
 
@@ -190,7 +227,7 @@ export function TrainingPage({
               <LockKeyhole size={18} />
               <div>
                 <p className="insight-title">Writes remain protected</p>
-                <p className="insight-copy">Without a valid proof and canonical metadata pair, the backend no longer accepts provenance writes at all.</p>
+                <p className="insight-copy">Without an authenticated account, an owner-bound model ID, and a valid proof/canonical metadata pair, the backend refuses provenance writes.</p>
               </div>
             </div>
           </div>
@@ -246,7 +283,7 @@ export function TrainingPage({
           <div className="panel-heading">
             <div>
               <p className="panel-eyebrow">Current Inspection Target</p>
-              <h3 className="panel-title">Use one real model as the bridge between pages</h3>
+              <h3 className="panel-title">Use one real model as the handoff between pages</h3>
             </div>
           </div>
 
@@ -265,7 +302,7 @@ export function TrainingPage({
                     This model is currently being used as the UI's live example for detail and verification fetches.
                   </p>
                 </div>
-                <span className={`status-pill${selectedAudit?.verified ? ' is-online' : ''}`}>
+                <span className={`status-pill${selectedAudit?.chainVerified ? ' is-online' : ''}`}>
                   {selectedDetail?.status || selectedModel.status || 'Pending'}
                 </span>
               </div>
@@ -297,7 +334,7 @@ export function TrainingPage({
                     <span>Local training artifacts are defined in the project workspace</span>
                   </div>
                   <div className="submission-chain-stage">
-                    <div className={`submission-chain-dot${status?.zkEnforced ? ' is-done' : ''}`} />
+                  <div className={`submission-chain-dot${status?.zkEnforced ? ' is-done' : ''}`} />
                     <span>Verifier-gated provenance is reported as {status?.zkEnforced ? 'enforced' : 'offline'} by the backend</span>
                   </div>
                   <div className="submission-chain-stage">
@@ -319,6 +356,77 @@ export function TrainingPage({
             </div>
           )}
         </article>
+      </section>
+
+      <section className="panel-card">
+        <div className="panel-heading">
+          <div>
+            <p className="panel-eyebrow">Viewer Authentication</p>
+            <h3 className="panel-title">Sign in before querying lifecycle secrets or downloading archived versions</h3>
+          </div>
+        </div>
+
+        {authSession?.user ? (
+          <div className="detail-callout">
+            <div className="detail-callout-head">
+              <div>
+                <p className="detail-callout-title">{authSession.user.username}</p>
+                <p className="detail-callout-copy">This browser session is now authorized to query lifecycle secrets and download recorded artifacts.</p>
+              </div>
+              <span className="status-pill is-online">Authenticated</span>
+            </div>
+
+            <div className="detail-kv-list">
+              <div className="detail-kv-item">
+                <span>Wallet binding</span>
+                <strong className="mono-text">{authSession.user.walletAddress}</strong>
+              </div>
+              <div className="detail-kv-item">
+                <span>Role</span>
+                <strong>{authSession.user.role}</strong>
+              </div>
+            </div>
+
+            <div className="form-actions">
+              <button type="button" className="secondary-action" onClick={onLogout}>
+                Sign out
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form className="registry-form" onSubmit={handleLoginSubmit}>
+            <div className="form-grid">
+              <label className="field-group">
+                <span>Username</span>
+                <input
+                  name="username"
+                  value={credentials.username}
+                  onChange={handleCredentialChange}
+                  placeholder="researcher"
+                  required
+                />
+              </label>
+              <label className="field-group">
+                <span>Password</span>
+                <input
+                  name="password"
+                  type="password"
+                  value={credentials.password}
+                  onChange={handleCredentialChange}
+                  placeholder="Enter your account password"
+                  required
+                />
+              </label>
+            </div>
+
+            <div className="form-actions">
+              <button type="submit" className="primary-action" disabled={authSubmitting || authRefreshing}>
+                <LockKeyhole size={16} />
+                <span>{authSubmitting ? 'Signing in...' : authRefreshing ? 'Checking session...' : 'Sign in for downloads'}</span>
+              </button>
+            </div>
+          </form>
+        )}
       </section>
 
       <section className="panel-card">
@@ -419,7 +527,7 @@ export function TrainingPage({
         <div className="panel-heading">
           <div>
             <p className="panel-eyebrow">Submission Readiness</p>
-            <h3 className="panel-title">Frontend write posture during demo</h3>
+            <h3 className="panel-title">Frontend and SDK responsibility split</h3>
           </div>
         </div>
 
@@ -428,14 +536,14 @@ export function TrainingPage({
             <ShieldCheck size={18} />
             <div>
               <p className="insight-title">Protected backend path</p>
-              <p className="insight-copy">The server still requires authenticated headers and nonce-based replay protection for write routes.</p>
+              <p className="insight-copy">The server now requires JWT authentication for lifecycle access and owner-bound provenance writes.</p>
             </div>
           </article>
           <article className="insight-item">
-            {writeAccess.enabled ? <Workflow size={18} /> : <AlertTriangle size={18} />}
+            {authSession?.user ? <Workflow size={18} /> : <AlertTriangle size={18} />}
             <div>
-              <p className="insight-title">{writeAccess.enabled ? 'Local write demo enabled' : 'Read-only frontend'}</p>
-              <p className="insight-copy">{writeAccess.summary}</p>
+              <p className="insight-title">{authSession?.user ? 'Download-capable viewer session' : 'Read-oriented frontend'}</p>
+              <p className="insight-copy">{frontendRole.summary}</p>
             </div>
           </article>
         </div>

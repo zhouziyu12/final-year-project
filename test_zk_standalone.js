@@ -40,7 +40,7 @@ function logError(message) {
 function normalizeInput(raw) {
   const secret = raw?.secret;
   const modelId = raw?.modelId;
-  const messageHash = raw?.messageHash ?? "424242";
+  const statementHash = raw?.statementHash ?? raw?.messageHash ?? "424242";
 
   if (secret === undefined || modelId === undefined) {
     throw new Error("Input JSON must contain both 'secret' and 'modelId'.");
@@ -49,7 +49,8 @@ function normalizeInput(raw) {
   return {
     secret: secret.toString(),
     modelId: modelId.toString(),
-    messageHash: messageHash.toString(),
+    statementHash: statementHash.toString(),
+    messageHash: statementHash.toString(),
   };
 }
 
@@ -63,14 +64,23 @@ function resolveExistingPath(candidates, label) {
   throw new Error(`${label} not found. Checked: ${candidates.join(", ")}`);
 }
 
+function resolveOutputPath(envName, fallbackSegments) {
+  const configured = process.env[envName];
+  if (configured) {
+    return path.resolve(configured);
+  }
+  return path.resolve(__dirname, ...fallbackSegments);
+}
+
 async function main() {
   setupUtf8ForWindows();
 
   logStep(1, "Starting standalone ZK robustness test (snarkjs core).");
 
-  const inputPath = path.resolve(__dirname, "scripts", "last_proof_input.json");
-  const proofOutPath = path.resolve(__dirname, "proof.json");
-  const publicOutPath = path.resolve(__dirname, "public.json");
+  const inputPath = resolveOutputPath("PROOF_INPUT_PATH", ["scripts", "last_proof_input.json"]);
+  const proofOutPath = resolveOutputPath("PROOF_OUTPUT_PATH", ["proof.json"]);
+  const publicOutPath = resolveOutputPath("PUBLIC_OUTPUT_PATH", ["public.json"]);
+  const calldataDebugPath = resolveOutputPath("PROOF_CALLDATA_OUTPUT_PATH", ["proof_calldata_debug.txt"]);
   const wasmPath = resolveExistingPath(
     [
       path.resolve(__dirname, "build", "circuit_js", "circuit.wasm"),
@@ -96,7 +106,8 @@ async function main() {
   logStep(2, `Loading input file: ${inputPath}`);
   let rawInput;
   if (!fs.existsSync(inputPath)) {
-    rawInput = { secret: "123456", modelId: "999999999", messageHash: "424242" };
+    rawInput = { secret: "123456", modelId: "999999999", statementHash: "424242", messageHash: "424242" };
+    fs.mkdirSync(path.dirname(inputPath), { recursive: true });
     fs.writeFileSync(inputPath, JSON.stringify(rawInput, null, 2), "utf8");
     logInfo("Input file was missing. Created a default proof input for standalone testing.");
   } else {
@@ -104,7 +115,7 @@ async function main() {
   }
   const input = normalizeInput(rawInput);
   logInfo(
-    `Input loaded. secret=${input.secret}, modelId=${input.modelId}, messageHash=${input.messageHash}`
+    `Input loaded. secret=${input.secret}, modelId=${input.modelId}, statementHash=${input.statementHash}, witness.messageHash=${input.messageHash}`
   );
 
   logStep(3, "Checking circuit artifacts...");
@@ -131,6 +142,9 @@ async function main() {
   logInfo(`Proof generation completed in ${(elapsedMs / 1000).toFixed(2)}s.`);
 
   logStep(5, `Writing outputs: ${proofOutPath}, ${publicOutPath}`);
+  fs.mkdirSync(path.dirname(proofOutPath), { recursive: true });
+  fs.mkdirSync(path.dirname(publicOutPath), { recursive: true });
+  fs.mkdirSync(path.dirname(calldataDebugPath), { recursive: true });
   fs.writeFileSync(proofOutPath, JSON.stringify(proof, null, 2), "utf8");
   fs.writeFileSync(publicOutPath, JSON.stringify(publicSignals, null, 2), "utf8");
   logInfo("proof.json and public.json generated successfully.");
@@ -147,7 +161,6 @@ async function main() {
   const calldata = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
   logInfo("Calldata conversion completed.");
 
-  const calldataDebugPath = path.resolve(__dirname, "proof_calldata_debug.txt");
   const calldataContent = `========== Solidity Calldata ==========\n${calldata}\n=======================================\n`;
   fs.writeFileSync(calldataDebugPath, calldataContent, "utf8");
   logInfo(`Calldata written to: ${calldataDebugPath}`);

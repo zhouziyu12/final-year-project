@@ -1,37 +1,32 @@
 openapi: 3.0.3
 info:
   title: AI Model Provenance API
-  version: 2.0.0
+  version: 2026-04-15
   description: |
-    OpenAPI description for the current backend implementation in `server/server.js`.
+    Current API surface for the SDK-first AI provenance system.
 
-    The API supports:
-    - backend health and chain status queries
-    - model listing and model detail lookup
-    - audit verification and recent audit event lookup
-    - lifecycle lookup and version download by model secret
-    - backend-mediated model registration and provenance submission
-    - IPFS file and metadata upload through Pinata-backed routes
+    Main write path:
+    - authenticate with username/password
+    - submit through the Python SDK
+    - backend relay preserves the authenticated owner's wallet
+    - provenance writes are verifier-gated
 
-    Scope note:
-    the default runtime write path is now verifier-gated. The SDK submits a
-    canonical metadata string plus proof arguments, and the backend writes
-    through `ZKProvenanceTracker.addVerifiedRecord(...)`.
-  contact:
-    name: FYP Project
-    url: https://github.com/zhouziyu12/final-year-project
+    Boundary notes:
+    - the current file-backed local account system is a runnable prototype baseline, not a production identity stack
+    - `/api/v2/models` exposes a backend-managed owner-scoped index, not a claim of full chain inventory
 
 servers:
-  - url: http://localhost:3000
+  - url: http://127.0.0.1:3000
     description: Local development server
 
 tags:
   - name: Health
+  - name: Auth
+  - name: Admin
   - name: Status
   - name: Models
   - name: Audit
   - name: Lifecycle
-  - name: Registration
   - name: Provenance
   - name: IPFS
 
@@ -39,8 +34,7 @@ paths:
   /api/health:
     get:
       tags: [Health]
-      summary: Health check
-      operationId: getHealth
+      summary: Backend health check
       responses:
         '200':
           description: Health payload
@@ -52,8 +46,7 @@ paths:
   /api/status:
     get:
       tags: [Status]
-      summary: Get aggregated backend and chain status
-      operationId: getLegacyStatus
+      summary: Legacy compatibility alias for v2 status
       responses:
         '200':
           description: Status payload
@@ -65,8 +58,7 @@ paths:
   /api/v2/status:
     get:
       tags: [Status]
-      summary: Get aggregated backend and chain status
-      operationId: getStatus
+      summary: Runtime status across chains and contracts
       responses:
         '200':
           description: Status payload
@@ -75,258 +67,115 @@ paths:
               schema:
                 $ref: '#/components/schemas/StatusResponse'
 
-  /api/models:
-    get:
-      tags: [Models]
-      summary: List known models
-      operationId: listLegacyModels
-      parameters:
-        - $ref: '#/components/parameters/ChainQuery'
-      responses:
-        '200':
-          description: Model list
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ModelsListResponse'
-        '400':
-          $ref: '#/components/responses/ErrorResponse'
-
-  /api/v2/models:
-    get:
-      tags: [Models]
-      summary: List known models
-      operationId: listModels
-      parameters:
-        - $ref: '#/components/parameters/ChainQuery'
-      responses:
-        '200':
-          description: Model list
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ModelsListResponse'
-        '400':
-          $ref: '#/components/responses/ErrorResponse'
-
-  /api/v2/models/{id}:
-    get:
-      tags: [Models]
-      summary: Get model detail by numeric ID
-      operationId: getModelById
-      parameters:
-        - $ref: '#/components/parameters/ModelIdPath'
-        - $ref: '#/components/parameters/ChainQuery'
-      responses:
-        '200':
-          description: Model detail
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ModelDetailResponse'
-        '400':
-          $ref: '#/components/responses/ErrorResponse'
-        '404':
-          $ref: '#/components/responses/ErrorResponse'
-
-  /api/v2/audit/recent:
-    get:
-      tags: [Audit]
-      summary: List recent audit events
-      operationId: listRecentAuditEvents
-      parameters:
-        - $ref: '#/components/parameters/ChainQuery'
-        - name: limit
-          in: query
-          required: false
-          description: Maximum number of decoded events to return
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 100
-            default: 10
-      responses:
-        '200':
-          description: Recent audit events
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RecentAuditResponse'
-        '400':
-          $ref: '#/components/responses/ErrorResponse'
-
-  /api/v2/audit/verify/{id}:
-    get:
-      tags: [Audit]
-      summary: Verify a model's provenance chain
-      operationId: verifyAuditChain
-      parameters:
-        - $ref: '#/components/parameters/ModelIdPath'
-        - $ref: '#/components/parameters/ChainQuery'
-      responses:
-        '200':
-          description: Verification result
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AuditVerifyResponse'
-        '400':
-          $ref: '#/components/responses/ErrorResponse'
-
-  /api/v2/lifecycle:
-    get:
-      tags: [Lifecycle]
-      summary: Load one model series lifecycle by secret
-      operationId: getLifecycleBySecret
-      parameters:
-        - name: secret
-          in: query
-          required: true
-          description: Lifecycle secret associated with one model series
-          schema:
-            type: string
-            maxLength: 512
-      responses:
-        '200':
-          description: Lifecycle version list
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/LifecycleResponse'
-        '404':
-          $ref: '#/components/responses/ErrorResponse'
-
-  /api/v2/lifecycle/download:
-    get:
-      tags: [Lifecycle]
-      summary: Download one model version from IPFS by secret and model hash
-      operationId: downloadLifecycleVersion
-      parameters:
-        - name: secret
-          in: query
-          required: true
-          description: Lifecycle secret associated with one model series
-          schema:
-            type: string
-            maxLength: 512
-        - name: modelHash
-          in: query
-          required: true
-          description: Version-level model hash used to identify the requested artifact
-          schema:
-            type: string
-            maxLength: 128
-      responses:
-        '200':
-          description: Binary model artifact streamed from IPFS
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-        '404':
-          $ref: '#/components/responses/ErrorResponse'
-        '502':
-          $ref: '#/components/responses/ErrorResponse'
-
-  /api/audit:
+  /api/auth/login:
     post:
-      tags: [Audit]
-      summary: Verify a model's provenance chain through the write-protected route
-      operationId: verifyAuditChainViaPost
-      security:
-        - ApiKeyAuth: []
-      parameters:
-        - $ref: '#/components/parameters/AuthTimestampHeader'
-        - $ref: '#/components/parameters/AuthNonceHeader'
+      tags: [Auth]
+      summary: Login and receive a JWT
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AuditVerifyRequest'
+              $ref: '#/components/schemas/LoginRequest'
       responses:
         '200':
-          description: Verification result
+          description: Login success
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuditPostResponse'
+                $ref: '#/components/schemas/LoginResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '423':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Return the authenticated session identity
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      summary: List backend users
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserListResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Admin]
+      summary: Create a backend user
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminUserCreateRequest'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserResponse'
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '401':
           $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/ErrorResponse'
-        '503':
-          $ref: '#/components/responses/ErrorResponse'
 
-  /api/register:
-    post:
-      tags: [Registration]
-      summary: Register a model through the backend wallet
-      operationId: registerModel
+  /api/admin/users/{username}:
+    patch:
+      tags: [Admin]
+      summary: Update a backend user
       security:
-        - ApiKeyAuth: []
+        - BearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/AuthTimestampHeader'
-        - $ref: '#/components/parameters/AuthNonceHeader'
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterModelRequest'
+              $ref: '#/components/schemas/AdminUserUpdateRequest'
       responses:
         '200':
-          description: Registration accepted or existing model returned
+          description: User updated
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/RegisterModelResponse'
-        '400':
-          $ref: '#/components/responses/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/ErrorResponse'
-        '409':
-          $ref: '#/components/responses/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/ErrorResponse'
-        '503':
-          $ref: '#/components/responses/ErrorResponse'
-
-  /api/sdk/provenance:
-    post:
-      tags: [Provenance]
-      summary: Submit a provenance event through the backend relay
-      operationId: submitProvenance
-      description: |
-        Records a provenance event on the selected chain through the verifier-gated
-        runtime path.
-
-        The model must already be registered. The backend validates the exact
-        canonical metadata string, recomputes `statementHash`, and rejects the
-        request unless the supplied proof signals match that statement.
-      security:
-        - ApiKeyAuth: []
-      parameters:
-        - $ref: '#/components/parameters/AuthTimestampHeader'
-        - $ref: '#/components/parameters/AuthNonceHeader'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ProvenanceRequest'
-      responses:
-        '200':
-          description: Provenance event accepted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ProvenanceResponse'
+                $ref: '#/components/schemas/AdminUserResponse'
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '401':
@@ -337,7 +186,325 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '409':
           $ref: '#/components/responses/ErrorResponse'
-        '429':
+    delete:
+      tags: [Admin]
+      summary: Delete a backend user
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: username
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v2/models:
+    get:
+      tags: [Models]
+      summary: List models from the backend-managed owner-scoped index
+      parameters:
+        - in: query
+          name: chain
+          schema:
+            $ref: '#/components/schemas/ChainName'
+          required: false
+      responses:
+        '200':
+          description: Model list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelListResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/models:
+    get:
+      tags: [Models]
+      summary: Legacy compatibility alias for model list
+      parameters:
+        - in: query
+          name: chain
+          schema:
+            $ref: '#/components/schemas/ChainName'
+          required: false
+      responses:
+        '200':
+          description: Model list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelListResponse'
+
+  /api/v2/models/{id}:
+    get:
+      tags: [Models]
+      summary: Load one model by numeric ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: chain
+          required: false
+          schema:
+            $ref: '#/components/schemas/ChainName'
+      responses:
+        '200':
+          description: Model summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelDetailResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v2/models/resolve:
+    get:
+      tags: [Models]
+      summary: Resolve a model by chain, owner, and model name
+      parameters:
+        - in: query
+          name: chain
+          required: true
+          schema:
+            $ref: '#/components/schemas/ChainName'
+        - in: query
+          name: owner
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Resolved model
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelResolveResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/register:
+    post:
+      tags: [Models]
+      summary: Register a model through the owner-preserving backend relay
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: Registration accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v2/audit/recent:
+    get:
+      tags: [Audit]
+      summary: Fetch recent audit events
+      parameters:
+        - in: query
+          name: chain
+          required: false
+          schema:
+            $ref: '#/components/schemas/ChainName'
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: Recent audit events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditRecentResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v2/audit/verify/{id}:
+    get:
+      tags: [Audit]
+      summary: Verify one model's provenance chain
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: chain
+          required: false
+          schema:
+            $ref: '#/components/schemas/ChainName'
+      responses:
+        '200':
+          description: Audit verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditVerifyResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/audit:
+    post:
+      tags: [Audit]
+      summary: Convenience audit verification request with JSON body
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuditPostRequest'
+      responses:
+        '200':
+          description: Audit verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditPostResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v2/lifecycle/query:
+    post:
+      tags: [Lifecycle]
+      summary: Load lifecycle versions by secret without exposing the secret in the URL
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleQueryRequest'
+      responses:
+        '200':
+          description: Lifecycle versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LifecycleQueryResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v2/lifecycle/download:
+    post:
+      tags: [Lifecycle]
+      summary: Download one lifecycle version by secret and model hash
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LifecycleDownloadRequest'
+      responses:
+        '200':
+          description: Binary model artifact
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '502':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v2/lifecycle:
+    get:
+      tags: [Lifecycle]
+      summary: Deprecated lifecycle URL
+      deprecated: true
+      responses:
+        '410':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/v2/lifecycle/download:
+    get:
+      tags: [Lifecycle]
+      summary: Deprecated lifecycle download URL
+      deprecated: true
+      responses:
+        '410':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /api/sdk/provenance:
+    post:
+      tags: [Provenance]
+      summary: Submit verifier-gated provenance from the SDK
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProvenanceSubmitRequest'
+      responses:
+        '200':
+          description: Provenance write accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvenanceSubmitResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
           $ref: '#/components/responses/ErrorResponse'
         '503':
           $ref: '#/components/responses/ErrorResponse'
@@ -345,22 +512,18 @@ paths:
   /api/ipfs/upload/file:
     post:
       tags: [IPFS]
-      summary: Upload a file to IPFS
-      operationId: uploadFileToIpfs
+      summary: Upload a binary file to Pinata
       security:
-        - ApiKeyAuth: []
-      parameters:
-        - $ref: '#/components/parameters/AuthTimestampHeader'
-        - $ref: '#/components/parameters/AuthNonceHeader'
+        - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UploadFileRequest'
+              $ref: '#/components/schemas/IpfsUploadFileRequest'
       responses:
         '200':
-          description: File upload result
+          description: IPFS upload success
           content:
             application/json:
               schema:
@@ -368,10 +531,6 @@ paths:
         '400':
           $ref: '#/components/responses/ErrorResponse'
         '401':
-          $ref: '#/components/responses/ErrorResponse'
-        '409':
-          $ref: '#/components/responses/ErrorResponse'
-        '429':
           $ref: '#/components/responses/ErrorResponse'
         '503':
           $ref: '#/components/responses/ErrorResponse'
@@ -379,22 +538,18 @@ paths:
   /api/ipfs/upload/metadata:
     post:
       tags: [IPFS]
-      summary: Upload metadata JSON to IPFS
-      operationId: uploadMetadataToIpfs
+      summary: Upload metadata JSON to Pinata
       security:
-        - ApiKeyAuth: []
-      parameters:
-        - $ref: '#/components/parameters/AuthTimestampHeader'
-        - $ref: '#/components/parameters/AuthNonceHeader'
+        - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UploadMetadataRequest'
+              $ref: '#/components/schemas/IpfsUploadMetadataRequest'
       responses:
         '200':
-          description: Metadata upload result
+          description: IPFS upload success
           content:
             application/json:
               schema:
@@ -403,28 +558,22 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '401':
           $ref: '#/components/responses/ErrorResponse'
-        '409':
-          $ref: '#/components/responses/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/ErrorResponse'
         '503':
           $ref: '#/components/responses/ErrorResponse'
 
   /api/ipfs/cat/{cid}:
     get:
       tags: [IPFS]
-      summary: Retrieve IPFS content through configured gateways
-      operationId: getIpfsContent
+      summary: Read IPFS content as base64
       parameters:
-        - name: cid
-          in: path
+        - in: path
+          name: cid
           required: true
-          description: IPFS CID
           schema:
             type: string
       responses:
         '200':
-          description: Base64-encoded content
+          description: Base64-wrapped IPFS content
           content:
             application/json:
               schema:
@@ -436,45 +585,14 @@ paths:
 
 components:
   securitySchemes:
-    ApiKeyAuth:
-      type: apiKey
-      in: header
-      name: x-api-key
-
-  parameters:
-    ChainQuery:
-      name: chain
-      in: query
-      required: false
-      description: Target chain
-      schema:
-        $ref: '#/components/schemas/ChainName'
-    ModelIdPath:
-      name: id
-      in: path
-      required: true
-      description: Numeric model ID
-      schema:
-        type: integer
-        minimum: 1
-    AuthTimestampHeader:
-      name: x-auth-timestamp
-      in: header
-      required: true
-      description: Millisecond timestamp used by backend write authentication
-      schema:
-        type: string
-    AuthNonceHeader:
-      name: x-auth-nonce
-      in: header
-      required: true
-      description: Single-use nonce used by backend write authentication
-      schema:
-        type: string
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
 
   responses:
     ErrorResponse:
-      description: Error response
+      description: Error payload
       content:
         application/json:
           schema:
@@ -485,25 +603,31 @@ components:
       type: string
       enum: [sepolia, tbnb]
 
-    ModelStatus:
-      type: string
-      enum: [DRAFT, ACTIVE, DEPRECATED, REVOKED, PENDING_REGISTRATION, UNKNOWN]
-
-    ProvenanceAction:
-      type: string
-      enum:
-        - REGISTERED
-        - ACTIVATED
-        - UPDATED
-        - TRAINING_COMPLETED
-        - DEPRECATED
-        - REVOKED
-        - VERSION_RELEASED
-        - TRANSFERRED
-        - STAKED
-        - UNSTAKED
-        - SLASHED
-        - ZK_PROOF_VERIFIED
+    User:
+      type: object
+      required: [username, walletAddress, role, status]
+      properties:
+        username:
+          type: string
+        walletAddress:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled]
+        createdAt:
+          type: string
+          format: date-time
+          nullable: true
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
 
     ErrorResponse:
       type: object
@@ -511,23 +635,25 @@ components:
       properties:
         success:
           type: boolean
-          enum: [false]
+          example: false
         error:
           type: string
 
     HealthResponse:
       type: object
-      required: [success, status, timestamp, warnings]
+      required: [success, status, timestamp, jwtSecretMode, warnings]
       properties:
         success:
           type: boolean
-          enum: [true]
+          example: true
         status:
           type: string
           enum: [ok, degraded]
         timestamp:
           type: integer
-          format: int64
+        jwtSecretMode:
+          type: string
+          enum: [configured, ephemeral]
         warnings:
           type: array
           items:
@@ -535,27 +661,30 @@ components:
 
     ChainStatus:
       type: object
-      required: [blockNumber, connected, balance, knownModels]
+      required: [blockNumber, connected, balance, knownModels, zkEnforced, provenanceMode]
       properties:
         blockNumber:
           type: integer
-          format: int64
           nullable: true
         connected:
           type: boolean
         balance:
           type: string
           nullable: true
-          description: Wallet balance in native units, or `read-only` when no private key is configured
         knownModels:
           type: integer
+        zkEnforced:
+          type: boolean
+        provenanceMode:
+          type: string
+          enum: [verifier-gated, legacy]
         walletAddress:
           type: string
           nullable: true
-        balanceError:
+        error:
           type: string
           nullable: true
-        error:
+        balanceError:
           type: string
           nullable: true
 
@@ -564,17 +693,25 @@ components:
       required:
         - success
         - chains
+        - contracts
+        - optionalExtensions
         - totalModels
         - totalAudits
         - zkReady
         - zkEnforced
-        - contracts
-        - writeMode
+        - inventoryMode
+        - inventoryScope
+        - authStoreMode
+        - authStoreVersion
+        - jwtSecretMode
+        - authLockoutPolicy
+        - authMode
+        - relayMode
         - warnings
       properties:
         success:
           type: boolean
-          enum: [true]
+          example: true
         chains:
           type: object
           required: [sepolia, tbnb]
@@ -583,6 +720,18 @@ components:
               $ref: '#/components/schemas/ChainStatus'
             tbnb:
               $ref: '#/components/schemas/ChainStatus'
+        contracts:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+        optionalExtensions:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
         totalModels:
           type: integer
         totalAudits:
@@ -591,32 +740,130 @@ components:
           type: boolean
         zkEnforced:
           type: boolean
-        contracts:
-          type: object
-          additionalProperties:
-            type: object
-            additionalProperties:
-              type: string
-        writeMode:
+        inventoryMode:
           type: string
-          enum: [enabled, read-only]
+          enum: [backend-index]
+        inventoryScope:
+          type: string
+          enum: [owner-scoped-known-models]
+        authStoreMode:
+          type: string
+          enum: [stateful-file-store]
+        authStoreVersion:
+          type: integer
+        jwtSecretMode:
+          type: string
+          enum: [configured, ephemeral]
+        authLockoutPolicy:
+          type: object
+          required: [threshold, durationSeconds]
+          properties:
+            threshold:
+              type: integer
+            durationSeconds:
+              type: integer
+        authMode:
+          type: string
+          enum: [jwt]
+        relayMode:
+          type: string
+          enum: [relay-enabled, read-only]
         warnings:
           type: array
           items:
             type: string
 
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+
+    LoginResponse:
+      type: object
+      required: [success, token, expiresAt, user]
+      properties:
+        success:
+          type: boolean
+          example: true
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/User'
+
+    MeResponse:
+      type: object
+      required: [success, user]
+      properties:
+        success:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/User'
+
+    AdminUserCreateRequest:
+      type: object
+      required: [username, password, walletAddress, role]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        walletAddress:
+          type: string
+        role:
+          type: string
+          enum: [researcher, admin]
+        status:
+          type: string
+          enum: [active, disabled]
+          default: active
+
+    AdminUserUpdateRequest:
+      type: object
+      properties:
+        password:
+          type: string
+        walletAddress:
+          type: string
+        role:
+          type: string
+          enum: [researcher, admin]
+        status:
+          type: string
+          enum: [active, disabled]
+
+    AdminUserResponse:
+      type: object
+      required: [success, user]
+      properties:
+        success:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/User'
+
+    AdminUserListResponse:
+      type: object
+      required: [success, users]
+      properties:
+        success:
+          type: boolean
+          example: true
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/User'
+
     ModelSummary:
       type: object
-      required:
-        - id
-        - numericId
-        - name
-        - description
-        - chain
-        - owner
-        - status
-        - verified
-        - staked
+      required: [id, numericId, name, description, chain, status, isActive, staked]
       properties:
         id:
           type: string
@@ -632,8 +879,9 @@ components:
           type: string
           nullable: true
         status:
-          $ref: '#/components/schemas/ModelStatus'
-        verified:
+          type: string
+          enum: [DRAFT, ACTIVE, DEPRECATED, REVOKED, PENDING_REGISTRATION, UNKNOWN]
+        isActive:
           type: boolean
         staked:
           type: boolean
@@ -641,13 +889,22 @@ components:
           type: boolean
           nullable: true
 
-    ModelsListResponse:
+    ModelListResponse:
       type: object
-      required: [success, models]
+      required: [success, inventoryMode, inventoryScope, isCompleteInventory, models]
       properties:
         success:
           type: boolean
-          enum: [true]
+          example: true
+        inventoryMode:
+          type: string
+          enum: [backend-index]
+        inventoryScope:
+          type: string
+          enum: [owner-scoped-known-models]
+        isCompleteInventory:
+          type: boolean
+          enum: [false]
         models:
           type: array
           items:
@@ -655,191 +912,39 @@ components:
 
     ModelDetailResponse:
       type: object
-      required: [success, id, owner, status, staked]
+      required: [success, id, chain, status, isActive, staked]
       properties:
         success:
           type: boolean
-          enum: [true]
+          example: true
         id:
           type: integer
+        chain:
+          $ref: '#/components/schemas/ChainName'
         owner:
           type: string
+          nullable: true
         status:
-          $ref: '#/components/schemas/ModelStatus'
+          type: string
+        isActive:
+          type: boolean
         staked:
           type: boolean
 
-    AuditEvent:
+    ModelResolveResponse:
       type: object
-      required:
-        - blockNumber
-        - blockHash
-        - transactionHash
-        - contractAddress
-        - event
-        - args
-      properties:
-        blockNumber:
-          type: integer
-          format: int64
-        blockHash:
-          type: string
-        transactionHash:
-          type: string
-        contractAddress:
-          type: string
-        event:
-          type: string
-        args:
-          type: object
-          additionalProperties:
-            type: string
-
-    BlockRange:
-      type: object
-      required: [from, to]
-      properties:
-        from:
-          type: integer
-          format: int64
-        to:
-          type: integer
-          format: int64
-
-    RecentAuditResponse:
-      type: object
-      required: [success, events, blockRange]
+      required: [success, resolutionMode, model]
       properties:
         success:
           type: boolean
-          enum: [true]
-        events:
-          type: array
-          items:
-            $ref: '#/components/schemas/AuditEvent'
-        blockRange:
-          $ref: '#/components/schemas/BlockRange'
+          example: true
+        resolutionMode:
+          type: string
+          enum: [owner-scoped-backend-index]
+        model:
+          $ref: '#/components/schemas/ModelSummary'
 
-    AuditRecord:
-      description: Raw tuple-style provenance record returned by ethers.js
-      nullable: true
-      oneOf:
-        - type: array
-          items:
-            oneOf:
-              - type: string
-              - type: integer
-              - type: boolean
-        - type: object
-          additionalProperties: true
-
-    AuditVerifyResponse:
-      type: object
-      required: [success, modelId, chain, verified, recordCount, latestRecord]
-      properties:
-        success:
-          type: boolean
-          enum: [true]
-        modelId:
-          type: integer
-        chain:
-          $ref: '#/components/schemas/ChainName'
-        verified:
-          type: boolean
-        recordCount:
-          type: integer
-        latestRecord:
-          $ref: '#/components/schemas/AuditRecord'
-
-    LifecycleVersion:
-      type: object
-      required:
-        - version
-        - modelId
-        - modelHash
-        - timestamp
-        - downloadReady
-      properties:
-        version:
-          type: string
-          nullable: true
-        modelId:
-          type: integer
-          nullable: true
-        modelHash:
-          type: string
-        timestamp:
-          type: string
-          nullable: true
-        modelName:
-          type: string
-          nullable: true
-        chain:
-          $ref: '#/components/schemas/ChainName'
-          nullable: true
-        ipfsCid:
-          type: string
-          nullable: true
-        txHash:
-          type: string
-          nullable: true
-        artifactFileName:
-          type: string
-          nullable: true
-        downloadReady:
-          type: boolean
-        downloadSource:
-          type: string
-          nullable: true
-          description: Currently `ipfs` when the version resolves to an IPFS-backed artifact
-
-    LifecycleResponse:
-      type: object
-      required: [success, series, storageMode, createdAt, versions]
-      properties:
-        success:
-          type: boolean
-          enum: [true]
-        series:
-          type: string
-        storageMode:
-          type: string
-          enum: [encrypted, plaintext-legacy]
-        createdAt:
-          type: string
-          nullable: true
-        versions:
-          type: array
-          items:
-            $ref: '#/components/schemas/LifecycleVersion'
-
-    AuditVerifyRequest:
-      type: object
-      required: [modelId]
-      properties:
-        modelId:
-          type: integer
-          minimum: 1
-        chain:
-          $ref: '#/components/schemas/ChainName'
-
-    AuditPostResponse:
-      type: object
-      required: [success, modelId, chain, verified, recordCount]
-      properties:
-        success:
-          type: boolean
-          enum: [true]
-        modelId:
-          type: integer
-        chain:
-          $ref: '#/components/schemas/ChainName'
-        verified:
-          type: boolean
-        recordCount:
-          type: integer
-
-    RegisterModelRequest:
+    RegisterRequest:
       type: object
       required: [name]
       properties:
@@ -863,20 +968,13 @@ components:
         chain:
           $ref: '#/components/schemas/ChainName'
 
-    RegisterModelResponse:
+    RegisterResponse:
       type: object
-      required:
-        - success
-        - id
-        - numericId
-        - name
-        - description
-        - chain
-        - verified
+      required: [success, id, numericId, name, chain, isActive]
       properties:
         success:
           type: boolean
-          enum: [true]
+          example: true
         id:
           type: string
         numericId:
@@ -890,7 +988,7 @@ components:
         owner:
           type: string
           nullable: true
-        verified:
+        isActive:
           type: boolean
         existing:
           type: boolean
@@ -902,7 +1000,202 @@ components:
           type: string
           nullable: true
 
-    ProvenanceRequest:
+    AuditEvent:
+      type: object
+      required: [blockNumber, blockHash, transactionHash, contractAddress, event, args]
+      properties:
+        blockNumber:
+          type: integer
+        blockHash:
+          type: string
+        transactionHash:
+          type: string
+        contractAddress:
+          type: string
+        event:
+          type: string
+        args:
+          type: object
+          additionalProperties:
+            type: string
+
+    AuditRecentResponse:
+      type: object
+      required: [success, events, blockRange]
+      properties:
+        success:
+          type: boolean
+          example: true
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditEvent'
+        blockRange:
+          type: object
+          required: [from, to]
+          properties:
+            from:
+              type: integer
+            to:
+              type: integer
+
+    AuditVerifyResponse:
+      type: object
+      required: [success, modelId, chain, chainVerified, recordCount, latestRecord]
+      properties:
+        success:
+          type: boolean
+          example: true
+        modelId:
+          type: integer
+        chain:
+          $ref: '#/components/schemas/ChainName'
+        chainVerified:
+          type: boolean
+        recordCount:
+          type: integer
+        latestRecord:
+          type: object
+          nullable: true
+          additionalProperties: {}
+
+    AuditPostRequest:
+      type: object
+      required: [modelId]
+      properties:
+        modelId:
+          type: integer
+          minimum: 1
+        chain:
+          $ref: '#/components/schemas/ChainName'
+
+    AuditPostResponse:
+      type: object
+      required: [success, modelId, chain, chainVerified, recordCount]
+      properties:
+        success:
+          type: boolean
+          example: true
+        modelId:
+          type: integer
+        chain:
+          $ref: '#/components/schemas/ChainName'
+        chainVerified:
+          type: boolean
+        recordCount:
+          type: integer
+
+    LifecycleQueryRequest:
+      type: object
+      required: [secret]
+      properties:
+        secret:
+          type: string
+
+    LifecycleDownloadRequest:
+      type: object
+      required: [secret, modelHash]
+      properties:
+        secret:
+          type: string
+        modelHash:
+          type: string
+
+    LifecycleVersion:
+      type: object
+      required:
+        - version
+        - modelId
+        - modelHash
+        - timestamp
+        - downloadReady
+      properties:
+        version:
+          type: string
+          nullable: true
+        modelId:
+          type: integer
+          nullable: true
+        modelHash:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+          nullable: true
+        modelName:
+          type: string
+          nullable: true
+        chain:
+          type: string
+          nullable: true
+        ipfsCid:
+          type: string
+          nullable: true
+        txHash:
+          type: string
+          nullable: true
+        artifactFileName:
+          type: string
+          nullable: true
+        downloadReady:
+          type: boolean
+        downloadSource:
+          type: string
+          nullable: true
+
+    LifecycleQueryResponse:
+      type: object
+      required: [success, series, storageMode, createdAt, versions]
+      properties:
+        success:
+          type: boolean
+          example: true
+        series:
+          type: string
+        storageMode:
+          type: string
+        createdAt:
+          type: string
+          nullable: true
+        versions:
+          type: array
+          items:
+            $ref: '#/components/schemas/LifecycleVersion'
+
+    ZKProof:
+      type: object
+      required: [pA, pB, pC, publicSignals]
+      properties:
+        pA:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: string
+        pB:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: string
+        pC:
+          type: array
+          minItems: 2
+          maxItems: 2
+          items:
+            type: string
+        publicSignals:
+          type: array
+          minItems: 3
+          maxItems: 3
+          items:
+            type: string
+
+    ProvenanceSubmitRequest:
       type: object
       required: [modelId, modelName, chain, canonicalMetadata, zkProof]
       properties:
@@ -915,53 +1208,25 @@ components:
           $ref: '#/components/schemas/ChainName'
         canonicalMetadata:
           type: string
-          description: Stable canonical JSON string bound directly to the proof statement
+          description: Stable JSON string that the backend re-hashes into statementHash
         zkProof:
-          type: object
-          required: [pA, pB, pC, publicSignals]
-          properties:
-            pA:
-              type: array
-              minItems: 2
-              maxItems: 2
-              items:
-                type: string
-            pB:
-              type: array
-              minItems: 2
-              maxItems: 2
-              items:
-                type: array
-                minItems: 2
-                maxItems: 2
-                items:
-                  type: string
-            pC:
-              type: array
-              minItems: 2
-              maxItems: 2
-              items:
-                type: string
-            publicSignals:
-              type: array
-              minItems: 3
-              maxItems: 3
-              items:
-                type: string
+          $ref: '#/components/schemas/ZKProof'
 
-    ProvenanceResponse:
+    ProvenanceSubmitResponse:
       type: object
-      required: [success, tx, modelId, eventType, statementHash, nullifier, proofVerified]
+      required: [success, tx, modelId, eventType, owner, statementHash, nullifier, proofVerified]
       properties:
         success:
           type: boolean
-          enum: [true]
+          example: true
         tx:
           type: string
         modelId:
           type: integer
         eventType:
           type: integer
+        owner:
+          type: string
         statementHash:
           type: string
         nullifier:
@@ -969,24 +1234,24 @@ components:
         proofVerified:
           type: boolean
 
-    UploadFileRequest:
+    IpfsUploadFileRequest:
       type: object
       required: [data]
       properties:
         data:
           type: string
-          description: Base64-encoded file payload
+          description: Base64-encoded file bytes
         fileName:
           type: string
           nullable: true
 
-    UploadMetadataRequest:
+    IpfsUploadMetadataRequest:
       type: object
       required: [metadata]
       properties:
         metadata:
           type: object
-          additionalProperties: true
+          additionalProperties: {}
 
     IpfsUploadResponse:
       type: object
@@ -994,7 +1259,7 @@ components:
       properties:
         success:
           type: boolean
-          enum: [true]
+          example: true
         cid:
           type: string
         gatewayUrl:
@@ -1006,7 +1271,7 @@ components:
       properties:
         success:
           type: boolean
-          enum: [true]
+          example: true
         content:
           type: string
-          description: Base64-encoded gateway response body
+          description: Base64-encoded IPFS content

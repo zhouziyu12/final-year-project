@@ -39,37 +39,38 @@ export function DashboardPage({
   auditEvents,
   loading,
   selectedModelContext,
-  writeAccess,
+  frontendRole,
+  authSession,
   onTabChange,
   onSelectModel
 }) {
-  const verifiedModels = models.filter((model) => model.verified).length;
+  const activeModels = models.filter((model) => model.isActive).length;
   const selectedModel = selectedModelContext.summary;
   const selectedDetail = selectedModelContext.detail;
   const selectedAudit = selectedModelContext.audit;
   const defenseHighlights = [
     {
       icon: ShieldCheck,
-      eyebrow: '可信性',
+      eyebrow: 'Trust Surface',
       title: 'Backend-first truth surface',
       copy: 'Health, registry, audit, and verification all come from live backend routes instead of fabricated showcase data.'
     },
     {
       icon: Box,
-      eyebrow: '可验证性',
+      eyebrow: 'Verifiability',
       title: 'Training to proof to chain',
       copy: 'The project story is explicit: local training artifacts, IPFS metadata, provenance records, and ZK-backed verification form one narrative.'
     },
     {
       icon: ServerCog,
-      eyebrow: '稳健性',
+      eyebrow: 'Resilience',
       title: 'Read-only degradation path',
       copy: 'If signer credentials are unavailable, the platform can still present audit and registry evidence instead of crashing the whole backend.'
     }
   ];
   const defensePoints = [
     'Dual-chain registry and provenance inspection',
-    'ZK proof pipeline and verification bridge',
+    'Verifier-gated ZK provenance path',
     'Audit-friendly UI for final presentation'
   ];
 
@@ -180,14 +181,14 @@ export function DashboardPage({
           <p className="metric-footnote">Inventory returned by the registry list endpoint.</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Verified models</p>
-          <p className="metric-value">{statValue(verifiedModels)}</p>
-          <p className="metric-footnote">Models whose list response already indicates an active or verified state.</p>
+          <p className="metric-label">Active models</p>
+          <p className="metric-value">{statValue(activeModels)}</p>
+          <p className="metric-footnote">Models whose owner-scoped registry entry is already active on-chain.</p>
         </article>
         <article className="metric-card">
-          <p className="metric-label">Frontend mode</p>
-          <p className="metric-value">{writeAccess.enabled ? 'Writable' : 'Read-only'}</p>
-          <p className="metric-footnote">{writeAccess.summary}</p>
+          <p className="metric-label">Frontend role</p>
+          <p className="metric-value">{authSession?.user ? 'Signed in' : 'Read-only'}</p>
+          <p className="metric-footnote">{frontendRole.summary}</p>
         </article>
       </section>
 
@@ -334,7 +335,7 @@ export function DashboardPage({
             {loading ? (
               <div className="table-empty">Refreshing models from the registry...</div>
             ) : models.length === 0 ? (
-              <div className="table-empty">No registered models yet. Add one through the SDK or enable local demo writes.</div>
+              <div className="table-empty">No indexed models yet. Submit one through the authenticated Python SDK first.</div>
             ) : (
               models.slice(0, 5).map((model) => (
                 <button
@@ -345,7 +346,7 @@ export function DashboardPage({
                 >
                   <span>{model.name || 'Unnamed model'}</span>
                   <span>{model.chain}</span>
-                  <span>{model.status || (model.verified ? 'ACTIVE' : 'PENDING')}</span>
+                  <span>{model.status || (model.isActive ? 'ACTIVE' : 'PENDING')}</span>
                 </button>
               ))
             )}
@@ -375,7 +376,7 @@ export function DashboardPage({
                     This card merges the list response, the model detail endpoint, and the audit verification endpoint.
                   </p>
                 </div>
-                <span className={`status-pill${selectedDetail?.status === 'ACTIVE' || selectedModel.verified ? ' is-online' : ''}`}>
+                <span className={`status-pill${selectedDetail?.status === 'ACTIVE' || selectedModel.isActive ? ' is-online' : ''}`}>
                   {selectedDetail?.status || selectedModel.status || 'Pending'}
                 </span>
               </div>
@@ -394,12 +395,8 @@ export function DashboardPage({
                   <strong className="mono-text">{selectedDetail?.owner || selectedModel.owner || '--'}</strong>
                 </div>
                 <div className="detail-kv-item">
-                  <span>Staked</span>
-                  <strong>{selectedDetail?.staked ? 'Yes' : 'No'}</strong>
-                </div>
-                <div className="detail-kv-item">
-                  <span>Verified</span>
-                  <strong>{selectedAudit?.verified ? 'Yes' : 'No'}</strong>
+                  <span>Chain verified</span>
+                  <strong>{selectedAudit?.chainVerified ? 'Yes' : 'No'}</strong>
                 </div>
                 <div className="detail-kv-item">
                   <span>Record count</span>
@@ -448,8 +445,8 @@ export function DashboardPage({
             <div className="insight-item">
               <ServerCog size={18} />
               <div>
-                <p className="insight-title">Write mode is explicit</p>
-                <p className="insight-copy">Registration is only offered when a frontend demo key is deliberately configured.</p>
+                <p className="insight-title">Write path is now SDK-only</p>
+                <p className="insight-copy">The browser presents backend state and lifecycle downloads; authenticated provenance writes are owned by the Python SDK.</p>
               </div>
             </div>
           </div>

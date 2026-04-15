@@ -1,6 +1,6 @@
 {
   "suite": "SDK and Backend Integration Tests",
-  "timestamp": "2026-04-14T17:26:53.344766Z",
+  "timestamp": "2026-04-15T12:15:47.835131Z",
   "tests": [
     {
       "name": "SDK Import",
@@ -21,6 +21,12 @@
       "data": null
     },
     {
+      "name": "GET /api/health jwtSecretMode",
+      "status": "PASS",
+      "detail": "Health endpoint reports jwtSecretMode=configured",
+      "data": null
+    },
+    {
       "name": "GET /api/v2/status",
       "status": "PASS",
       "detail": "Endpoint returned success=true",
@@ -33,15 +39,45 @@
       "data": null
     },
     {
+      "name": "GET /api/v2/status authStoreMode",
+      "status": "PASS",
+      "detail": "Backend reports the hardened file-backed auth store mode",
+      "data": null
+    },
+    {
+      "name": "GET /api/v2/status jwtSecretMode",
+      "status": "PASS",
+      "detail": "Status endpoint reports jwtSecretMode=configured",
+      "data": null
+    },
+    {
       "name": "GET /api/v2/models",
       "status": "PASS",
       "detail": "Endpoint returned success=true",
       "data": null
     },
     {
+      "name": "GET /api/v2/models inventoryMode",
+      "status": "PASS",
+      "detail": "Model list explicitly reports backend-index inventory semantics",
+      "data": null
+    },
+    {
       "name": "GET /api/v2/audit/recent",
       "status": "PASS",
       "detail": "Endpoint returned success=true",
+      "data": null
+    },
+    {
+      "name": "POST /api/auth/login",
+      "status": "PASS",
+      "detail": "Login returned success=true and issued a JWT",
+      "data": null
+    },
+    {
+      "name": "GET /api/auth/me",
+      "status": "PASS",
+      "detail": "Authenticated session resolves to a bound wallet address",
       "data": null
     },
     {
@@ -89,13 +125,13 @@
     {
       "name": "File: server/server.js",
       "status": "PASS",
-      "detail": "Exists (40.42 KB)",
+      "detail": "Exists (67.95 KB)",
       "data": null
     },
     {
       "name": "File: sdk/python/provenance_sdk.py",
       "status": "PASS",
-      "detail": "Exists (16.42 KB)",
+      "detail": "Exists (19.85 KB)",
       "data": null
     },
     {
@@ -107,7 +143,7 @@
     {
       "name": "File: test_zk_standalone.js",
       "status": "PASS",
-      "detail": "Exists (5.38 KB)",
+      "detail": "Exists (6.07 KB)",
       "data": null
     },
     {
@@ -125,7 +161,7 @@
     {
       "name": "File: contracts/ModelRegistry.sol",
       "status": "PASS",
-      "detail": "Exists (13.06 KB)",
+      "detail": "Exists (14.26 KB)",
       "data": null
     },
     {
@@ -155,7 +191,7 @@
     {
       "name": "File: scripts/test_contracts.cjs",
       "status": "PASS",
-      "detail": "Exists (9.53 KB)",
+      "detail": "Exists (9.79 KB)",
       "data": null
     },
     {
@@ -167,7 +203,7 @@
     {
       "name": "SDK model resolution",
       "status": "PASS",
-      "detail": "Resolved registered model 'TestSDKModel_1776187625' to on-chain ID",
+      "detail": "Resolved registered model 'TestSDKModel_1776255357' to on-chain ID",
       "data": null
     },
     {
@@ -190,10 +226,10 @@
     }
   ],
   "summary": {
-    "passed": 31,
+    "passed": 37,
     "failed": 0,
     "warned": 0,
     "skipped": 0,
-    "total": 31
+    "total": 37
   }
 }

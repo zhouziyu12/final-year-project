@@ -1,126 +1,136 @@
 # Deployment Guide
 
-## Scope
+This guide follows the current repository semantics: JWT-authenticated SDK writes, backend relay ownership preservation, and verifier-gated provenance.
 
-This guide takes a clean checkout to a state where the project compiles, runs, and validates successfully.
+## 1. Required Environment
 
-## Prerequisites
-
-- Node.js 18+
-- Python 3.10+
-- npm
-- a populated `.env`
-
-## 1. Install Dependencies
-
-```bash
-npm install
-cd client && npm install
-cd ..
-```
-
-## 2. Configure Environment
-
-Copy `.env.example` to `.env` and populate:
+Set these values in `.env`:
 
 - `PRIVATE_KEY`
-- `SEPOLIA_URL`
-- `BNB_TESTNET_URL`
-- `WRITE_API_KEY`
-- `VITE_WRITE_API_KEY`
+- `JWT_SECRET`
 - `PINATA_API_KEY`
 - `PINATA_SECRET`
+- `SEPOLIA_URL` or use the default public endpoint
+- `BNB_TESTNET_URL` or use the default public endpoint
 
-## 3. Compile Contracts
+Optional:
+
+- `PORT`
+- `CLIENT_URL`
+- `VITE_API_URL`
+
+No frontend write key is required.
+
+For any demo, shared, or examiner-facing environment:
+
+- set an explicit long random `JWT_SECRET`
+- do not rely on the backend's ephemeral fallback secret
+- confirm `/api/health` or `/api/v2/status` reports `jwtSecretMode: configured`
+
+## 2. Compile Contracts
 
 ```bash
 npx hardhat compile --show-stack-traces
 ```
 
-## 4. Deploy Contracts
-
-Use the multi-chain deployment script:
+## 3. Deploy to Sepolia and tBNB
 
 ```bash
 node scripts/deploy_multi_chain.cjs
 ```
 
-Deployment metadata is merged into:
+Expected output:
 
-- `address_v2_multi.json`
+- `address_v2_multi.json` is rewritten
+- both networks receive fresh contract addresses
+- the new `ModelRegistry` supports `registerModelFor(owner, ...)`
 
-Current default deployment scope:
-
-- `ModelAccessControl`
-- `ModelRegistry`
-- `ModelProvenanceTracker`
-- `ModelAuditLog`
-- `ModelNFT`
-- `ModelStaking`
-
-Note:
-
-- `Verifier.sol` and `RealZKBridge.sol` exist in the repository
-- they are not part of the default `deploy_multi_chain.cjs` flow at the moment
-
-## 5. Build ZK Assets
-
-If the circuit changed, rebuild inside `zk/`:
+## 4. Refresh Frontend ABI Metadata
 
 ```bash
-cd zk
-cmd /c ..\node_modules\.bin\circom2.cmd circuit.circom --r1cs --wasm --sym -o build -l ..\node_modules
-cmd /c ..\node_modules\.bin\snarkjs.cmd groth16 setup build\circuit.r1cs pot12_final.ptau circuit_0000.zkey
-cmd /c ..\node_modules\.bin\snarkjs.cmd zkey contribute circuit_0000.zkey circuit_final.zkey --name="local" -e="local"
-cmd /c ..\node_modules\.bin\snarkjs.cmd zkey export verificationkey circuit_final.zkey verification_key.json
-cmd /c ..\node_modules\.bin\snarkjs.cmd zkey export solidityverifier circuit_final.zkey ..\contracts\Verifier.sol
+node client/scripts_extract_abi.js
 ```
 
-Then recompile contracts from the repo root:
+This updates:
 
-```bash
-cd ..
-npx hardhat compile --show-stack-traces
-```
+- `client/src/abis.json`
 
-## 6. Start the Backend
+## 5. Start the Backend
 
 ```bash
 node server/server.js
 ```
 
-Default API base:
+On first boot the backend seeds `server/data/auth_store.json` if needed.
 
-```text
-http://127.0.0.1:3000
-```
-
-## 7. Start the Frontend
+## 6. Start the Frontend
 
 ```bash
 cd client
 npm run dev
 ```
 
-## 8. Validate
+## 7. Verify the Build
+
+Run:
 
 ```bash
-cd client && npm run lint && npm run build && cd ..
-node tests/test_zk_proof.js
 python tests/test_sdk_backend.py
-node tests/test_smart_contracts.js
+node tests/test_zk_proof.js
+cd client && npm run lint
+cd client && npm run build
 ```
 
-Or run the Windows regression wrapper:
+## 8. Expected Runtime Semantics
 
-```powershell
-powershell -ExecutionPolicy Bypass -File tests/run_all_tests.ps1
-```
+After deployment:
 
-## Notes
+- `/api/auth/login` issues JWTs
+- `/api/register` relays to `registerModelFor(owner, ...)`
+- `/api/sdk/provenance` writes through `ZKProvenanceTracker`
+- lifecycle queries use authenticated `POST` bodies
+- frontend stays presentation-only for writes
 
-- `ModelNFT` depends on `ModelAccessControl` and `ModelRegistry`.
-- `/api/register` now predicts a model ID and returns a pending registration response immediately.
-- ZK artifacts live under `zk/`, not the repository root.
-- Native Windows circuit compilation is supported and already verified.
-- Local proof generation is implemented today, but bridge-backed end-to-end settlement is still only partially integrated into the main application path.
+## 9. Troubleshooting
+
+### Status shows `relayMode: read-only`
+
+Cause:
+
+- `PRIVATE_KEY` is missing or invalid
+
+### Login works but writes fail with `403`
+
+Cause:
+
+- the authenticated user's bound wallet does not own the target model
+
+### Health/status shows `jwtSecretMode: ephemeral`
+
+Cause:
+
+- `JWT_SECRET` is missing
+
+Fix:
+
+- generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+- place it in `.env` as `JWT_SECRET=...`
+- restart the backend
+
+### SDK cannot resolve a model by name
+
+Check:
+
+- chain
+- owner wallet address
+- model name spelling
+- `model_name_map.json` owner bucket
+
+### Lifecycle query fails after URL migration
+
+Use:
+
+- `POST /api/v2/lifecycle/query`
+- `POST /api/v2/lifecycle/download`
+
+Do not use the deprecated `GET` URLs.

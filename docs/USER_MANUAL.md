@@ -1,163 +1,184 @@
 # User Manual
 
-## What the System Does
+This manual describes how to use the current application after the SDK-first write path refactor.
 
-This system treats an AI model as a traceable asset and records its path from registration to provenance submission and audit verification.
+## 1. What Each Surface Is For
 
-Core capabilities:
+### Python SDK
 
-- model registration
-- lifecycle status tracking
-- provenance event writes
-- audit log queries and verification
-- IPFS-backed file and metadata storage
-- SDK-driven local ZK proof generation and provenance submission
-- NFT and staking presentation and extension points
+Use the SDK when you want to:
 
-Important scope note:
-
-- the current prototype fully supports registry, provenance, audit, backend relay, and local ZK tooling
-- NFT, staking, and bridge-oriented cross-chain behavior should currently be treated as partial or extension-level features, not full user-facing flows
-
-## Main Interfaces
+- register a model
+- upload an artifact
+- generate a proof
+- submit provenance
 
 ### Frontend
 
-The frontend has six primary pages:
+Use the frontend when you want to:
 
-- `Overview`
-- `Training`
-- `Registry`
-- `Audit`
-- `System`
-- `NFT`
+- inspect system health
+- browse indexed models
+- verify audits
+- query lifecycle versions after login
+- download a specific version after login
 
-Start it with:
+The frontend is not the normal place to submit training writes.
 
-```bash
-cd client
-npm run dev
-```
+## 2. Starting the App
 
-### Backend
-
-Default address:
-
-```text
-http://127.0.0.1:3000
-```
-
-Primary endpoints:
-
-- `GET /api/health`
-- `GET /api/v2/status`
-- `GET /api/v2/models`
-- `GET /api/v2/audit/recent`
-- `POST /api/register`
-- `POST /api/sdk/provenance`
-
-## Common Workflows
-
-### 1. Register a Model from the Frontend
-
-Requirements:
-
-- the backend is running
-- `VITE_WRITE_API_KEY` is configured
-
-Flow:
-
-1. Open `Registry`
-2. Fill in the model name, chain, and metadata
-3. Submit the form, which calls `POST /api/register`
-4. The new model may appear as `PENDING_REGISTRATION` before chain confirmation completes
-
-### 2. Submit Provenance from Python
-
-```python
-from sdk.python.provenance_sdk import ProvenanceSDK
-
-sdk = ProvenanceSDK()
-result = sdk.submit_provenance(
-    model_path="artifacts/model.bin",
-    model_name="ExampleModel",
-    version="v1.0.0",
-    commit_msg="Initial training",
-    sender="0xYourAddress",
-    chain="sepolia",
-)
-
-print(result)
-```
-
-The SDK will:
-
-1. hash the model file
-2. resolve or register a real on-chain `modelId`
-3. generate a ZK proof
-4. upload the model to IPFS
-5. call the backend to submit the provenance record
-
-Implementation note:
-
-- the proof generation step is real
-- proof-related metadata is preserved in the submission payload
-- the current backend mainline still records the event through the provenance tracker flow rather than a full bridge-settlement path
-
-### 3. Verify a Model
-
-Option A:
-
-- open the `Audit` page
-- pick a model or enter a model ID
-
-Option B:
-
-```bash
-curl "http://127.0.0.1:3000/api/v2/audit/verify/1?chain=sepolia"
-```
-
-## Start the System Locally
-
-### Compile
-
-```bash
-npx hardhat compile --show-stack-traces
-```
-
-### Start Backend
+Start the backend:
 
 ```bash
 node server/server.js
 ```
 
-### Start Frontend
+Start the frontend:
 
 ```bash
 cd client
 npm run dev
 ```
 
-## Troubleshooting
+## 3. Default Demo Login
 
-### Backend is read-only
+On first backend boot, a demo account is seeded automatically.
 
-This means `.env` is missing `PRIVATE_KEY` or `WRITE_API_KEY`.
+- username: `researcher`
+- password: `researcher-demo-pass`
 
-### Frontend registration is disabled
+This account is bound to:
 
-This means `VITE_WRITE_API_KEY` is not configured, so the UI stays in read-only mode.
+- `0x1111111111111111111111111111111111111111`
 
-### Registration returns but model detail is not immediately available
+## 3.1 Create Another User
 
-This is expected. `/api/register` now returns a predicted ID and a `PENDING_REGISTRATION` state before the transaction is confirmed on-chain.
+Create a new local backend account with:
 
-### ZK proof fails
+```bash
+node scripts/create_user.cjs create --username alice --password strong-pass --wallet 0xYourWallet --role researcher
+```
 
-Rebuild the circuit and confirm these files exist:
+Bootstrap an API admin account with:
 
-- `zk/build/circuit_js/circuit.wasm`
-- `zk/circuit_final.zkey`
-- `zk/verification_key.json`
+```bash
+node scripts/create_user.cjs create --username admin --password change-me --wallet 0xYourWallet --role admin
+```
 
-See `docs/ZK_GUIDE.md` for the full flow.
+List users:
+
+```bash
+npm run user:list
+```
+
+Delete a user:
+
+```bash
+npm run user:delete -- --username alice
+```
+
+Once an admin account exists, the backend also exposes protected admin APIs:
+
+- `GET /api/admin/users`
+- `POST /api/admin/users`
+- `PATCH /api/admin/users/:username`
+- `DELETE /api/admin/users/:username`
+
+## 4. Frontend Pages
+
+### Overview
+
+Shows:
+
+- backend health
+- chain connectivity
+- registry counts
+- recent audit activity
+
+### Training
+
+Shows:
+
+- the SDK-first write story
+- lifecycle query form
+- version download actions after login
+
+### Registry
+
+Shows:
+
+- backend-managed model index
+- model status and owner
+- whether a record is currently `ACTIVE`
+
+### Audit
+
+Shows:
+
+- `chainVerified`
+- record count
+- latest record payload
+
+### System
+
+Shows:
+
+- `authMode`
+- `relayMode`
+- contract addresses
+- chain health
+
+## 5. Query Lifecycle and Download a Version
+
+1. Open the Training page.
+2. Sign in with a backend account.
+3. Enter the lifecycle secret.
+4. Load the version list.
+5. Download the chosen version.
+
+The secret now travels in the authenticated request body, not in the URL.
+
+## 6. Submit Through the SDK
+
+A typical SDK flow is:
+
+1. instantiate the SDK
+2. log in with username/password
+3. call the submission helper for a model artifact
+
+The SDK handles:
+
+- auth
+- owner-scoped resolution
+- artifact hashing
+- IPFS upload
+- proof generation
+- provenance submission
+
+## 7. Troubleshooting
+
+### The frontend does not show a write button
+
+That is expected. Browser write mode was removed.
+
+### Login succeeds but model registration fails
+
+Check:
+
+- backend `PRIVATE_KEY`
+- current deployment addresses in `address_v2_multi.json`
+- bound wallet ownership expectations
+
+### Lifecycle query returns `401`
+
+Cause:
+
+- missing or expired JWT
+
+Fix:
+
+- sign in again from the frontend or obtain a fresh token through `/api/auth/login`
+
+### Proof generation files appear in multiple folders
+
+That is expected. Each SDK run now gets its own `.proof_runs/<run-id>/` directory.

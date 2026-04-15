@@ -1,12 +1,12 @@
 {
   "suite": "Contract Verification",
-  "timestamp": "2026-04-14T10:17:27.404Z",
+  "timestamp": "2026-04-15T11:21:29.299Z",
   "summary": {
-    "passed": 30,
+    "passed": 32,
     "failed": 0,
     "warned": 0,
     "skipped": 0,
-    "total": 30
+    "total": 32
   },
   "results": {
     "Sepolia": [
@@ -18,17 +18,22 @@
       {
         "name": "Grant registrar role",
         "status": "PASS",
-        "msg": "0xAB172B41363cd396aC47E5993fbff89aBF674dBB"
+        "msg": "0x561aB1748fb0D3000402791e2e1629f4ADeE2d2e"
       },
       {
         "name": "Revoke registrar role",
         "status": "PASS",
-        "msg": "0xAB172B41363cd396aC47E5993fbff89aBF674dBB"
+        "msg": "0x561aB1748fb0D3000402791e2e1629f4ADeE2d2e"
       },
       {
         "name": "Register model",
         "status": "PASS",
-        "msg": "modelId=29"
+        "msg": "modelId=3"
+      },
+      {
+        "name": "Delegated owner assignment",
+        "status": "PASS",
+        "msg": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
       },
       {
         "name": "Initial status is DRAFT",
@@ -53,7 +58,7 @@
       {
         "name": "Audit entry appended",
         "status": "PASS",
-        "msg": "14 -> 15"
+        "msg": "1 -> 2"
       },
       {
         "name": "Audit chain verification",
@@ -63,7 +68,7 @@
       {
         "name": "Mint NFT",
         "status": "PASS",
-        "msg": "tokenId=15"
+        "msg": "tokenId=1"
       },
       {
         "name": "NFT owner check",
@@ -73,7 +78,7 @@
       {
         "name": "Burn NFT",
         "status": "PASS",
-        "msg": "1 -> 1"
+        "msg": "0 -> 0"
       },
       {
         "name": "Stake model",
@@ -95,17 +100,22 @@
       {
         "name": "Grant registrar role",
         "status": "PASS",
-        "msg": "0x5E2D0c99779f2D88b8478c1c9d1D3E3FF0558a1D"
+        "msg": "0x81F6C37A2c4650FE49C09BB7Af49C0a34df23005"
       },
       {
         "name": "Revoke registrar role",
         "status": "PASS",
-        "msg": "0x5E2D0c99779f2D88b8478c1c9d1D3E3FF0558a1D"
+        "msg": "0x81F6C37A2c4650FE49C09BB7Af49C0a34df23005"
       },
       {
         "name": "Register model",
         "status": "PASS",
-        "msg": "modelId=24"
+        "msg": "modelId=1"
+      },
+      {
+        "name": "Delegated owner assignment",
+        "status": "PASS",
+        "msg": "0xEF8a56C4040Bf0E3f2cEC1eBFf244bd77d04d5E1"
       },
       {
         "name": "Initial status is DRAFT",
@@ -130,7 +140,7 @@
       {
         "name": "Audit entry appended",
         "status": "PASS",
-        "msg": "13 -> 14"
+        "msg": "1 -> 2"
       },
       {
         "name": "Audit chain verification",
@@ -140,7 +150,7 @@
       {
         "name": "Mint NFT",
         "status": "PASS",
-        "msg": "tokenId=14"
+        "msg": "tokenId=1"
       },
       {
         "name": "NFT owner check",

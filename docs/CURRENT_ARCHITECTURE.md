@@ -1,364 +1,258 @@
-# Current Architecture and ZKP Data Flow
+# Current Architecture
 
-This document describes the architecture that is actually reflected in the current codebase.
+This document describes the implementation that is actually wired together in the repository as of 2026-04-15.
 
-It is intended for:
+## 1. Architecture Summary
 
-- final dissertation system design
-- implementation chapter alignment
-- ZKP-focused architecture explanation
-- separating current runtime behavior from planned or only partially integrated features
+The project is now organized around a clear separation of roles:
 
-## 1. System Overview
+- Python SDK
+  Submission client for training-time writes.
 
-The current prototype is best understood as a six-layer system:
+- Backend relay
+  Auth issuer, owner-aware registry relay, verifier-gated provenance writer, lifecycle service, and chain reader.
 
-1. local training scripts
-2. Python SDK
-3. backend relay service
-4. smart contracts
-5. frontend dashboard
-6. IPFS / Pinata-backed off-chain storage
+- Frontend
+  Read-only presentation surface plus authenticated lifecycle lookup and download.
 
-The operational center of gravity is:
+- Contracts
+  Access control, registry, verifier-gated provenance, audit, and optional extension logic.
 
-`Training Script -> Python SDK -> Backend Relay -> Smart Contracts`
+The old public write-key browser flow is no longer the main path.
 
-The frontend is not the main write path. It is primarily:
+## 2. Primary Write Sequence
 
-- a dashboard
-- a registry view
-- an audit inspection layer
-- a demonstration interface over backend-exposed state
+The current end-to-end runtime is:
 
-## 2. ZKP-Centered Architecture
+1. A local training script produces a model artifact.
+2. The SDK logs in with `POST /api/auth/login`.
+3. The backend returns a JWT bound to one stored user and one wallet address.
+4. The SDK computes the artifact hash.
+5. The SDK resolves the target model by `chain + owner + modelName`.
+6. If the model does not exist, the SDK calls `POST /api/register`.
+7. The backend relay executes `ModelRegistry.registerModelFor(owner, ...)`.
+8. The SDK uploads the artifact to IPFS.
+9. The SDK constructs `canonicalMetadata`.
+10. The SDK computes `statementHash = keccak256(canonicalMetadata) % snark_field`.
+11. The prover writes a dedicated run directory under `.proof_runs/<run-id>/`.
+12. The SDK submits `canonicalMetadata + zkProof` to `POST /api/sdk/provenance`.
+13. The backend recomputes `statementHash`, validates ownership, verifies the proof, and calls `ZKProvenanceTracker.addVerifiedRecord(...)`.
+14. The frontend later reads status, registry entries, audit results, and lifecycle downloads from backend APIs.
 
-The current codebase already contains a real ZKP-oriented submission path, but that path must be described precisely.
+## 3. Ownership Semantics
 
-What the runtime does today:
+The ownership drift is intentionally fixed by contract and relay changes.
 
-- the SDK generates a Groth16 proof locally
-- the SDK exports proof artifacts and Solidity calldata
-- the SDK injects ZKP-derived fields into `trainingMetadata`
-- the backend stores those fields through the provenance submission route
+### 3.1 Contract
 
-What the runtime does by default today:
+`ModelRegistry` now exposes:
 
-- it routes SDK provenance submissions through the verifier-gated backend path
-- it requires proof-linked metadata validation before a provenance record is accepted
-- it writes through `ZKProvenanceTracker.addVerifiedRecord(...)`
+- `registerModel(...)`
+- `registerModelFor(address owner, ...)`
 
-So the current architecture is best described as:
+The relay uses `registerModelFor(...)`, so the stored chain owner is the authenticated user's bound wallet address instead of the relay wallet.
 
-- verifier-gated at the default application write path
-- ZKP-generating at the SDK layer
-- ZKP-enforced at the provenance acceptance layer
-- bridge-capable through additional contracts that are present in the repository
+### 3.2 Backend
 
-## 3. Module Responsibilities
+The backend stores users in a file-backed auth store at `server/data/auth_store.json` by default.
 
-### 3.1 Local Training Scripts
+Each user record includes:
 
-Primary files:
+- `username`
+- password hash
+- `walletAddress`
+- `role`
+- `status`
+- token/session version metadata
+- lockout and login timestamps
 
-- `train1.py`
-- `train2.py`
-- `train_v2_incremental.py`
+Write routes trust the JWT session and use `req.auth.walletAddress` as the submitter identity.
 
-Responsibilities:
+### 3.3 SDK
 
-- train or fine-tune local model artifacts
-- maintain a stable `model_series` lifecycle identity
-- obtain a lifecycle secret through `ModelSecretManager`
-- invoke the Python SDK after artifact creation
+The SDK no longer treats model names as globally unique. The lookup key is:
 
-Boundary:
-
-- these scripts do not talk directly to smart contracts
-- they do not perform on-chain writes by themselves
-- they rely on the SDK for hashing, proof generation, and submission
-
-### 3.2 Python SDK
-
-Primary file:
-
-- `sdk/python/provenance_sdk.py`
-
-Responsibilities:
-
-- hash model files
-- resolve model identity through backend APIs
-- auto-register models when needed
-- compute `messageHash` from submission context
-- generate local Groth16 proof artifacts
-- export public signals and Solidity calldata
-- upload model artifacts to IPFS when credentials are available
-- assemble `trainingMetadata`
-- submit provenance through the backend relay
-
-Boundary:
-
-- the SDK is the main ZKP-processing layer in the current runtime
-- it does not write directly to contracts
-- it depends on the backend for authenticated application writes
-
-### 3.3 Backend Relay
-
-Primary file:
-
-- `server/server.js`
-
-Responsibilities:
-
-- expose REST APIs to the frontend and SDK
-- enforce write authentication using API key, timestamp, and nonce
-- apply replay protection and rate limiting
-- manage model registration through `ModelRegistry`
-- relay provenance submissions through `ModelProvenanceTracker`
-- expose status, registry, and audit data
-- mediate Pinata-backed IPFS uploads
-- maintain local model-name cache state in `model_name_map.json`
-
-Boundary:
-
-- the backend is the actual application core
-- it accepts ZKP-derived metadata from the SDK
-- it validates canonical metadata and proof arguments before writing
-- it writes provenance through `ZKProvenanceTracker.addVerifiedRecord(...)`
-
-### 3.4 Smart Contracts
-
-Primary runtime-facing contracts:
-
-- `contracts/ModelAccessControl.sol`
-- `contracts/ModelRegistry.sol`
-- `contracts/ZKProvenanceTracker.sol`
-- `contracts/Verifier.sol`
-- `contracts/ModelAuditLog.sol`
-- `contracts/ModelNFT.sol`
-- `contracts/ModelStaking.sol`
-
-Supporting contracts and compatibility layers:
-
-- `contracts/ProvenanceTracker.sol`
-- `contracts/RealZKBridge.sol`
-
-Responsibilities:
-
-- maintain model registry state
-- control write permissions and roles
-- append verifier-gated provenance records
-- provide audit-verification support
-- provide optional NFT and staking features
-- expose bridge and verifier logic for the ZKP-oriented design
-
-Boundary:
-
-- contract-level capability is broader than the currently exposed app workflow
-- bridge settlement contracts exist alongside the verifier-gated provenance path
-
-### 3.5 Frontend Dashboard
-
-Primary files:
-
-- `client/src/App.jsx`
-- `client/src/lib/api.js`
-- `client/src/pages/*`
-
-Responsibilities:
-
-- display system status
-- show model registry state
-- render audit verification results
-- expose backend write posture
-- provide a demonstration-oriented system interface
-
-Boundary:
-
-- the frontend is not the main training execution environment
-- it is not the full chain interaction surface
-- it does not currently implement a full ZKP submission control plane
-
-### 3.6 Off-Chain Storage
-
-Current integration:
-
-- Pinata API
-- IPFS CID-based storage
-
-Responsibilities:
-
-- store model artifacts or metadata off-chain
-- avoid placing large payloads on-chain
-- return CIDs that can be referenced inside provenance metadata
-
-Boundary:
-
-- IPFS is auxiliary storage, not the source of verification logic
-- the ZKP flow can still run even when SDK-side direct Pinata upload is unavailable
-
-## 4. Current Runtime Topology
-
-Current topology in code:
-
-- active networks: `sepolia`, `tbnb`
-- deployment address source: `address_v2_multi.json`
-- frontend communicates only with backend APIs
-- SDK communicates only with backend APIs for application writes
-- backend communicates with contracts and Pinata
-- local circuit tooling is executed from the SDK on the same machine
-
-This means the real topology is backend-mediated, not direct client-to-chain interaction.
-
-## 5. ZKP Runtime Data Flow
-
-## 5.1 High-Level ZKP Flow
-
-```mermaid
-flowchart LR
-    A["Training Script"] --> B["Python SDK"]
-    B --> C["Hash Model Artifact"]
-    C --> D["Resolve / Register modelId via Backend"]
-    D --> E["Compute messageHash"]
-    E --> F["Run Groth16 Proof Generation"]
-    F --> G["proof.json / public.json / calldata"]
-    B --> H["Optional IPFS Upload"]
-    G --> I["Assemble trainingMetadata"]
-    H --> I
-    I --> J["POST /api/sdk/provenance"]
-    J --> K["Backend Relay + Proof Validation"]
-    K --> L["ZKProvenanceTracker.addVerifiedRecord(...)"]
-    L --> M["Chain State"]
-    M --> N["Frontend Audit / Registry Views"]
+```text
+chain + owner + modelName
 ```
 
-## 5.2 Detailed ZKP Submission Path
+This means:
 
-The current code-verified runtime sequence is:
+- same-name models from different owners do not collide
+- one owner can resolve their own model deterministically
 
-1. A local training script creates or updates a model artifact.
-2. The script requests a stable lifecycle secret from `ModelSecretManager`.
-3. The SDK computes `modelHash` from the saved model file.
-4. The SDK resolves the on-chain model identity through backend APIs.
-5. If the model does not exist, the backend registers it through `ModelRegistry`.
-6. The SDK computes `messageHash` from:
-   - model name
-   - chain
-   - model hash
-   - commit message
-   - sender
-   - version
-7. The SDK writes `scripts/last_proof_input.json`.
-8. The SDK runs `node test_zk_standalone.js`.
-9. The proof flow produces:
-   - `proof.json`
-   - `public.json`
-   - `proof_calldata_debug.txt`
-10. The SDK optionally uploads the model artifact to IPFS through Pinata.
-11. The SDK assembles `trainingMetadata`, including:
-    - `message_hash`
-    - `zk_verified`
-    - `zk_engine`
-    - `zk_public_signals`
-    - `zk_calldata`
-    - `ipfs_upload_mode`
-12. The SDK sends the payload to `POST /api/sdk/provenance`.
-13. The backend validates write authentication.
-14. The backend writes the provenance record through `ZKProvenanceTracker.addVerifiedRecord(...)`.
-15. The resulting state is visible again through backend read endpoints and the frontend dashboard.
+## 4. Backend Index Semantics
 
-## 5.3 Current ZKP Artifacts and Their Roles
+`/api/v2/models` is backed by a backend-managed index plus live contract reads.
 
-Circuit and proving assets:
+That index is stored in `model_name_map.json` and is now versioned and owner-scoped:
 
-- `zk/circuit.circom`
-- `zk/build/circuit.r1cs`
-- `zk/build/circuit_js/circuit.wasm`
-- `zk/circuit_final.zkey`
-- `zk/verification_key.json`
+```json
+{
+  "version": 2,
+  "chains": {
+    "sepolia": {
+      "owners": {
+        "0x...owner": {
+          "examplemodel": {
+            "id": 1,
+            "name": "ExampleModel",
+            "owner": "0x...owner"
+          }
+        }
+      }
+    }
+  }
+}
+```
 
-Runtime-generated debugging and proof outputs:
+Important consequence:
 
-- `scripts/last_proof_input.json`
-- `proof.json`
-- `public.json`
-- `proof_calldata_debug.txt`
+- `/api/v2/models` is useful and live
+- it is not claimed to be a complete on-chain inventory service
 
-These files make the ZKP path inspectable and reproducible, which is useful for dissertation evidence and debugging.
+## 5. ZK and Provenance Semantics
 
-## 6. Non-ZKP Data Flows
+### 5.1 Canonical Metadata
 
-## 6.1 Registration Flow
+The application-level provenance payload is centered on `canonicalMetadata`, not on ad hoc top-level write fields.
 
-Current registration flow:
+Required fields include:
 
-1. The SDK or frontend supplies a model name.
-2. The backend checks `model_name_map.json`.
-3. If needed, the backend uses `ModelRegistry.registerModel(...)`.
-4. The backend predicts the model ID and returns it immediately.
-5. The model appears as `PENDING_REGISTRATION` until chain reads confirm the owner state.
+- `action`
+- `artifactCid`
+- `chain`
+- `commit`
+- `modelHash`
+- `modelName`
+- `sender`
+- `submittedAt`
+- `trainingMetadata`
+- `versionTag`
 
-Important note:
+`trainingMetadata` is still a nested business metadata object, but proof material is forbidden inside it.
 
-- discovery is currently cache-assisted rather than full chain indexing
+### 5.2 Statement Hash vs Message Hash
 
-## 6.2 Audit Read Flow
+The runtime terminology is:
 
-Current audit read flow:
+- `statementHash`
+  Application term used by the SDK and backend.
 
-1. The frontend requests recent audit events or verification data.
-2. The backend reads logs or contract state.
-3. The backend converts the result into API-friendly JSON.
-4. The frontend renders:
-   - recent events
-   - model verification state
-   - record count
-   - latest record
+- `messageHash`
+  Circuit compatibility field name still used by the witness/prover.
 
-## 6.3 IPFS Flow
+In practice:
 
-Current IPFS flow:
+- the SDK computes `statementHash` from `canonicalMetadata`
+- the prover receives that value in the witness slot named `messageHash`
+- the backend recomputes `statementHash` and checks it against `zkProof.publicSignals[2]`
 
-1. The SDK or client sends file or metadata payloads.
-2. The backend uploads through Pinata if credentials are available.
-3. The backend returns CID information.
-4. CID references can be carried inside provenance metadata.
+### 5.3 Proof Artifacts
 
-## 7. ZKP Boundary Clarifications
+Proof files are no longer written to one shared repository root location.
 
-These distinctions are important for accurate final-paper wording.
+Each submission generates a dedicated directory such as:
 
-### 7.1 Implemented in the Current Main Path
+```text
+.proof_runs/20260415T190632-4f3a9d2e/
+  last_proof_input.json
+  proof.json
+  public.json
+  proof_calldata_debug.txt
+```
 
-- local proof generation
-- local proof verification
-- SDK-side `messageHash` construction
-- SDK-side proof artifact export
-- ZKP-derived metadata injection into provenance payloads
-- backend storage of that metadata through the verifier-gated provenance path
+This prevents concurrent SDK runs from overwriting each other.
 
-### 7.2 Bridge-Oriented Extension Path Present in Code
+### 5.4 On-Chain Write Target
 
-- `Verifier.sol`
-- `RealZKBridge.sol`
-- bridge nonce and payload binding logic
-- dedicated `addZKProofRecord(...)` support in contract ABI
+The main provenance write path is verifier-gated:
 
-### 7.3 Accurate Runtime Claims Today
+- contract: `ZKProvenanceTracker`
+- verifier: `Groth16Verifier`
 
-- default SDK provenance submissions are verifier-gated before on-chain acceptance
-- the backend writes through `ZKProvenanceTracker.addVerifiedRecord(...)`
-- proofless or mismatched submissions are rejected before anchoring provenance
+`ModelProvenanceTracker` still exists in the repository and is still used by some read/audit helpers, but it is not the primary story for authenticated SDK submissions.
 
-## 8. Dissertation-Safe Framing
+`ModelNFT`, `ModelStaking`, and `RealZKBridge` are also retained as optional extensions. They are not surfaced as the default frontend workflow and they are not part of the main thesis write-path claim.
 
-For the final dissertation, the safest and clearest framing is:
+## 6. Frontend Role
 
-- the system implements a blockchain-backed provenance pipeline with local ZKP generation, backend-mediated model registration, verifier-gated provenance submission, IPFS-backed off-chain storage, and frontend audit visibility
-- the ZKP path is real and operational at the SDK, backend, and contract-write layers
-- bridge and verifier contracts are part of the architecture and support the broader ZKP trust model
-- the default application write path is now verifier-gated even though the bridge-oriented path remains a separate architectural capability
+The frontend no longer:
 
-## 9. One-Sentence Truthful Summary
+- registers models directly
+- depends on `VITE_WRITE_API_KEY`
+- acts as a public write demo
 
-The current project is a working AI model provenance prototype with a real ZKP-generating SDK pipeline, verifier-gated backend-to-chain provenance writes, real dashboard observability, and bridge/verifier architecture in code, with `ZKProvenanceTracker` serving as the default end-to-end provenance write path.
+The frontend now:
+
+- shows health and system readiness
+- displays registry records returned by `/api/v2/models`
+- shows audit verification results
+- allows authenticated lifecycle lookup and download
+
+The UI is therefore aligned with the real system boundary:
+
+- SDK writes
+- backend relays
+- frontend presents and downloads
+
+## 7. Lifecycle Service
+
+Lifecycle access was changed specifically to remove secret leakage from URLs.
+
+Old shape:
+
+- `GET /api/v2/lifecycle?secret=...`
+- `GET /api/v2/lifecycle/download?secret=...&modelHash=...`
+
+Current shape:
+
+- `POST /api/v2/lifecycle/query`
+- `POST /api/v2/lifecycle/download`
+
+Both now accept a JSON body and require a JWT.
+
+## 8. Status and Audit Vocabulary
+
+The API vocabulary is intentionally split:
+
+- registry/list/detail endpoints use `isActive`
+- audit verification endpoints use `chainVerified`
+
+The older generic `verified` field is no longer the recommended wording for current UI or API docs.
+
+## 9. Current Deployments
+
+Deployment metadata was refreshed on 2026-04-15 and written to `address_v2_multi.json`.
+
+Primary write-path contracts:
+
+- Sepolia
+  - `ModelRegistry`: `0x487C02203D72b378a69F47daC0957c0c3354C9aC`
+  - `Groth16Verifier`: `0xE1639d60F78F4Ba37C2D00BCD3612cAfD858af17`
+  - `ZKProvenanceTracker`: `0xCaE0d0ff07DfC0cdd21e9Ddb2813dA66931bC5cD`
+
+- tBNB
+  - `ModelRegistry`: `0x8d32A2dcBDa306c678cab2370F3dafA3E1D46948`
+  - `Groth16Verifier`: `0x7054577279D496DcF00E37FdBe9a192631e195D4`
+  - `ZKProvenanceTracker`: `0x947a547ad9da78E12c3F2F4e1197787ADD9Ff61a`
+
+## 10. Not the Primary Path Today
+
+The following are still present in the repository, but they are not the main authenticated application flow:
+
+- frontend registration by public API key
+- lifecycle secrets in URL query strings
+- bridge-first provenance narrative
+- flat global `modelName -> id` cache semantics
+- embedding proof fields inside `trainingMetadata`
+
+That scope reduction is intentional. The current repository now tells one consistent story:
+
+```text
+SDK main write path
+-> backend JWT auth
+-> owner-aware relay
+-> verifier-gated provenance
+-> frontend presentation and download
+```
