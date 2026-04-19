@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This guide follows the current repository semantics: JWT-authenticated SDK writes, backend relay ownership preservation, and verifier-gated provenance.
+This guide follows the final repository semantics: JWT-authenticated SDK writes, backend relay ownership preservation, and verifier-gated provenance.
 
 ## 1. Required Environment
 

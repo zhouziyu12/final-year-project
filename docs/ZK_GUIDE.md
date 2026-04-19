@@ -1,12 +1,12 @@
 # ZK Guide
 
-This document describes the zero-knowledge proving path that is currently used by the repository.
+This document describes the zero-knowledge proving path used by the final repository-aligned workflow.
 
 ## 1. Core Idea
 
 The live application path binds a proof to the exact canonical metadata string that the backend will anchor on-chain.
 
-Current proof inputs are conceptually:
+Proof inputs are conceptually:
 
 - `secret`
 - `modelId`
@@ -16,7 +16,7 @@ The circuit still names the third witness input `messageHash`, but that is now o
 
 ## 2. Runtime Path
 
-The current ZK runtime path is:
+The ZK runtime path is:
 
 1. the SDK logs in and obtains a JWT
 2. the SDK resolves or registers the model under `chain + owner + modelName`
@@ -45,7 +45,7 @@ This replaces the older shared-root layout and prevents concurrent proof jobs fr
 
 ## 4. Circuit Semantics
 
-The current circuit still expects witness fields named:
+The circuit still expects witness fields named:
 
 - `secret`
 - `modelId`
@@ -62,7 +62,7 @@ Application translation:
 - SDK/backend term: `statementHash`
 - circuit/public-signal label: `messageHash`
 
-The two refer to the same numeric value in the current main path.
+The two refer to the same numeric value in the final main path.
 
 ## 5. Canonical Metadata Contract
 
@@ -101,7 +101,7 @@ Example application-side proof input before circuit translation:
 }
 ```
 
-In the current application path:
+In the application path:
 
 - `statementHash` is the application term
 - `messageHash` is the circuit-compatibility alias carrying the same numeric value
@@ -156,7 +156,7 @@ node tests/test_zk_proof.js
 node test_zk_standalone.js
 ```
 
-## 10. Current Narrative Boundary
+## 10. Narrative Boundary
 
 True today:
 
@@ -171,7 +171,7 @@ Not the main path today:
 - storing proof blobs inside business metadata
 - browser-based proof submission
 
-The current ZK story that matches the codebase is:
+The ZK story that matches the codebase is:
 
 ```text
 canonicalMetadata

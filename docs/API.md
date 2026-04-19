@@ -19,7 +19,7 @@ Authenticated routes now use:
 
 JWTs represent a backend user that is already bound to one wallet address. The relay uses that bound wallet address as the intended on-chain owner.
 
-The current file-backed local account system is a runnable prototype baseline, not a claim of production-grade identity infrastructure.
+The file-backed local account system in this repository is a runnable prototype baseline, not a claim of production-grade identity infrastructure.
 
 ## Scope Note
 
@@ -100,7 +100,7 @@ Bootstrap note:
 
 ### `GET /api/admin/users`
 
-Returns the current backend user list without password hashes.
+Returns the backend user list without password hashes.
 
 ### `POST /api/admin/users`
 
@@ -145,7 +145,7 @@ Supported fields:
 Notes:
 
 - security-relevant changes revoke outstanding JWTs by incrementing the stored token version
-- `status` is currently `active` or `disabled`
+- `status` is `active` or `disabled`
 - the backend keeps at least one active admin account
 
 ## Status Endpoints
@@ -180,10 +180,10 @@ Returns runtime status, including:
 Important fields:
 
 - `authMode`
-  Always `jwt` for the current main path.
+  Always `jwt` for the final main path.
 
 - `authStoreMode`
-  `stateful-file-store` for the current local account implementation.
+  `stateful-file-store` for the local account implementation in this repository.
 
 - `jwtSecretMode`
   - `configured` means the backend is using an explicit persistent JWT signing secret
@@ -578,4 +578,4 @@ Optional extensions retained in the repository:
 
 These modules may still appear in deployment metadata or helper scripts, but they are not the primary authenticated SDK write path and should not be presented as the thesis main workflow.
 
-Current deployment addresses are stored in `address_v2_multi.json`.
+Deployment addresses are stored in `address_v2_multi.json`.

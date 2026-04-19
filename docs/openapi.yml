@@ -3,7 +3,7 @@ info:
   title: AI Model Provenance API
   version: 2026-04-15
   description: |
-    Current API surface for the SDK-first AI provenance system.
+    Final API surface for the SDK-first AI provenance system.
 
     Main write path:
     - authenticate with username/password
@@ -12,7 +12,7 @@ info:
     - provenance writes are verifier-gated
 
     Boundary notes:
-    - the current file-backed local account system is a runnable prototype baseline, not a production identity stack
+    - the file-backed local account system in this repository is a runnable prototype baseline, not a production identity stack
     - `/api/v2/models` exposes a backend-managed owner-scoped index, not a claim of full chain inventory
 
 servers:
@@ -99,7 +99,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: Current user
+          description: Authenticated user
           content:
             application/json:
               schema:

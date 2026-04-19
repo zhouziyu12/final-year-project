@@ -1,8 +1,8 @@
 # Frontend Notes
 
-The frontend is a React + Vite presentation surface for the current AI provenance backend.
+The frontend is a React + Vite presentation surface for the final repository-aligned AI provenance backend.
 
-## Current Scope
+## Final Scope
 
 The browser now focuses on:
 
@@ -33,7 +33,7 @@ The frontend uses backend JWT auth for:
 - `POST /api/v2/lifecycle/query`
 - `POST /api/v2/lifecycle/download`
 
-The frontend stores the JWT in session storage for the current browser session.
+The frontend stores the JWT in session storage for the active browser session.
 
 ## Pages
 

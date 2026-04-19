@@ -1,6 +1,6 @@
-# Current Architecture
+# Architecture
 
-This document describes the implementation that is actually wired together in the repository as of 2026-04-15.
+This document describes the final repository-aligned architecture baseline as of 2026-04-15.
 
 ## 1. Architecture Summary
 
@@ -22,7 +22,7 @@ The old public write-key browser flow is no longer the main path.
 
 ## 2. Primary Write Sequence
 
-The current end-to-end runtime is:
+The end-to-end runtime is:
 
 1. A local training script produces a model artifact.
 2. The SDK logs in with `POST /api/auth/login`.
@@ -205,7 +205,7 @@ Old shape:
 - `GET /api/v2/lifecycle?secret=...`
 - `GET /api/v2/lifecycle/download?secret=...&modelHash=...`
 
-Current shape:
+Final route shape:
 
 - `POST /api/v2/lifecycle/query`
 - `POST /api/v2/lifecycle/download`
@@ -219,9 +219,9 @@ The API vocabulary is intentionally split:
 - registry/list/detail endpoints use `isActive`
 - audit verification endpoints use `chainVerified`
 
-The older generic `verified` field is no longer the recommended wording for current UI or API docs.
+The older generic `verified` field is no longer the recommended wording for the final UI or API docs.
 
-## 9. Current Deployments
+## 9. Deployment Baseline
 
 Deployment metadata was refreshed on 2026-04-15 and written to `address_v2_multi.json`.
 
@@ -237,7 +237,7 @@ Primary write-path contracts:
   - `Groth16Verifier`: `0x7054577279D496DcF00E37FdBe9a192631e195D4`
   - `ZKProvenanceTracker`: `0x947a547ad9da78E12c3F2F4e1197787ADD9Ff61a`
 
-## 10. Not the Primary Path Today
+## 10. Not the Primary Path
 
 The following are still present in the repository, but they are not the main authenticated application flow:
 
@@ -247,7 +247,7 @@ The following are still present in the repository, but they are not the main aut
 - flat global `modelName -> id` cache semantics
 - embedding proof fields inside `trainingMetadata`
 
-That scope reduction is intentional. The current repository now tells one consistent story:
+That scope reduction is intentional. The repository now tells one consistent story:
 
 ```text
 SDK main write path

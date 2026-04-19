@@ -2,7 +2,7 @@
 
 An SDK-first prototype for AI model registration, verifier-gated provenance, lifecycle tracking, audit inspection, and authenticated model download across Sepolia and BSC testnet.
 
-## Current Primary Path
+## Primary Path
 
 The real write path in this repository is now:
 
@@ -26,7 +26,7 @@ The browser is no longer a public write console. The frontend is used to:
 
 Backend users are stored in the file-backed auth store at `server/data/auth_store.json` by default.
 
-This local username/password store is the current runnable prototype baseline. It should not be described as the final production authentication architecture.
+This local username/password store is the runnable prototype baseline in this repository. It should not be described as the final production authentication architecture.
 
 Default seeded account:
 
@@ -164,7 +164,7 @@ See [docs/API.md](./docs/API.md) and [docs/ZK_GUIDE.md](./docs/ZK_GUIDE.md) for 
 
 ## Verified On 2026-04-15
 
-These commands were re-run against the current code and current deployment metadata:
+These commands were re-run against the validated code and deployment metadata:
 
 ```bash
 npx hardhat compile --show-stack-traces
@@ -255,7 +255,7 @@ ai-project/
 ## Documentation
 
 - [docs/PROJECT_STATUS.md](./docs/PROJECT_STATUS.md)
-- [docs/CURRENT_ARCHITECTURE.md](./docs/CURRENT_ARCHITECTURE.md)
+- [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
 - [docs/API.md](./docs/API.md)
 - [docs/ZK_GUIDE.md](./docs/ZK_GUIDE.md)
 - [docs/DEPLOY_GUIDE.md](./docs/DEPLOY_GUIDE.md)

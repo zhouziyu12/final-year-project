@@ -1,6 +1,6 @@
 # User Manual
 
-This manual describes how to use the current application after the SDK-first write path refactor.
+This manual describes how to use the final repository-aligned application flow after the SDK-first write path refactor.
 
 ## 1. What Each Surface Is For
 
@@ -109,7 +109,7 @@ Shows:
 
 - backend-managed model index
 - model status and owner
-- whether a record is currently `ACTIVE`
+- whether a record is `ACTIVE`
 
 ### Audit
 
@@ -166,7 +166,7 @@ That is expected. Browser write mode was removed.
 Check:
 
 - backend `PRIVATE_KEY`
-- current deployment addresses in `address_v2_multi.json`
+- deployment addresses in `address_v2_multi.json`
 - bound wallet ownership expectations
 
 ### Lifecycle query returns `401`

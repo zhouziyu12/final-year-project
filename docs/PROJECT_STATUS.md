@@ -2,9 +2,9 @@
 
 Updated: 2026-04-15
 
-This document records the current implementation status after the ownership, authentication, lifecycle, and terminology drift cleanup.
+This document records the validated implementation baseline after the ownership, authentication, lifecycle, and terminology drift cleanup.
 
-## 1. Current System Statement
+## 1. Final System Statement
 
 The repository now presents one consistent primary workflow:
 
@@ -29,9 +29,9 @@ Implemented:
 
 Boundary note:
 
-- the current local username/password account store is a prototype-friendly baseline, not the final production identity stack
+- the local username/password account store in this repository is a prototype-friendly baseline, not the final production identity stack
 
-Current default seeded account:
+Default seeded account:
 
 - username: `researcher`
 - password: `researcher-demo-pass`
@@ -46,7 +46,7 @@ Implemented:
 - owner-scoped model resolution via `GET /api/v2/models/resolve`
 - owner-scoped backend index in `model_name_map.json`
 
-Current identity rule:
+Identity rule:
 
 ```text
 chain + owner + modelName
@@ -96,7 +96,7 @@ Implemented:
 - `statementHash` is the application term
 - `messageHash` is kept only for circuit compatibility
 
-## 3. Current Deployments
+## 3. Deployment Baseline
 
 Deployment metadata was refreshed and written to `address_v2_multi.json`.
 
@@ -132,7 +132,7 @@ These extension addresses are retained for completeness, but they are not part o
 
 ## 4. Validated On This Baseline
 
-Re-run on the current codebase:
+Re-run on the validated codebase:
 
 - `npx hardhat compile --show-stack-traces`
 - `python tests/test_sdk_backend.py`
@@ -147,7 +147,7 @@ Observed outcomes:
 - lifecycle access no longer exposes secrets in the request URL
 - proof outputs no longer overwrite each other across concurrent runs
 
-## 5. Current Truths
+## 5. Baseline Truths
 
 True today:
 

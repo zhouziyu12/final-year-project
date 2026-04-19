@@ -46,7 +46,7 @@ This mode is still useful for:
 
 The frontend is no longer a write mode toggle.
 
-Current browser responsibilities:
+Browser responsibilities:
 
 - health and system visibility
 - model registry browsing
@@ -79,7 +79,7 @@ cd client && npm run build
 
 ## 6. Deployment Metadata
 
-The current chain deployments are stored in:
+The chain deployments are stored in:
 
 - `address_v2_multi.json`
 
