@@ -1,0 +1,70 @@
+\documentclass[12pt,a4paper]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage{tocloft}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{caption}
+
+\geometry{margin=1in}
+\onehalfspacing
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  urlcolor=blue,
+  citecolor=black
+}
+
+\begin{document}
+
+\input{frontmatter/titlepage}
+
+% -------------------------
+% Front Matter
+% -------------------------
+\pagenumbering{roman}
+
+\input{frontmatter/abstract}
+
+\tableofcontents
+\addcontentsline{toc}{chapter}{Table of Contents}
+\newpage
+
+% -------------------------
+% Main Matter
+% -------------------------
+\clearpage
+\pagenumbering{arabic}
+
+\input{chapters/01_introduction}
+\input{chapters/02_background_and_motivation}
+\input{chapters/03_related_work}
+\input{chapters/04_research_gap_and_contributions}
+\input{chapters/05_method_and_system_design}
+\input{chapters/06_implementation}
+\input{chapters/07_evaluation}
+\input{chapters/08_project_management_and_reflection}
+\input{chapters/09_discussion_limitations_future_work}
+\input{chapters/10_conclusion}
+
+% -------------------------
+% Back Matter
+% -------------------------
+\bibliographystyle{plain}
+\bibliography{references}
+
+\appendix
+
+\input{appendices/appendix_a_system_screenshots}
+\input{appendices/appendix_b_api_and_contract_reference}
+\input{appendices/appendix_c_additional_evaluation_results}
+\input{appendices/appendix_d_project_timeline_and_supporting_materials}
+
+\end{document}
